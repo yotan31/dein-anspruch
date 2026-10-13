@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; connect-src 'self' https://*.supabase.co wss://*.supabase.co; img-src 'self' data: blob: https://*.supabase.co; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'wasm-unsafe-eval'; worker-src 'self' blob: https://cdn.jsdelivr.net; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://cdn.jsdelivr.net data: blob:; img-src 'self' data: blob: https://*.supabase.co; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'self'">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex, nofollow">
 <meta name="description" content="Pflegegrad oder Schwerbehinderung: Welche Leistungen stehen noch zu? Mit fertigen Anträgen, Belege-Ablage und Fristen.">
@@ -152,6 +152,14 @@ ol.howsend{margin:0;padding-left:1.4em;display:flex;flex-direction:column;gap:12
 .btnrow.big .btn{min-height:52px}
 .pending{display:flex;flex-direction:column;gap:14px}
 .thumb.big{width:110px;height:140px}
+.minis{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
+.panel.mini{padding:16px;gap:12px}
+.panel.mini.warn{border-color:var(--warn)}
+.mini-head{display:flex;gap:12px;align-items:flex-start}
+.mini-head>svg{width:24px;height:24px;color:var(--accent);margin-top:2px}
+.mini-head>div{flex:1;min-width:0}
+.mini-num{text-align:right;flex:none!important}
+.mini-num b{display:block;font-family:var(--f-display);font-size:1.6rem;color:var(--money);font-variant-numeric:tabular-nums;line-height:1.1}
 .yearchips{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 .notice{border-radius:12px;padding:12px 14px;font-size:.93rem;background:var(--warn-soft);color:var(--ink);display:flex;gap:10px;align-items:flex-start}
 .notice svg{color:var(--warn);margin-top:2px}
