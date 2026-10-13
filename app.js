@@ -725,7 +725,7 @@ function bescheidCard(){
   if(bescheidDraft) return bescheidForm();
   if(!i) return `<section class="panel mini">
      <div class="mini-head">${ic("file")}<div><h3>Bescheid oder Gutachten bekommen?</h3><p class="small muted">Foto machen: Wir prüfen, ob sich ein Widerspruch lohnt, und behalten die Frist im Blick.</p></div></div>
-     <div class="btnrow"><button class="btn small" type="button" data-act="bes-cam">${ic("camera")}Foto machen</button><button class="btn small ghost" type="button" data-act="bes-manual">Abtippen</button></div>
+     <div class="btnrow"><button class="btn small" type="button" data-act="bes-cam">${ic("camera")}Foto machen</button><button class="btn small ghost" type="button" data-act="bes-manual">Abtippen</button><button class="linkbtn" type="button" data-act="r-start">Pflegegrad selbst einschätzen</button></div>
    </section>`;
   const tage=i.frist?daysUntil(i.frist):null;
   const lohnt = (i.knapp||i.abgelehnt) && i.offen;
@@ -803,6 +803,296 @@ function entlCard(){
     <div class="btnrow"><button class="btn small" type="button" data-act="entl-add">${ic("plus")}Rechnung erfassen</button><button class="btn small ghost" type="button" data-wopen="entlastung">Erstattung beantragen</button>
       <label class="small muted" style="display:flex;align-items:center;gap:6px">Pflegegrad seit <input type="month" id="entl-seit" value="${esc(S.entlSeit||"")}" style="width:auto;padding:4px 8px"></label></div>
   </section>`;
+}
+
+
+/* ---------- Pflegegrad-Rechner (Selbsteinschätzung nach dem Begutachtungsinstrument) ---------- */
+const SELB=[["0","Selbstständig","schafft es allein"],["1","Überwiegend selbstständig","braucht ab und zu etwas Hilfe"],["2","Überwiegend unselbstständig","schafft nur einen kleinen Teil allein"],["3","Unselbstständig","schafft es nicht allein"]];
+const FAEH=[["0","Ja, ohne Probleme",""],["1","Meistens",""],["2","Nur selten",""],["3","Nein, gar nicht",""]];
+const HAEUF=[["0","Nie",""],["1","Selten","1- bis 3-mal im Monat"],["3","Oft","mehrmals pro Woche"],["5","Täglich",""]];
+const RQ=[
+ {m:1,q:"Im Bett die Lage wechseln (umdrehen, aufsetzen)",o:SELB},
+ {m:1,q:"Sicher sitzen, ohne zur Seite zu kippen",o:SELB},
+ {m:1,q:"Aufstehen vom Stuhl oder Bett und sich umsetzen",o:SELB},
+ {m:1,q:"In der Wohnung von Raum zu Raum gehen",o:SELB},
+ {m:1,q:"Treppen steigen",o:SELB},
+ {m:2,q:"Erkennt vertraute Personen aus dem Umfeld",o:FAEH},
+ {m:2,q:"Weiß, welcher Tag und welche Tageszeit ist",o:FAEH},
+ {m:2,q:"Trifft Entscheidungen im Alltag (z. B. was anziehen)",o:FAEH},
+ {m:2,q:"Kann einem Gespräch folgen und es verstehen",o:FAEH},
+ {m:3,q:"Ist nachts unruhig, läuft umher oder ruft",o:HAEUF},
+ {m:3,q:"Wehrt sich gegen Pflege oder Hilfe",o:HAEUF},
+ {m:3,q:"Hat starke Ängste oder ist sehr niedergeschlagen",o:HAEUF},
+ {m:4,q:"Oberkörper waschen",o:SELB,w:1},
+ {m:4,q:"Duschen oder baden (inkl. Haare waschen)",o:SELB,w:1},
+ {m:4,q:"Oberkörper an- und auskleiden",o:SELB,w:1},
+ {m:4,q:"Unterkörper an- und auskleiden (Hose, Socken, Schuhe)",o:SELB,w:1},
+ {m:4,q:"Essen (mundgerecht zubereitetes Essen zum Mund führen)",o:SELB,w:3},
+ {m:4,q:"Trinken (genug und selbstständig)",o:SELB,w:2},
+ {m:4,q:"Toilette benutzen",o:SELB,w:2},
+ {m:5,q:"Wie oft wird Hilfe bei Medikamenten, Spritzen, Verbänden oder Messungen gebraucht?",o:[["0","Nie oder selten",""],["1","Wöchentlich",""],["3","Täglich",""],["5","Mehrmals täglich",""]]},
+ {m:5,q:"Wie oft muss jemand zu Arzt- oder Therapieterminen begleiten?",o:[["0","Nie",""],["1","Etwa einmal im Monat",""],["2","Jede Woche",""]]},
+ {m:6,q:"Den Tag einteilen und sich an Abläufe halten",o:SELB},
+ {m:6,q:"Sich sinnvoll beschäftigen",o:SELB},
+ {m:6,q:"Kontakt zu Familie, Nachbarn, Freunden halten",o:SELB},
+];
+const MOD={1:{n:"Mobilität",max:15,t:[[2,2.5],[4,5],[6,7.5],[10,10]]},2:{n:"Verstehen und Erinnern",max:33,t:[[2,3.75],[6,7.5],[11,11.25],[17,15]]},3:{n:"Verhalten und Psyche",t:[[1,3.75],[3,7.5],[5,11.25],[7,15]]},4:{n:"Selbstversorgung",max:54,t:[[3,10],[8,20],[19,30],[37,40]]},5:{n:"Krankheitsbedingte Hilfe",t:[[1,5],[2,10],[4,15],[6,20]]},6:{n:"Alltag und Kontakte",max:18,t:[[1,3.75],[4,7.5],[7,11.25],[12,15]]}};
+let RECHNER=null; // {i, a:[]}
+function rechnerErgebnis(a){
+  const roh={1:0,2:0,3:0,4:0,5:0,6:0}, mx={1:0,2:0,3:0,4:0,5:0,6:0};
+  RQ.forEach((q,i)=>{ const v=Number(a[i]||0)*(q.w||1); roh[q.m]+=v; mx[q.m]+=Number(q.o[q.o.length-1][0])*(q.w||1) });
+  const gew={};
+  for(const m of [1,2,3,4,5,6]){
+    let r=roh[m]; if(MOD[m].max && mx[m]) r=r/mx[m]*MOD[m].max; // auf das echte Modul hochrechnen
+    let g=0; MOD[m].t.forEach(([ab,p])=>{ if(r>=ab-1e-9) g=p }); gew[m]=g;
+  }
+  const m23=Math.max(gew[2],gew[3]);
+  const summe=gew[1]+m23+gew[4]+gew[5]+gew[6];
+  return {summe,grad:pgAusPunkten(summe),gew,m23};
+}
+function startRechner(){ RECHNER={i:0,a:[]}; render(); scrollTop() }
+function viewRechner(){
+  const R=RECHNER, n=RQ.length;
+  if(R.i>=n){
+    const e=rechnerErgebnis(R.a); const hat=(typeof USER!=='undefined'&&USER)||(typeof GUEST!=='undefined'&&GUEST); const aktuell=pg();
+    const next=e.grad<5?PG_GRENZEN[e.grad]:null;
+    const bars=[[1,"Mobilität",10,e.gew[1]],[23,"Verstehen / Verhalten",15,e.m23],[4,"Selbstversorgung",40,e.gew[4]],[5,"Krankheitsbedingte Hilfe",20,e.gew[5]],[6,"Alltag und Kontakte",15,e.gew[6]]];
+    return `<section class="panel wiz">
+      <div class="wiztop"><button type="button" class="btn small ghost" data-act="r-close">← Schließen</button><span class="small muted">Pflegegrad-Rechner</span></div>
+      <h2 class="wq">${e.grad?`Voraussichtlich Pflegegrad ${e.grad}`:"Voraussichtlich noch kein Pflegegrad"}</h2>
+      <p class="whelp">${ic("info")}<span>Geschätzt ${String(e.summe.toFixed(1)).replace(".",",")} von 100 Punkten.${next?` Ab ${String(next).replace(".",",")} Punkten gäbe es Pflegegrad ${e.grad+1}.`:""} Das ist eine Schätzung. Die Entscheidung trifft der Medizinische Dienst bei einem Hausbesuch.</span></p>
+      <div class="rbars">${bars.map(([k,l,mx,v])=>`<div><span>${l}</span><div class="track"><i style="width:${Math.round(v/mx*100)}%"></i></div><b>${String(v).replace(".",",")}</b></div>`).join("")}</div>
+      ${e.grad>=1&&(!aktuell||e.grad>aktuell)?`<p class="notice good">${ic("check")}<span>${aktuell?`Das wäre höher als der jetzige Pflegegrad ${aktuell}. Ein Antrag auf Höherstufung kann sich lohnen.`:"Ein Antrag auf einen Pflegegrad kann sich lohnen. Ab Pflegegrad 1 gibt es schon 131 € im Monat Entlastungsbetrag und mehr."}</span></p>`:""}
+      <div class="btnrow big">${hat?(e.grad>=1&&(!aktuell||e.grad>aktuell)?`<button class="btn" type="button" data-act="r-antrag">${aktuell?"Höherstufung beantragen":"Pflegegrad beantragen"}</button>`:"")
+        :`<button class="btn" type="button" data-act="r-konto">Antrag vorbereiten (kostenlos)</button>`}
+        <button class="btn ghost" type="button" data-act="r-neu">Noch einmal</button></div>
+    </section>`;
+  }
+  const q=RQ[R.i];
+  return `<section class="panel wiz">
+    <div class="wiztop"><button type="button" class="btn small ghost" data-act="r-close">← Schließen</button><span class="small muted">Pflegegrad-Rechner · ${MOD[q.m].n}</span></div>
+    ${bar(R.i+1,n,`Frage ${R.i+1} von ${n}`)}
+    ${R.i===0?`<p class="small muted">Beantworte die Fragen so, wie es an einem normalen Tag ist, nicht an einem besonders guten.</p>`:""}
+    <h2 class="wq">${esc(q.q)}</h2>
+    <div class="choices big">${q.o.map(([v,t,s])=>`<label class="choice" for="rq-${v}"><input type="radio" id="rq-${v}" name="rq" data-rq="${v}" ${R.a[R.i]===v?"checked":""}><span>${esc(t)}${s?`<small>${esc(s)}</small>`:""}</span></label>`).join("")}</div>
+    <div class="nav big">${R.i>0?`<button class="btn ghost" type="button" data-act="r-back">Zurück</button>`:"<span></span>"}${R.a[R.i]!=null?`<button class="btn" type="button" data-act="r-next">Weiter</button>`:""}</div>
+  </section>`;
+}
+
+
+/* ---------- Anbieter vor Ort finden ---------- */
+const LOTSE="https://www.pflegelotse.de/";
+const FINDER={
+ tagespflege:[["Tagespflege in der Nähe","Tagespflege"],["Pflegelotse der Ersatzkassen (mit Preisen)",LOTSE]],
+ entlastung:[["Anerkannte Alltagshilfen (AOK-Pflegenavigator, für alle nutzbar)","https://www.aok.de/pk/cl/uni/pflege/pflegenavigator/unterstuetzungsangebote/"],["Nachbarschaftshilfe in der Nähe","Nachbarschaftshilfe"],["Alltagsbegleitung in der Nähe","Alltagsbegleitung Senioren"]],
+ sachleistung:[["Pflegedienste in der Nähe","ambulanter Pflegedienst"],["Pflegelotse der Ersatzkassen (mit Preisen)",LOTSE]],
+ jahresbetrag:[["Kurzzeitpflege in der Nähe","Kurzzeitpflege"],["Pflegelotse der Ersatzkassen",LOTSE]],
+ verbrauch:[["Sanitätshaus in der Nähe","Sanitätshaus"],["Apotheke in der Nähe","Apotheke"]],
+ technisch:[["Sanitätshaus in der Nähe","Sanitätshaus"],["Hausnotruf-Anbieter in der Nähe","Hausnotruf"]],
+ wohnumfeld:[["Wohnberatung in der Nähe","Wohnberatung barrierefrei"]],
+ beratung:[["Pflegestützpunkt in der Nähe","Pflegestützpunkt"],["Beratungsstellen-Suche des ZQP","https://www.zqp.de/beratung-pflege/"]],
+ stationaer:[["Pflegeheime vergleichen (Pflegelotse)",LOTSE]],
+ pflegekurs:[["Pflegekurse in der Nähe","Pflegekurs Angehörige"]],
+};
+function plz(){ const m=String(S.person.ort||"").match(/\b\d{5}\b/); return m?m[0]:(S.plz||"") }
+function finderHTML(k){
+  const L=FINDER[k]; if(!L) return "";
+  const p=plz();
+  return `<div><h4>In der Nähe finden</h4>
+    ${p?"":`<div class="field" style="max-width:220px;margin-bottom:8px"><label for="plz-${k}">Deine Postleitzahl</label><input type="text" inputmode="numeric" id="plz-${k}" data-plz="1" maxlength="5" placeholder="z. B. 70173"></div>`}
+    <div class="btnrow">${L.map(([t,q])=>{const url=/^https?:/.test(q)?q:`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q+" "+(p||""))}`;return `<a class="btn small soft" href="${url}" target="_blank" rel="noopener">${esc(t)}</a>`}).join("")}</div>
+    <p class="small muted">Neutral: Wir bekommen für diese Links kein Geld. Bei Anrufen „im Auftrag der Pflegekasse“ bitte vorsichtig sein.</p></div>`;
+}
+
+
+/* ---------- Sprachen: Oberfläche, Fragebogen und Rechner übersetzt; Anträge bleiben Deutsch ---------- */
+const LANGS=[["de","Deutsch"],["tr","Türkçe"],["ru","Русский"],["ar","العربية"],["ti","ትግርኛ"]];
+// Reihenfolge je Eintrag: Türkisch, Russisch, Arabisch, Tigrinya
+const T={
+"Willkommen":["Hoş geldiniz","Добро пожаловать","مرحبًا","እንቋዕ ብደሓን መጻእኩም"],
+"Melde dich an, um deine Angaben und Belege zu sehen.":["Bilgilerinizi ve belgelerinizi görmek için giriş yapın.","Войдите, чтобы увидеть свои данные и документы.","سجّل الدخول لرؤية بياناتك ومستنداتك.","ሓበሬታኹምን ሰነዳትኩምን ንምርኣይ እተዉ።"],
+"Mit Google anmelden":["Google ile giriş yap","Войти через Google","تسجيل الدخول عبر Google","ብGoogle እተዉ"],
+"oder mit E-Mail":["veya e-posta ile","или по эл. почте","أو بالبريد الإلكتروني","ወይ ብኢመይል"],
+"E-Mail-Adresse":["E-posta adresi","Адрес эл. почты","البريد الإلكتروني","ኣድራሻ ኢመይል"],
+"Passwort":["Şifre","Пароль","كلمة المرور","መሕለፊ ቃል"],
+"Anmelden":["Giriş yap","Войти","تسجيل الدخول","እቶ"],
+"Konto anlegen":["Hesap oluştur","Создать аккаунт","إنشاء حساب","ሕሳብ ክፈት"],
+"Neu hier? Konto anlegen":["Yeni misiniz? Hesap oluşturun","Впервые здесь? Создайте аккаунт","جديد هنا؟ أنشئ حسابًا","ሓዱሽ ዲኹም? ሕሳብ ክፈቱ"],
+"Passwort vergessen?":["Şifrenizi mi unuttunuz?","Забыли пароль?","نسيت كلمة المرور؟","መሕለፊ ቃል ረሲዕኩም?"],
+"Ich habe schon ein Konto":["Zaten hesabım var","У меня уже есть аккаунт","لدي حساب بالفعل","ሕሳብ ኣሎኒ"],
+"Ohne Konto ausprobieren":["Hesapsız deneyin","Попробовать без аккаунта","جرّب بدون حساب","ብዘይ ሕሳብ ፈትኑ"],
+"Zeigen":["Göster","Показать","إظهار","ኣርኢ"],
+"Abmelden":["Çıkış","Выйти","تسجيل الخروج","ውጻእ"],
+"Ansprüche":["Haklar","Права","الاستحقاقات","መሰላት"],
+"Belege":["Belgeler","Документы","الإيصالات","ሰነዳት"],
+"Termine":["Tarihler","Сроки","المواعيد","ቆጸራታት"],
+"Noch offen an Geld und Budgets pro Jahr":["Yıllık henüz kullanılmayan para ve bütçe","Ещё не использовано денег и бюджетов в год","مبالغ وميزانيات غير مستخدمة سنويًا","ኣብ ዓመት ዘይተጠቐምኩምሉ ገንዘብን በጀትን"],
+"offene Punkte":["açık konu","открытых пунктов","بنود مفتوحة","ክፉት ነጥብታት"],
+"Angaben ändern":["Bilgileri değiştir","Изменить данные","تعديل البيانات","ሓበሬታ ቀይር"],
+"Welche Hilfen stehen dir noch zu?":["Hangi yardımlara hâlâ hakkınız var?","На какую помощь вы ещё имеете право?","ما المساعدات التي لا تزال تستحقها؟","ኣየኖት ሓገዛት ገና ይግብኡኹም?"],
+"Viele Familien nutzen nur das Pflegegeld. Dabei sind oft mehrere tausend Euro im Jahr zusätzlich drin, etwa für Haushaltshilfe, Ersatzpflege oder Hilfsmittel.":["Birçok aile yalnızca bakım parasını kullanıyor. Oysa ev yardımı, yedek bakım veya yardımcı araçlar için yılda birkaç bin euro daha mümkün.","Многие семьи получают только пособие по уходу. А ведь часто можно получить ещё несколько тысяч евро в год — на помощь по дому, замену ухаживающего или вспомогательные средства.","كثير من العائلات تستخدم بدل الرعاية فقط، مع أنه يمكن غالبًا الحصول على عدة آلاف يورو إضافية سنويًا للمساعدة المنزلية أو الرعاية البديلة أو الوسائل المساعدة.","ብዙሓት ስድራቤታት ገንዘብ ክንክን ጥራይ ይወስዱ። ግን ንሓገዝ ገዛ፡ ተክኢ ክንክን ወይ መሳርሒታት ብዙሕ ኣሽሓት ዩሮ ተወሳኺ ይርከብ።"],
+"Ein paar Fragen, etwa 3 Minuten. Danach siehst du deine offenen Ansprüche mit fertigen Anträgen.":["Birkaç soru, yaklaşık 3 dakika. Ardından hazır başvurularla açık haklarınızı görürsünüz.","Несколько вопросов, около 3 минут. Затем вы увидите свои права и готовые заявления.","بضعة أسئلة، حوالي 3 دقائق. بعدها ترى استحقاقاتك مع طلبات جاهزة.","ቁሩብ ሕቶታት፡ ኣስታት 3 ደቒቕ። ድሕሪኡ መሰላትኩምን ድሉዋት መመልከቲታትን ትርእዩ።"],
+"Für wen nutzt du die App?":["Uygulamayı kimin için kullanıyorsunuz?","Для кого вы используете приложение?","لمن تستخدم التطبيق؟","ነመን ኢኹም እዚ ኣፕ ትጥቀሙ?"],
+"Für mich selbst":["Kendim için","Для себя","لنفسي","ንርእሰይ"],
+"ich bin pflegebedürftig oder schwerbehindert":["bakıma muhtacım veya ağır engelliyim","мне нужен уход или у меня инвалидность","أحتاج رعاية أو لدي إعاقة شديدة","ክንክን የድልየኒ ወይ ከቢድ ስንክልና ኣለኒ"],
+"Für eine angehörige Person":["Bir yakınım için","Для родственника","لأحد أقاربي","ንሓደ ቤተሰብ"],
+"ich pflege oder kümmere mich":["bakıyorum veya ilgileniyorum","я ухаживаю или забочусь","أقوم بالرعاية أو الاهتمام","ኣነ እየ ዝከናኸን"],
+"Worum geht es?":["Konu nedir?","О чём идёт речь?","ما الموضوع؟","ብዛዕባ እንታይ እዩ?"],
+"Beides ist möglich.":["İkisi de mümkün.","Можно выбрать оба.","يمكن اختيار الاثنين.","ክልቲኡ ይከኣል።"],
+"Pflegegrad / Pflegebedürftigkeit":["Bakım derecesi / bakım ihtiyacı","Степень ухода / потребность в уходе","درجة الرعاية / الحاجة للرعاية","ደረጃ ክንክን"],
+"Schwerbehinderung / GdB":["Ağır engellilik / engel derecesi","Инвалидность / степень инвалидности","إعاقة شديدة / درجة الإعاقة","ከቢድ ስንክልና"],
+"Los geht's":["Başlayalım","Начать","ابدأ","ንጀምር"],
+"Weiter":["İleri","Далее","التالي","ቀጽል"],
+"Zurück":["Geri","Назад","رجوع","ተመለስ"],
+"Weiß ich nicht":["Bilmiyorum","Не знаю","لا أعرف","ኣይፈልጥን"],
+"Speichern":["Kaydet","Сохранить","حفظ","ኣቐምጥ"],
+"Abbrechen":["İptal","Отмена","إلغاء","ሰርዝ"],
+"Schließen":["Kapat","Закрыть","إغلاق","ዕጸው"],
+"← Schließen":["← Kapat","← Закрыть","← إغلاق","← ዕጸው"],
+"← Zur Übersicht":["← Genel bakış","← К обзору","← إلى النظرة العامة","← ናብ ሓፈሻዊ"],
+"Ergebnis anzeigen":["Sonucu göster","Показать результат","عرض النتيجة","ውጽኢት ኣርኢ"],
+"Pflegegrad und Wohnsituation":["Bakım derecesi ve yaşam durumu","Степень ухода и условия проживания","درجة الرعاية وظروف السكن","ደረጃ ክንክንን ኩነታት መንበሪን"],
+"Welcher Pflegegrad ist festgestellt?":["Hangi bakım derecesi belirlendi?","Какая степень ухода установлена?","ما درجة الرعاية المحددة؟","ኣየናይ ደረጃ ክንክን ተወሲኑ?"],
+"Noch keiner":["Henüz yok","Ещё нет","لا يوجد بعد","ገና የለን"],
+"oder Antrag läuft":["veya başvuru sürüyor","или заявление на рассмотрении","أو الطلب قيد المعالجة","ወይ መመልከቲ ኣብ መስርሕ"],
+"Wo und wie wird gepflegt?":["Bakım nerede ve nasıl yapılıyor?","Где и как осуществляется уход?","أين وكيف تتم الرعاية؟","ክንክን ኣበይን ከመይን ይግበር?"],
+"Bei welcher Krankenkasse bist du versichert?":["Hangi sağlık sigortasındasınız?","В какой больничной кассе вы застрахованы?","ما هو صندوق التأمين الصحي الخاص بك؟","ኣብ ኣየናይ ናይ ሕክምና መድሕን ኢኹም?"],
+"Bei welcher Krankenkasse ist die Person versichert?":["Kişi hangi sağlık sigortasında?","В какой больничной кассе застрахован человек?","ما هو صندوق التأمين الصحي للشخص؟","እቲ ሰብ ኣብ ኣየናይ መድሕን እዩ?"],
+"Die Pflegekasse gehört immer zur Krankenkasse. Dorthin gehen die Anträge.":["Bakım sigortası her zaman sağlık sigortasına bağlıdır. Başvurular oraya gider.","Касса по уходу всегда относится к больничной кассе. Туда направляются заявления.","صندوق الرعاية تابع دائمًا لصندوق التأمين الصحي. إليه تُرسل الطلبات.","መድሕን ክንክን ኩሉ ግዜ ምስ መድሕን ሕክምና እዩ። መመልከቲታት ናብኡ ይኸዱ።"],
+"Wer pflegt im Alltag?":["Günlük bakımı kim yapıyor?","Кто ухаживает в повседневной жизни?","من يقدّم الرعاية يوميًا؟","መዓልታዊ መን ይከናኸን?"],
+"Ja":["Evet","Да","نعم","እወ"],
+"Nein":["Hayır","Нет","لا","ኣይፋል"],
+"Weiß nicht":["Bilmiyorum","Не знаю","لا أعرف","ኣይፈልጥን"],
+"Schwerbehinderung":["Ağır engellilik","Инвалидность","الإعاقة الشديدة","ከቢድ ስንክልና"],
+"Was bekommt ihr schon?":["Şu an neler alıyorsunuz?","Что вы уже получаете?","ماذا تحصلون عليه بالفعل؟","ሕጂ እንታይ ትረኽቡ?"],
+"Was bekommst du schon?":["Şu an neler alıyorsunuz?","Что вы уже получаете?","ماذا تحصل عليه بالفعل؟","ሕጂ እንታይ ትረኽብ?"],
+"Angaben für die Anträge":["Başvurular için bilgiler","Данные для заявлений","بيانات للطلبات","ሓበሬታ ንመመልከቲታት"],
+"Vor- und Nachname":["Ad ve soyad","Имя и фамилия","الاسم الكامل","ሽምን ስም ኣቦን"],
+"Geburtsdatum":["Doğum tarihi","Дата рождения","تاريخ الميلاد","ዕለተ ልደት"],
+"Versichertennummer":["Sigorta numarası","Номер страховки","رقم التأمين","ቁጽሪ መድሕን"],
+"Deine offenen Ansprüche":["Açık haklarınız","Ваши открытые права","استحقاقاتك المفتوحة","ክፉታት መሰላትኩም"],
+"Antippen für Antrag und Checkliste":["Başvuru ve kontrol listesi için dokunun","Нажмите для заявления и списка","اضغط للطلب وقائمة التحقق","ንመመልከቲ ጠውቑ"],
+"Antrag ausfüllen":["Başvuruyu doldur","Заполнить заявление","املأ الطلب","መመልከቲ ምላእ"],
+"So läuft es ab":["Nasıl işliyor","Как это происходит","كيف تسير الأمور","ከመይ ይኸይድ"],
+"Diese Unterlagen brauchst du":["Gerekli belgeler","Нужные документы","المستندات المطلوبة","ዘድልዩ ሰነዳት"],
+"In der Nähe finden":["Yakında bul","Найти поблизости","ابحث بالقرب منك","ኣብ ቀረባ ድለ"],
+"Dein Antrag ist fertig":["Başvurunuz hazır","Ваше заявление готово","طلبك جاهز","መመልከቲኹም ድሉው እዩ"],
+"Stimmt alles?":["Her şey doğru mu?","Всё верно?","هل كل شيء صحيح؟","ኩሉ ቅኑዕ ድዩ?"],
+"Antrag erstellen":["Başvuru oluştur","Создать заявление","إنشاء الطلب","መመልከቲ ፍጠር"],
+"Ändern":["Değiştir","Изменить","تعديل","ቀይር"],
+"Als PDF speichern":["PDF olarak kaydet","Сохранить как PDF","حفظ كملف PDF","ከም PDF ኣቐምጥ"],
+"Text kopieren":["Metni kopyala","Скопировать текст","نسخ النص","ጽሑፍ ቅዳሕ"],
+"So schickst du ihn ab":["Nasıl gönderilir","Как отправить","كيفية الإرسال","ከመይ ትሰዶ"],
+"Ich habe den Antrag abgeschickt":["Başvuruyu gönderdim","Я отправил(а) заявление","لقد أرسلت الطلب","መመልከቲ ሰዲደ"],
+"Bescheid oder Gutachten bekommen?":["Karar veya bilirkişi raporu mu aldınız?","Получили решение или заключение?","هل وصلك قرار أو تقرير؟","ውሳነ ወይ ጸብጻብ መጺኡኩም?"],
+"Foto machen":["Fotoğraf çek","Сфотографировать","التقط صورة","ስእሊ ኣልዕል"],
+"Abtippen":["Elle gir","Ввести вручную","إدخال يدوي","ብኢድ ጽሓፍ"],
+"Pflegegrad selbst einschätzen":["Bakım derecesini kendiniz tahmin edin","Оценить степень ухода самостоятельно","قدّر درجة الرعاية بنفسك","ደረጃ ክንክን ባዕልኹም ገምግሙ"],
+"Entlastungsbetrag":["Rahatlatma tutarı","Сумма разгрузки","مبلغ التخفيف","ናይ ምፍኳስ ገንዘብ"],
+"jetzt frei":["şu an kullanılabilir","доступно сейчас","متاح الآن","ሕጂ ዘሎ"],
+"Rechnung erfassen":["Fatura ekle","Добавить счёт","أضف فاتورة","ፋክቱራ ኣእቱ"],
+"Erstattung beantragen":["İade talep et","Запросить возмещение","اطلب الاسترداد","ምምላስ ሕተት"],
+"Foto aufnehmen":["Fotoğraf çek","Сделать фото","التقط صورة","ስእሊ ኣልዕል"],
+"Datei wählen":["Dosya seç","Выбрать файл","اختر ملفًا","ፋይል ምረጽ"],
+"Ohne Foto erfassen":["Fotoğrafsız ekle","Добавить без фото","أضف بدون صورة","ብዘይ ስእሊ ኣእቱ"],
+"Bearbeiten":["Düzenle","Изменить","تعديل","ኣመሓይሽ"],
+"Löschen":["Sil","Удалить","حذف","ሰርዝ"],
+"Beleg speichern":["Belgeyi kaydet","Сохранить документ","حفظ الإيصال","ሰነድ ኣቐምጥ"],
+"Fristen und Erinnerungen":["Süreler ve hatırlatmalar","Сроки и напоминания","المواعيد والتذكيرات","ግዜ ገደባትን መዘኻኸሪታትን"],
+"Erinnerungen per E-Mail":["E-posta ile hatırlatmalar","Напоминания по эл. почте","تذكيرات بالبريد الإلكتروني","መዘኻኸሪ ብኢመይል"],
+"Einschalten":["Aç","Включить","تشغيل","ኣወልዕ"],
+"Ausschalten":["Kapat","Выключить","إيقاف","ኣጥፍእ"],
+"Beratungsbesuch":["Danışma ziyareti","Консультационный визит","زيارة استشارية","ናይ ምኽሪ በጻሕ"],
+"Eigene Erinnerung":["Kendi hatırlatman","Своё напоминание","تذكير خاص","ናይ ገዛእ ርእስኻ መዘኻኸሪ"],
+"Hinzufügen":["Ekle","Добавить","إضافة","ወስኽ"],
+"Für wen?":["Kimin için?","Для кого?","لمن؟","ንመን?"],
+"Weitere Person anlegen":["Başka kişi ekle","Добавить человека","أضف شخصًا آخر","ካልእ ሰብ ወስኽ"],
+"Gemeinsam pflegen":["Birlikte bakım","Ухаживать вместе","الرعاية معًا","ብሓባር ምክንካን"],
+"Jemanden einladen":["Birini davet et","Пригласить","ادعُ شخصًا","ሓደ ሰብ ዕደም"],
+"Link kopieren":["Bağlantıyı kopyala","Скопировать ссылку","نسخ الرابط","ሊንክ ቅዳሕ"],
+"Pflegegrad-Rechner":["Bakım derecesi hesaplayıcı","Калькулятор степени ухода","حاسبة درجة الرعاية","መቑጸሪ ደረጃ ክንክን"],
+"Selbstständig":["Bağımsız","Самостоятельно","مستقل","ብርእሱ"],
+"schafft es allein":["tek başına yapabiliyor","справляется сам(а)","يستطيع وحده","በይኑ ይኽእል"],
+"Überwiegend selbstständig":["Çoğunlukla bağımsız","В основном самостоятельно","مستقل في الغالب","ብዙሕ ግዜ ብርእሱ"],
+"braucht ab und zu etwas Hilfe":["ara sıra biraz yardım gerekiyor","иногда нужна небольшая помощь","يحتاج أحيانًا لبعض المساعدة","ሓደሓደ ግዜ ሓገዝ የድልዮ"],
+"Überwiegend unselbstständig":["Çoğunlukla bağımlı","В основном несамостоятельно","معتمد في الغالب","ብዙሕ ግዜ ሓገዝ የድልዮ"],
+"schafft nur einen kleinen Teil allein":["sadece küçük bir kısmını yapabiliyor","справляется лишь с малой частью","يستطيع جزءًا صغيرًا فقط","ንእሽቶ ክፋል ጥራይ ይኽእል"],
+"Unselbstständig":["Bağımlı","Несамостоятельно","غير مستقل","ብርእሱ ኣይኽእልን"],
+"schafft es nicht allein":["tek başına yapamıyor","не справляется сам(а)","لا يستطيع وحده","በይኑ ኣይኽእልን"],
+"Ja, ohne Probleme":["Evet, sorunsuz","Да, без проблем","نعم، بدون مشاكل","እወ፡ ብዘይ ጸገም"],
+"Meistens":["Çoğunlukla","Обычно","غالبًا","መብዛሕትኡ ግዜ"],
+"Nur selten":["Nadiren","Редко","نادرًا","ሳሕቲ"],
+"Nein, gar nicht":["Hayır, hiç","Нет, совсем нет","لا، إطلاقًا","ኣይፋል፡ ፈጺሙ"],
+"Nie":["Hiç","Никогда","أبدًا","ፈጺሙ"],
+"Selten":["Nadiren","Редко","نادرًا","ሳሕቲ"],
+"Oft":["Sık","Часто","كثيرًا","ብዙሕ ግዜ"],
+"Täglich":["Her gün","Ежедневно","يوميًا","መዓልታዊ"],
+"Im Bett die Lage wechseln (umdrehen, aufsetzen)":["Yatakta pozisyon değiştirmek (dönmek, oturmak)","Менять положение в кровати (повернуться, сесть)","تغيير الوضعية في السرير (التقلب، الجلوس)","ኣብ ዓራት ኣቀማምጣ ምቕያር"],
+"Sicher sitzen, ohne zur Seite zu kippen":["Yana devrilmeden güvenle oturmak","Устойчиво сидеть, не заваливаясь","الجلوس بثبات دون الميل","ብዘይ ምውዳቕ ብድሕነት ምቕማጥ"],
+"Aufstehen vom Stuhl oder Bett und sich umsetzen":["Sandalyeden veya yataktan kalkmak","Вставать со стула или кровати и пересаживаться","النهوض من الكرسي أو السرير والانتقال","ካብ መንበር ወይ ዓራት ምትሳእ"],
+"In der Wohnung von Raum zu Raum gehen":["Evde odadan odaya yürümek","Передвигаться по квартире из комнаты в комнату","التنقل في البيت من غرفة لأخرى","ኣብ ገዛ ካብ ክፍሊ ናብ ክፍሊ ምኻድ"],
+"Treppen steigen":["Merdiven çıkmak","Подниматься по лестнице","صعود الدرج","ደረጃ ምድያብ"],
+"Erkennt vertraute Personen aus dem Umfeld":["Tanıdık kişileri tanıyor","Узнаёт знакомых людей","يتعرّف على الأشخاص المألوفين","ፍሉጣት ሰባት ይፈልጥ"],
+"Weiß, welcher Tag und welche Tageszeit ist":["Hangi gün ve saat olduğunu biliyor","Знает, какой день и время суток","يعرف اليوم ووقت النهار","መዓልትን ሰዓትን ይፈልጥ"],
+"Trifft Entscheidungen im Alltag (z. B. was anziehen)":["Günlük kararlar veriyor (ör. ne giyeceği)","Принимает повседневные решения (напр., что надеть)","يتخذ قرارات يومية (مثل ماذا يلبس)","መዓልታዊ ውሳነታት ይገብር"],
+"Kann einem Gespräch folgen und es verstehen":["Bir konuşmayı takip edip anlayabiliyor","Может следить за разговором и понимать его","يستطيع متابعة الحديث وفهمه","ዘረባ ክከታተልን ክርድእን ይኽእል"],
+"Ist nachts unruhig, läuft umher oder ruft":["Geceleri huzursuz, dolaşıyor veya bağırıyor","Ночью беспокоен, бродит или зовёт","مضطرب ليلًا، يتجول أو ينادي","ለይቲ ዘይህዱእ፡ ይዘውር ወይ ይጸዊዕ"],
+"Wehrt sich gegen Pflege oder Hilfe":["Bakıma veya yardıma karşı çıkıyor","Сопротивляется уходу или помощи","يرفض الرعاية أو المساعدة","ክንክን ወይ ሓገዝ ይነጽግ"],
+"Hat starke Ängste oder ist sehr niedergeschlagen":["Güçlü korkuları var veya çok üzgün","Сильные страхи или подавленность","لديه مخاوف شديدة أو حزن شديد","ብርቱዕ ፍርሒ ወይ ጓሂ ኣለዎ"],
+"Oberkörper waschen":["Üst bedeni yıkamak","Мыть верхнюю часть тела","غسل الجزء العلوي من الجسم","ላዕለዋይ ኣካል ምሕጻብ"],
+"Duschen oder baden (inkl. Haare waschen)":["Duş veya banyo (saç yıkama dahil)","Принимать душ или ванну (вкл. мытьё головы)","الاستحمام (مع غسل الشعر)","ሻወር ወይ ምሕጻብ (ጸጉሪ ምሕጻብ ሓዊሱ)"],
+"Oberkörper an- und auskleiden":["Üst bedeni giydirmek/soymak","Одевать и раздевать верх тела","لبس وخلع ملابس الجزء العلوي","ላዕለዋይ ክዳን ምኽዳንን ምውጻእን"],
+"Unterkörper an- und auskleiden (Hose, Socken, Schuhe)":["Alt bedeni giydirmek (pantolon, çorap, ayakkabı)","Одевать низ (брюки, носки, обувь)","لبس الجزء السفلي (بنطال، جوارب، أحذية)","ታሕተዋይ ክዳን (ስረ፡ ካልሲ፡ ጫማ)"],
+"Essen (mundgerecht zubereitetes Essen zum Mund führen)":["Yemek yemek (hazırlanmış yemeği ağza götürmek)","Есть (подносить подготовленную еду ко рту)","الأكل (إيصال الطعام المحضّر إلى الفم)","ምብላዕ"],
+"Trinken (genug und selbstständig)":["İçmek (yeterli ve bağımsız)","Пить (достаточно и самостоятельно)","الشرب (بكمية كافية وبشكل مستقل)","ምስታይ (እኹል ብርእሱ)"],
+"Toilette benutzen":["Tuvaleti kullanmak","Пользоваться туалетом","استخدام المرحاض","ሽቓቕ ምጥቃም"],
+"Wie oft wird Hilfe bei Medikamenten, Spritzen, Verbänden oder Messungen gebraucht?":["İlaç, iğne, pansuman veya ölçümlerde ne sıklıkla yardım gerekiyor?","Как часто нужна помощь с лекарствами, уколами, перевязками или измерениями?","كم مرة يحتاج المساعدة في الأدوية أو الحقن أو الضمادات أو القياسات؟","ኣብ መድሃኒት፡ መርፍእ ወይ መለክዒ ክንደይ ግዜ ሓገዝ የድሊ?"],
+"Wie oft muss jemand zu Arzt- oder Therapieterminen begleiten?":["Doktor veya terapi randevularına ne sıklıkla eşlik etmek gerekiyor?","Как часто нужно сопровождать к врачу или на терапию?","كم مرة يحتاج مرافقة إلى الطبيب أو العلاج؟","ናብ ሓኪም ክንደይ ግዜ ምስ ሰብ ክኸይድ የድልዮ?"],
+"Nie oder selten":["Hiç veya nadiren","Никогда или редко","أبدًا أو نادرًا","ፈጺሙ ወይ ሳሕቲ"],
+"Wöchentlich":["Haftalık","Еженедельно","أسبوعيًا","ሰሙናዊ"],
+"Mehrmals täglich":["Günde birkaç kez","Несколько раз в день","عدة مرات يوميًا","ኣብ መዓልቲ ብዙሕ ግዜ"],
+"Etwa einmal im Monat":["Ayda yaklaşık bir kez","Примерно раз в месяц","مرة في الشهر تقريبًا","ኣብ ወርሒ ሓደ ግዜ"],
+"Jede Woche":["Her hafta","Каждую неделю","كل أسبوع","ኩሉ ሰሙን"],
+"Den Tag einteilen und sich an Abläufe halten":["Günü planlamak ve düzene uymak","Планировать день и соблюдать распорядок","تنظيم اليوم والالتزام بالروتين","መዓልቲ ምውዳብ"],
+"Sich sinnvoll beschäftigen":["Anlamlı şekilde meşgul olmak","Занимать себя полезными делами","الانشغال بشكل مفيد","ብጠቓሚ ነገር ምትሓዝ"],
+"Kontakt zu Familie, Nachbarn, Freunden halten":["Aile, komşu ve arkadaşlarla iletişim","Поддерживать контакт с семьёй, соседями, друзьями","التواصل مع العائلة والجيران والأصدقاء","ምስ ስድራ፡ ጎረባብቲ፡ ኣዕሩኽ ርክብ"],
+"Noch einmal":["Tekrar","Ещё раз","مرة أخرى","ደጊምካ"],
+"Pflegegrad beantragen":["Bakım derecesi başvurusu","Подать заявление на степень ухода","التقدم بطلب درجة رعاية","ደረጃ ክንክን ሕተት"],
+"Höherstufung beantragen":["Daha yüksek derece başvurusu","Подать на повышение степени","طلب رفع الدرجة","ልዕል ዝበለ ደረጃ ሕተት"],
+"Antrag vorbereiten (kostenlos)":["Başvuruyu hazırla (ücretsiz)","Подготовить заявление (бесплатно)","تحضير الطلب (مجانًا)","መመልከቲ ኣዳሉ (ብነጻ)"],
+"Ein Widerspruch kann sich lohnen.":["İtiraz etmek faydalı olabilir.","Возражение может иметь смысл.","قد يكون الاعتراض مجديًا.","ተቓውሞ ጠቓሚ ክኸውን ይኽእል።"],
+"Widerspruch schreiben":["İtiraz yaz","Написать возражение","اكتب اعتراضًا","ተቓውሞ ጽሓፍ"],
+"Meine Daten endgültig löschen":["Verilerimi kalıcı olarak sil","Окончательно удалить мои данные","حذف بياناتي نهائيًا","ሓበሬታይ ብቐጻሊ ሰርዝ"],
+};
+let LANG="de"; try{ LANG=JSON.parse(localStorage.getItem("da-lang")||'"de"')||"de" }catch(e){}
+const LIDX={tr:0,ru:1,ar:2,ti:3};
+const RX=[
+ [/^Frage (\d+) von (\d+)$/,["Soru $1 / $2","Вопрос $1 из $2","السؤال $1 من $2","ሕቶ $1 ካብ $2"]],
+ [/^Schritt (\d+) von (\d+)$/,["Adım $1 / $2","Шаг $1 из $2","الخطوة $1 من $2","ስጉምቲ $1 ካብ $2"]],
+ [/^Voraussichtlich Pflegegrad (\d)$/,["Tahmini bakım derecesi $1","Предположительно степень ухода $1","على الأرجح درجة الرعاية $1","ተኽእሎ ደረጃ ክንክን $1"]],
+ [/^Pflegegrad (\d)$/,["Bakım derecesi $1","Степень ухода $1","درجة الرعاية $1","ደረጃ ክንክን $1"]],
+];
+function tr(s){
+  if(LANG==="de"||!s) return s;
+  const i=LIDX[LANG]; const k=s.trim(); if(!k) return s;
+  let out=T[k]&&T[k][i];
+  if(!out){ for(const [re,arr] of RX){ if(re.test(k)){ out=k.replace(re,arr[i]); break } } }
+  return out? s.replace(k,out) : s;
+}
+function applyI18n(root){
+  document.documentElement.lang=LANG; document.documentElement.dir=LANG==="ar"?"rtl":"ltr";
+  if(LANG==="de"||!root) return;
+  const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT,{acceptNode:n=>n.parentNode&&/^(SCRIPT|STYLE|TEXTAREA|CODE)$/.test(n.parentNode.nodeName)||n.parentNode.closest&&n.parentNode.closest(".paper")?NodeFilter.FILTER_REJECT:NodeFilter.FILTER_ACCEPT});
+  const nodes=[]; while(w.nextNode()) nodes.push(w.currentNode);
+  for(const n of nodes){ const v=n.nodeValue; const t=tr(v); if(t!==v) n.nodeValue=t }
+}
+function langSelect(){
+  return `<select class="langsel" id="langsel" aria-label="Sprache">${LANGS.map(([k,n])=>`<option value="${k}" ${LANG===k?"selected":""}>${n}</option>`).join("")}</select>`;
+}
+function langNotice(){
+  if(LANG==="de") return "";
+  const m={tr:"Açıklamaların bir kısmı henüz Almanca. Başvurular her zaman Almanca kalır, çünkü kurumlar bunları Almanca istiyor.",ru:"Часть пояснений пока на немецком. Заявления всегда остаются на немецком, так как ведомствам они нужны на немецком.",ar:"بعض الشروحات لا تزال باللغة الألمانية. الطلبات تبقى دائمًا بالألمانية لأن الجهات الرسمية تطلبها كذلك.",ti:"ገለ መግለጺታት ገና ብጀርመንኛ እዮም። መመልከቲታት ኩሉ ግዜ ብጀርመንኛ እዮም፡ ምኽንያቱ ቤት ጽሕፈታት ብጀርመንኛ ይደልይዎም።"};
+  return `<p class="notice info small">${ic("info")}<span>${m[LANG]}</span></p>`;
 }
 
 /* ---------- Schritte ---------- */
@@ -900,7 +1190,7 @@ function choice(name,val,label,small,type="radio",checked=false){
   const id=`${name}-${val}`.replace(/[^a-zA-Z0-9-_]/g,"_");
   return `<label class="choice" for="${id}"><input type="${type}" id="${id}" name="${name}" value="${esc(val)}" ${checked?"checked":""}><span>${esc(label)}${small?`<small>${esc(small)}</small>`:""}</span></label>`;
 }
-function render(){ renderHero(); renderTabs(); renderMain(); }
+function render(){ renderHero(); renderTabs(); renderMain(); try{ applyI18n(document.querySelector(".wrap")) }catch(e){} }
 function scrollTop(){ window.scrollTo({top:0}) }
 
 function sums(){
@@ -912,17 +1202,19 @@ function sums(){
 function renderHero(){
   const save=`<div class="savestate"><span class="dot ${saveState.c}" id="savedot"></span><span id="savetxt">${esc(saveState.t)}</span></div>`;
   const brand=`<div class="brand"><span class="mark" aria-hidden="true">§</span><b>Dein Anspruch</b></div>`;
+  const curF = USER && FAELLE.find(f=>f.id===FALL_ID);
+  const personBtn = curF ? `<button type="button" class="acct person" data-act="persons" aria-expanded="${showPersons}">${ic("user")}${esc(fallName(curF))} ▾</button>` : "";
   const acct = USER?`<button type="button" class="acct" data-act="logout" title="${esc(USER.email||"")}">Abmelden</button>`:GUEST?`<button type="button" class="acct" data-act="guest-register">Konto anlegen</button>`:"";
   const fontsw=`<div class="fontsw" role="group" aria-label="Schriftgröße">${[["1","A"],["1.15","A+"],["1.3","A++"]].map(([v,t])=>`<button type="button" data-font="${v}" aria-pressed="${(S.font||"1")===v}" aria-label="Schrift ${t}">${t}</button>`).join("")}</div>`;
-  if(S.wiz){ $("hero").innerHTML=`<div class="row">${brand}<div class="row" style="gap:12px">${fontsw}${save}${acct}</div></div>`; return }
+  if(S.wiz||RECHNER){ $("hero").innerHTML=`<div class="row">${brand}<div class="row" style="gap:12px">${langSelect()}${personBtn}${fontsw}${save}${acct}</div></div>`; return }
   if(!S.done){
-    $("hero").innerHTML=`<div class="row">${brand}<div class="row" style="gap:12px">${fontsw}${save}${acct}</div></div>
+    $("hero").innerHTML=`<div class="row">${brand}<div class="row" style="gap:12px">${langSelect()}${personBtn}${fontsw}${save}${acct}</div></div>
      <p class="lead">Pflegegrad oder Schwerbehinderung: Wir prüfen, welche Leistungen 2026 noch offen sind, schreiben die Anträge vor, sortieren deine Belege und erinnern an Fristen.</p>`;
     return;
   }
   const s=sums(); const dl=deadlines(); const crit=dl.find(x=>x.main&&!x.ok&&urg(x.d)!=="ok") || dl.find(x=>urg(x.d)==="late");
   const next=dl[0];
-  $("hero").innerHTML=`<div class="row">${brand}<div class="row" style="gap:12px">${fontsw}${save}${acct}</div></div>
+  $("hero").innerHTML=`<div class="row">${brand}<div class="row" style="gap:12px">${langSelect()}${personBtn}${fontsw}${save}${acct}</div></div>
    <div style="position:relative;z-index:1;display:flex;flex-direction:column;gap:4px">
      <span class="small" style="color:var(--hero-muted)">Noch offen an Geld und Budgets pro Jahr</span>
      <span class="figure">${eur(s.cash)}</span>
@@ -936,7 +1228,7 @@ function renderHero(){
    </div>`;
 }
 function renderTabs(){
-  const t=$("tabs"); t.hidden=!S.done||!!S.wiz||(!USER&&!GUEST); if(t.hidden) return;
+  const t=$("tabs"); t.hidden=!S.done||!!S.wiz||!!RECHNER||(!USER&&!GUEST); if(t.hidden) return;
   const dl=deadlines(); const att=dl.filter(x=>!x.ok && urg(x.d)!=="ok").length;
   const T=[["ansprueche","Ansprüche","list",0],["belege","Belege","receipt",0],["termine","Termine","cal",att]];
   t.innerHTML=T.map(([k,l,i,b])=>`<button type="button" role="tab" data-tab="${k}" aria-selected="${S.tab===k}">${ic(i)}<span class="lbl">${l}</span>${b?`<span class="badge">${b}</span>`:""}</button>`).join("");
@@ -944,7 +1236,9 @@ function renderTabs(){
 function renderMain(){
   document.documentElement.style.setProperty("--fs", S.font||"1");
   if(!loaded){ $("main").innerHTML=`<section class="panel"><p class="muted">Einen Moment, deine Daten werden geladen …</p></section>`; return }
+  if(RECHNER){ $("main").innerHTML=viewRechner(); return }
   if(!USER && !GUEST){ $("main").innerHTML=viewLogin(); return }
+  if(USER && showPersons){ $("main").innerHTML=viewPersons(); return }
   if(S.wiz && B.find(x=>x.k===S.wiz.k)){ $("main").innerHTML=viewWizard(); return }
   S.wiz=null;
   if(!S.done){
@@ -1075,6 +1369,7 @@ function viewAnsprueche(){
        <button type="button" class="howbtn" data-tab="termine"><b>${ic("bell")}Fristen im Blick</b><span>Erinnerung an Beratungsbesuch und Abgabefristen im Kalender.</span></button>
      </div></section>`:""}
    ${(bescheidCard()||entlCard())?`<div class="minis">${bescheidCard()}${entlCard()}</div>`:""}
+   ${langNotice()}
    <div class="section-title"><h2>Deine offenen Ansprüche</h2><span class="small muted">Antippen für Antrag und Checkliste</span></div>
    ${areas.length>2?`<div class="filters">${areas.map(a=>`<button type="button" class="chip" data-area="${esc(a)}" aria-pressed="${areaFilter===a}">${esc(a)}</button>`).join("")}</div>`:""}
    <div class="list">${sorted.map(itemHTML).join("") || '<p class="muted">Ihr nutzt bereits alles, was wir prüfen konnten.</p>'}</div>
@@ -1116,9 +1411,11 @@ function detailHTML(b){
   return `<div class="detail">
     ${b.ask?`<div class="startbox">
         <button class="btn big" type="button" data-wopen="${b.k}">${ic("file")}${st==="offen"?"Antrag ausfüllen":"Antrag ansehen"}</button>
+        ${["pg_antrag","pg_hoch"].includes(b.k)?`<button class="btn ghost" type="button" data-act="r-start">Erst selbst einschätzen: Pflegegrad-Rechner</button>`:""}
         <p class="small muted">${nQ?`${nQ} einfache Fragen, Schritt für Schritt. Du kannst jederzeit zurück, nichts wird ohne dich abgeschickt.`:"Der Antrag ist schon fertig vorbereitet. Du musst nur noch prüfen."}</p>
       </div>`:`<p class="notice info">${ic("info")}<span>Dafür ist kein Antrag nötig. Trage den Betrag einfach in der Steuererklärung ein (oder gib diese Info an deine Steuerberatung weiter).</span></p>`}
     <div><h4>So läuft es ab</h4><ol>${b.steps.map(s=>`<li>${esc(s)}</li>`).join("")}</ol></div>
+    ${finderHTML(b.k)}
     ${checks.length?`<div><h4>Diese Unterlagen brauchst du</h4><ul class="checks">${checks.map((c,i)=>`<li><label><input type="checkbox" data-check="${b.k}:${i}" ${S.checks[b.k+":"+i]?"checked":""}><span>${esc(c)}</span></label></li>`).join("")}</ul></div>`:""}
     <div class="status"><label for="st-${b.k}"><strong>Stand:</strong></label><select id="st-${b.k}" data-status="${b.k}">${[["offen","noch nicht beantragt"],["beantragt","beantragt, warte auf Antwort"],["bewilligt","bewilligt"]].map(([v,t])=>`<option value="${v}" ${st===v?"selected":""}>${t}</option>`).join("")}</select>
     <label class="choice" for="gn-${b.k}" style="padding:6px 10px"><input type="checkbox" id="gn-${b.k}" data-gen="${b.k}" ${S.genutzt[b.k]?"checked":""}><span>bekommen wir schon</span></label></div>
@@ -1222,6 +1519,7 @@ function viewTermine(){
   const dl=deadlines(); const rel=beratungRelevant(); const st=beratungStatus();
   const halves=[st.prev,st.H,st.next];
   return `
+  ${eriCard()}
   ${rel?`<section class="panel">
     <div class="section-title"><h2>Beratungsbesuch</h2><span class="small muted">§ 37 Abs. 3 SGB XI</span></div>
     <p class="muted small">Wer Pflegegeld bekommt, muss einmal in jedem Kalenderhalbjahr (Januar–Juni und Juli–Dezember) einen Beratungsbesuch durch einen Pflegedienst oder eine anerkannte Beratungsstelle nachweisen. Fehlt der Nachweis, kürzt die Pflegekasse das Pflegegeld, im Wiederholungsfall wird es gestrichen. Der Besuch ist kostenlos, jeder zweite darf per Video sein.</p>
@@ -1419,12 +1717,13 @@ async function toggleSubmitted(id){
 
 /* ---------- Events ---------- */
 document.addEventListener("click", e=>{
-  const t=e.target.closest("[data-act],[data-open],[data-copy],[data-pdf],[data-resettx],[data-tab],[data-area],[data-kat],[data-del],[data-delyes],[data-delno],[data-sub-toggle],[data-view],[data-delown],[data-year],[data-befpdf],[data-befcopy],[data-edit],[data-wopen],[data-wnav],[data-font],[data-gotoclaim]");
+  const t=e.target.closest("[data-act],[data-open],[data-copy],[data-pdf],[data-resettx],[data-tab],[data-area],[data-kat],[data-del],[data-delyes],[data-delno],[data-sub-toggle],[data-view],[data-delown],[data-year],[data-befpdf],[data-befcopy],[data-edit],[data-wopen],[data-wnav],[data-font],[data-gotoclaim],[data-rmember]");
   if(!t) return;
   const a=t.dataset.act;
   if(t.dataset.tab){if(t.classList.contains("howbtn"))S.welcomeSeen=true;S.tab=t.dataset.tab;openKey=null;save();render();scrollTop();return}
   if(t.dataset.area){areaFilter=t.dataset.area;render();return}
   if(t.dataset.gotoclaim){ S.tab="ansprueche"; openKey=t.dataset.gotoclaim; render(); const el=$("it-"+openKey); el&&el.scrollIntoView({block:"start"}); return }
+  if(t.dataset.rmember){ removeMember(t.dataset.rmember); return }
   if(t.dataset.font){ S.font=t.dataset.font; save(); render(); return }
   if(t.dataset.edit){ editBeleg(t.dataset.edit); return }
   if(t.dataset.wopen){ startWiz(t.dataset.wopen); return }
@@ -1463,6 +1762,13 @@ document.addEventListener("click", e=>{
     case "bes-cancel": bescheidDraft=null; ocrMsg=""; render(); break;
     case "bes-save": saveBescheid(); break;
     case "entl-add": S.tab="belege"; pending=null; startPending(null); if(pending){ pending.kat="entl"; render() } scrollTop(); break;
+    case "r-start": startRechner(); break;
+    case "r-next": RECHNER.i++; render(); scrollTop(); break;
+    case "r-back": RECHNER.i=Math.max(0,RECHNER.i-1); render(); scrollTop(); break;
+    case "r-close": RECHNER=null; render(); scrollTop(); break;
+    case "r-neu": startRechner(); break;
+    case "r-antrag": { const k=pg()?"pg_hoch":"pg_antrag"; RECHNER=null; S.bereiche.pflege=true; if(!S.done){ S.done=true } startWiz(k); break }
+    case "r-konto": RECHNER=null; if(typeof authMode!=="undefined"){ authMode="register"; authMsg="Lege ein kostenloses Konto an. Danach hilft dir die App Schritt für Schritt beim Antrag." } render(); scrollTop(); break;
     case "au-google": googleLogin(); break;
     case "au-login": case "au-register": case "au-forgot": case "au-newpw": authAction(a); break;
     case "au-mode": authMode=t.dataset.mode; authMsg=""; render(); break;
@@ -1470,6 +1776,15 @@ document.addEventListener("click", e=>{
     case "au-guest": lsSet("dein-anspruch-modus","gast"); startGuest(); scrollTop(); break;
     case "guest-register": GUEST=false; authMode="register"; authMsg=""; lsSet("dein-anspruch-modus",""); render(); scrollTop(); break;
     case "logout": logout(); break;
+    case "eri-on": setEri(true,($("eri-mail")||{}).value); break;
+    case "eri-off": setEri(false); break;
+    case "persons": showPersons=!showPersons; delPersonAsk=false; if(showPersons) loadMembers(); render(); scrollTop(); break;
+    case "add-person": addPerson(); break;
+    case "invite": makeInvite(); break;
+    case "inv-copy": copy(inviteLink); break;
+    case "del-person": delPersonAsk=true; render(); break;
+    case "del-person-no": delPersonAsk=false; render(); break;
+    case "del-person-yes": deletePerson(); break;
     case "wipe": { const w=$("wipeconfirm"); if(w) w.hidden=false; break }
     case "wipe-no": { const w=$("wipeconfirm"); if(w) w.hidden=true; break }
     case "wipe-yes": wipeAll(); break;
@@ -1491,8 +1806,12 @@ document.addEventListener("click", e=>{
 });
 document.addEventListener("change", e=>{
   const t=e.target, n=t.name;
+  if(t.id==="langsel"){ LANG=t.value; try{localStorage.setItem("da-lang",JSON.stringify(LANG))}catch(e){} render(); return }
+  if(t.dataset.plz){ if(/^\d{5}$/.test(t.value.trim())){ S.plz=t.value.trim(); save(); render() } return }
+  if(t.dataset.rq!=null && RECHNER){ RECHNER.a[RECHNER.i]=t.dataset.rq; render(); setTimeout(()=>{ if(RECHNER && RECHNER.a[RECHNER.i]!=null){ RECHNER.i++; render(); scrollTop() } },350); return }
   if(t.id==="fileCam"||t.id==="fileAny"){ const f=t.files&&t.files[0]; if(f){ if(fileTarget==="bescheid"){ fileTarget=null; scanBescheid(f) } else startPending(f) } return }
   if(t.dataset.bd && bescheidDraft){ bescheidDraft[t.dataset.bd]=t.value; return }
+  if(t.dataset.fall){ openFall(t.dataset.fall); scrollTop(); return }
   if(t.id==="entl-seit"){ S.entlSeit=t.value; save(); render(); return }
   if(t.dataset.wq && t.type==="radio"){ const q=wizSteps().list.find(x=>x.k===t.dataset.wq); if(q){ setQ(q,t.value); render() } return }
   if(t.dataset.wqm){ const q=wizSteps().list.find(x=>x.k===t.dataset.wqm); if(q){ const cur=Array.isArray(getQ(q))?getQ(q):[]; setQ(q, t.checked?[...cur,t.value]:cur.filter(x=>x!==t.value)); render() } return }
@@ -1548,7 +1867,7 @@ async function copy(text){
   try{await navigator.clipboard.writeText(text);toast("Text kopiert")}
   catch(e){const ta=document.querySelector("textarea[data-tx]"); if(ta){ta.focus();ta.select()} toast("Bitte Text markieren und kopieren (Strg+C)")}
 }
-let tT; function toast(m){const t=$("toast");t.textContent=m;t.hidden=false;clearTimeout(tT);tT=setTimeout(()=>t.hidden=true,2800)}
+let tT; function toast(m){const t=$("toast");t.textContent=tr(m);t.hidden=false;clearTimeout(tT);tT=setTimeout(()=>t.hidden=true,2800)}
 
 /* ---------- Speicher (privat pro Konto) ---------- */
 
@@ -1569,11 +1888,18 @@ const DL={ async save({filename,data}){
   const u=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=u; a.download=filename; document.body.appendChild(a); a.click(); a.remove();
   setTimeout(()=>URL.revokeObjectURL(u),8000); return {status:"saved"} } };
 function claudeUse(n){ return Promise.resolve(n==="downloads"?DL:null) }
+const UI_KEYS=["tab","wiz","belegFilter","welcomeSeen"];
+let FAELLE=[], FALL_ID=null, MEMBERS=[], showPersons=false, inviteLink="", inviteBusy=false;
+function uiKey(){ return "da-ui-"+(USER?USER.id:"gast")+"-"+(FALL_ID||"x") }
 function save(){
   if(!canSave||!ref) return;
   clearTimeout(saveTimer); setSave("","Speichert …");
+  const ui={}; UI_KEYS.forEach(k=>ui[k]=S[k]); lsSet(uiKey(),ui); lsSet("da-font",S.font);
   saveTimer=setTimeout(()=>{
+    saveTimer=null;
     const data=JSON.parse(JSON.stringify(S)); data.updated=new Date().toISOString();
+    if(USER) UI_KEYS.forEach(k=>delete data[k]);
+    const f=FAELLE.find(x=>x.id===FALL_ID); if(f) f.data=data;
     writing = writing.then(()=>ref.set(data)).then(()=>setSave("ok",USER?"Gespeichert":"Nur auf diesem Gerät")).catch(()=>{ setSave("warn","Nicht gespeichert – Internet prüfen") });
   },700);
 }
@@ -1583,6 +1909,7 @@ function merge(d){
   if(d.done===undefined) m.done = (d.step||0)>=6 && !!d.rolle;
   delete m.updated; return m;
 }
+function fallName(f){ const p=(f&&f.data&&f.data.person)||{}; return (p.name||"").trim()||"Neue Person" }
 const toRow=d=>{ const r={}; for(const k of ["kat","titel","ctype","eingereicht","jahr"]) if(k in d) r[k]=d[k];
   if("datum" in d) r.datum=d.datum||null; if("betrag" in d) r.betrag=(d.betrag===""||d.betrag==null||isNaN(d.betrag))?null:Number(d.betrag);
   if("asset" in d) r.pfad=d.asset||""; return r };
@@ -1592,15 +1919,15 @@ async function refreshUrls(){
   (data||[]).forEach(x=>{ if(x.signedUrl) URLS[x.path]=x.signedUrl });
 }
 async function reloadBelege(){
-  if(!USER) return;
-  const {data,error}=await sb.from("belege").select("*").order("datum",{ascending:false});
+  if(!USER||!FALL_ID) return;
+  const {data,error}=await sb.from("belege").select("*").eq("fall_id",FALL_ID).order("datum",{ascending:false});
   if(error){ toast("Belege konnten nicht geladen werden."); return }
   BEL=data.map(r=>({id:r.id,kat:r.kat,datum:r.datum||"",jahr:r.jahr,betrag:r.betrag==null?"":Number(r.betrag),titel:r.titel||"",asset:r.pfad||"",ctype:r.ctype||"",eingereicht:!!r.eingereicht}));
   try{ await refreshUrls() }catch(e){}
   render();
 }
 const BCOL_SB={
-  async add(d){ const {error}=await sb.from("belege").insert(toRow(d)); if(error) throw error; await reloadBelege() },
+  async add(d){ const {error}=await sb.from("belege").insert({...toRow(d),fall_id:FALL_ID}); if(error) throw error; await reloadBelege() },
   doc(id){ return {
     async update(d){ const {error}=await sb.from("belege").update(toRow(d)).eq("id",id); if(error) throw error; await reloadBelege() },
     async delete(){ const {error}=await sb.from("belege").delete().eq("id",id); if(error) throw error; await reloadBelege() } } },
@@ -1609,7 +1936,7 @@ const ASSETS_SB={
   async upload(blob,{type}){
     const ext=type==="application/pdf"?"pdf":type==="image/png"?"png":type==="image/webp"?"webp":"jpg";
     const id=(crypto.randomUUID?crypto.randomUUID():String(Date.now())+Math.random().toString(16).slice(2));
-    const path=`${USER.id}/${id}.${ext}`;
+    const path=`${FALL_ID}/${id}.${ext}`;
     const {error}=await sb.storage.from("belege").upload(path,blob,{contentType:type,upsert:false});
     if(error) throw {code:/size|large|exceed/i.test(error.message||"")?"too_large":"upload"};
     const {data}=await sb.storage.from("belege").createSignedUrl(path,6*3600); if(data) URLS[path]=data.signedUrl;
@@ -1617,24 +1944,98 @@ const ASSETS_SB={
   },
   async delete(path){ await sb.storage.from("belege").remove([path]) },
 };
-const REF_SB={ async set(data){ const {error}=await sb.from("faelle").upsert({user_id:USER.id,data,updated_at:new Date().toISOString()}); if(error) throw error } };
+const REF_SB={ async set(data){ const {error}=await sb.from("fall").update({data,updated_at:new Date().toISOString()}).eq("id",FALL_ID); if(error) throw error } };
 const REF_LOCAL={ async set(data){ lsSet("dein-anspruch-gast",data) } };
 
+async function loadFaelle(){
+  const {data,error}=await sb.from("fall").select("id,data,created_by,updated_at").order("created_at");
+  if(error) throw error;
+  const {data:m}=await sb.from("mitglied").select("fall_id,rolle").eq("user_id",USER.id);
+  const rollen=Object.fromEntries((m||[]).map(x=>[x.fall_id,x.rolle]));
+  FAELLE=data.map(f=>({...f,rolle:rollen[f.id]||"mitglied"}));
+}
+async function createFall(data){
+  const {data:row,error}=await sb.from("fall").insert({data:data||{}}).select("id,data,created_by,updated_at").single();
+  if(error) throw error; FAELLE.push({...row,rolle:"besitzer"}); return row.id;
+}
+async function openFall(id){
+  FALL_ID=id; lsSet("da-fall-"+USER.id,id); inviteLink=""; showPersons=false;
+  const f=FAELLE.find(x=>x.id===id);
+  S=merge({...(f?f.data:{}),...(lsGet(uiKey())||{}),font:lsGet("da-font")||"1"});
+  BEL=[]; URLS={}; openKey=null; pending=null; bescheidDraft=null;
+  ref=REF_SB; canSave=true; render(); reloadBelege(); loadMembers();
+}
+async function loadMembers(){
+  MEMBERS=[]; if(!FALL_ID) return;
+  const {data}=await sb.from("mitglied").select("user_id,rolle,email").eq("fall_id",FALL_ID);
+  MEMBERS=data||[]; if(showPersons) render();
+}
 async function loadUserData(){
   setSave("","Lade deine Daten …");
-  const {data,error}=await sb.from("faelle").select("data").eq("user_id",USER.id).maybeSingle();
-  if(error){ canSave=false; setSave("warn","Speicher nicht erreichbar"); }
-  else {
-    const guest=lsGet("dein-anspruch-gast");
-    if(data && data.data) S=merge(data.data);
-    else if(guest){ S=merge(guest); toast("Deine Angaben von diesem Gerät wurden ins Konto übernommen.") }
-    else S=blank();
-    ref=REF_SB; canSave=true; setSave("ok","Gespeichert");
-    if(!data && guest) save();
-  }
-  ASSETS=ASSETS_SB; BCOL=BCOL_SB; GUEST=false;
-  loaded=true; render();
+  try{
+    const code=lsGet("da-einladung"); let joined=null;
+    if(code){ lsSet("da-einladung",null); const {data,error}=await sb.rpc("einladung_annehmen",{c:code}); if(error) toast("Die Einladung ist ungültig oder abgelaufen."); else { joined=data; toast("Willkommen! Ihr pflegt jetzt gemeinsam.") } }
+    await loadFaelle();
+    if(!FAELLE.length){ const guest=lsGet("dein-anspruch-gast"); await createFall(guest||{}); if(guest) toast("Deine Angaben von diesem Gerät wurden ins Konto übernommen.") }
+    const want=joined||lsGet("da-fall-"+USER.id);
+    ASSETS=ASSETS_SB; BCOL=BCOL_SB; GUEST=false; loaded=true;
+    setSave("ok","Gespeichert");
+    await openFall(FAELLE.some(f=>f.id===want)?want:FAELLE[0].id);
+  }catch(e){ canSave=false; loaded=true; setSave("warn","Speicher nicht erreichbar"); render() }
+}
+async function refreshFromServer(){
+  if(!USER||!FALL_ID||saveTimer) return;
+  const {data}=await sb.from("fall").select("data,updated_at").eq("id",FALL_ID).maybeSingle();
+  const f=FAELLE.find(x=>x.id===FALL_ID);
+  if(data && f && data.updated_at!==f.updated_at){ f.data=data.data; f.updated_at=data.updated_at; const ui={}; UI_KEYS.forEach(k=>ui[k]=S[k]); S=merge({...data.data,...ui,font:S.font}); render(); }
   reloadBelege();
+}
+document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible") refreshFromServer().catch(()=>{}) });
+async function addPerson(){
+  try{ const id=await createFall({}); await openFall(id); scrollTop(); toast("Neue Person angelegt. Beantworte kurz die Fragen.") }catch(e){ toast("Anlegen hat nicht geklappt.") }
+}
+async function makeInvite(){
+  inviteBusy=true; render();
+  const {data,error}=await sb.rpc("einladung_erstellen",{f:FALL_ID});
+  inviteBusy=false;
+  if(error){ toast("Einladung konnte nicht erstellt werden."); return render() }
+  inviteLink=location.origin+location.pathname+"?einladung="+data; render();
+}
+async function removeMember(uid){
+  const {error}=await sb.from("mitglied").delete().eq("fall_id",FALL_ID).eq("user_id",uid);
+  if(error) return toast("Entfernen hat nicht geklappt.");
+  if(uid===USER.id){ FAELLE=FAELLE.filter(f=>f.id!==FALL_ID); toast("Du bist ausgetreten."); if(!FAELLE.length) await createFall({}); return openFall(FAELLE[0].id) }
+  toast("Person entfernt."); loadMembers().then(render);
+}
+let delPersonAsk=false;
+async function deletePerson(){
+  try{
+    const paths=BEL.map(b=>b.asset).filter(Boolean); if(paths.length) await sb.storage.from("belege").remove(paths);
+    const {error}=await sb.from("fall").delete().eq("id",FALL_ID); if(error) throw error;
+    FAELLE=FAELLE.filter(f=>f.id!==FALL_ID); delPersonAsk=false; toast("Person und ihre Daten wurden gelöscht.");
+    if(!FAELLE.length) await createFall({}); openFall(FAELLE[0].id);
+  }catch(e){ toast("Löschen hat nicht geklappt.") }
+}
+function viewPersons(){
+  const cur=FAELLE.find(f=>f.id===FALL_ID)||{}; const own=cur.rolle==="besitzer";
+  const others=MEMBERS.filter(m=>m.user_id!==USER.id);
+  return `<section class="panel persons">
+    <div class="section-title"><h2>Für wen?</h2><button type="button" class="linkbtn" data-act="persons">Schließen</button></div>
+    <div class="choices big">${FAELLE.map(f=>`<label class="choice" for="pf-${f.id}"><input type="radio" id="pf-${f.id}" name="pfall" data-fall="${f.id}" ${f.id===FALL_ID?"checked":""}><span>${esc(fallName(f))}<small>${f.rolle==="besitzer"?"angelegt von dir":"mit dir geteilt"}</small></span></label>`).join("")}</div>
+    <button class="btn ghost" type="button" data-act="add-person">${ic("plus")}Weitere Person anlegen</button>
+    <hr class="sep">
+    <h3>Gemeinsam pflegen</h3>
+    <p class="small muted">Lade Geschwister oder andere Helfer ein. Sie sehen dann die Angaben, Belege und Fristen von ${esc(fallName(cur))} und können mithelfen.</p>
+    ${others.length?`<ul class="members">${others.map(m=>`<li><span>${esc(m.email||"Familienmitglied")}${m.rolle==="besitzer"?' <span class="tag">hat angelegt</span>':""}</span>${own?`<button type="button" class="linkbtn danger" data-rmember="${m.user_id}">Entfernen</button>`:""}</li>`).join("")}</ul>`:""}
+    ${inviteLink?`<div class="recip"><span><strong>Einladungslink</strong> (14 Tage gültig, für eine Person)</span><code>${esc(inviteLink)}</code>
+        <span class="btnrow"><button class="btn small" type="button" data-act="inv-copy">Link kopieren</button><a class="btn small soft" href="https://wa.me/?text=${encodeURIComponent("Ich lade dich zu „Dein Anspruch“ ein, damit wir uns gemeinsam um "+fallName(cur)+" kümmern können: "+inviteLink)}" target="_blank" rel="noopener">Per WhatsApp</a>
+        <a class="btn small ghost" href="mailto:?subject=${encodeURIComponent("Einladung: Dein Anspruch")}&body=${encodeURIComponent("Hallo, ich lade dich zu „Dein Anspruch“ ein, damit wir uns gemeinsam um "+fallName(cur)+" kümmern können:\n\n"+inviteLink)}">Per E-Mail</a></span></div>`
+      :`<button class="btn" type="button" data-act="invite" ${inviteBusy?"disabled":""}>${ic("user")}Jemanden einladen</button>`}
+    <hr class="sep">
+    ${own?(delPersonAsk?`<p class="notice bad">${ic("alert")}<span>${esc(fallName(cur))} mit allen Angaben und Belegen für alle löschen? <span class="btnrow" style="margin-top:8px"><button class="btn small danger" type="button" data-act="del-person-yes">Ja, löschen</button><button class="btn small ghost" type="button" data-act="del-person-no">Abbrechen</button></span></span></p>`
+      :`<button class="linkbtn danger" type="button" data-act="del-person">${esc(fallName(cur))} löschen</button>`)
+      :`<button class="linkbtn danger" type="button" data-rmember="${USER.id}">Aus diesem gemeinsamen Fall austreten</button>`}
+  </section>`;
 }
 function startGuest(){
   GUEST=true; USER=null; ref=REF_LOCAL; canSave=true; ASSETS=null; BCOL=null;
@@ -1643,13 +2044,15 @@ function startGuest(){
 }
 let loaded=false;
 async function initStore(){
+  try{ if(new URLSearchParams(location.search).has("rechner")) RECHNER={i:0,a:[]} }catch(e){}
+  try{ const q=new URLSearchParams(location.search); const c=q.get("einladung"); if(c){ lsSet("da-einladung",c); history.replaceState(null,"",location.pathname) } }catch(e){}
   if(!window.supabase){ loaded=true; setSave("warn","Keine Verbindung – nur auf diesem Gerät"); startGuest(); return }
   sb=window.supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,storageKey:"dein-anspruch-auth"}});
   sb.auth.onAuthStateChange((ev,session)=>{
     if(ev==="PASSWORD_RECOVERY"){ RECOVERY=true; render() }
     const u=session?session.user:null;
     if(u && (!USER || USER.id!==u.id)){ USER=u; setTimeout(loadUserData,0) }
-    if(!u && USER){ USER=null; S=blank(); BEL=[]; URLS={}; canSave=false; ref=null; ASSETS=null; BCOL=null; render() }
+    if(!u && USER){ USER=null; S=blank(); BEL=[]; URLS={}; FAELLE=[]; FALL_ID=null; canSave=false; ref=null; ASSETS=null; BCOL=null; render() }
   });
   try{
     const {data:{session}}=await sb.auth.getSession();
@@ -1666,6 +2069,7 @@ function viewLogin(){
     <button class="btn big" type="button" data-act="au-newpw" ${authBusy?"disabled":""}>Passwort speichern</button></section>`;
   const reg=authMode==="register", fg=authMode==="forgot";
   return `<section class="panel auth">
+    ${lsGet("da-einladung")?`<p class="notice good">${ic("user")}<span><strong>Du wurdest eingeladen.</strong> Melde dich an oder lege ein Konto an. Danach siehst du den gemeinsamen Fall.</span></p>`:""}
     <h2>${reg?"Konto anlegen":fg?"Passwort vergessen":"Willkommen"}</h2>
     <p class="muted">${reg?"Mit einem Konto sind deine Angaben und Belege sicher gespeichert und auf Handy und Computer gleich.":fg?"Gib deine E-Mail-Adresse ein. Wir schicken dir einen Link zum Zurücksetzen.":"Melde dich an, um deine Angaben und Belege zu sehen."}</p>
     ${fg?"":`<button type="button" class="btn big gbtn" data-act="au-google"><svg viewBox="0 0 48 48" width="22" height="22" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>Mit Google anmelden</button>
@@ -1679,6 +2083,7 @@ function viewLogin(){
     </div>
     <hr style="border:0;border-top:1px solid var(--line);margin:4px 0">
     <button type="button" class="btn ghost" data-act="au-guest">Ohne Konto ausprobieren</button>
+    <button type="button" class="linkbtn" data-act="r-start">Pflegegrad-Rechner: ohne Anmeldung einschätzen, welcher Pflegegrad in Frage kommt</button>
     <p class="small muted">Ohne Konto bleiben deine Angaben nur in diesem Browser, und Belege-Fotos werden nicht gespeichert. Du kannst später jederzeit ein Konto anlegen, deine Angaben werden dann übernommen.</p>
   </section>`;
 }
@@ -1705,19 +2110,44 @@ async function googleLogin(){
   const {error}=await sb.auth.signInWithOAuth({provider:"google",options:{redirectTo:location.origin+location.pathname}});
   if(error){ authBusy=false; authMsg=/not enabled|provider/i.test(error.message)?"Die Anmeldung mit Google ist noch nicht eingeschaltet. Bitte vorerst mit E-Mail anmelden.":"Anmeldung mit Google hat nicht geklappt. Bitte erneut versuchen."; render() }
 }
-async function logout(){ try{ await sb.auth.signOut() }catch(e){} lsSet("dein-anspruch-modus",""); USER=null; GUEST=false; S=blank(); BEL=[]; URLS={}; canSave=false; ref=null; render(); scrollTop() }
+async function logout(){ try{ await sb.auth.signOut() }catch(e){} ERI=null; eriLoaded=false; lsSet("dein-anspruch-modus",""); USER=null; GUEST=false; S=blank(); BEL=[]; URLS={}; FAELLE=[]; FALL_ID=null; showPersons=false; canSave=false; ref=null; render(); scrollTop() }
 
 async function wipeAll(){
   if(!USER){ lsSet("dein-anspruch-gast",null); S=blank(); BEL=[]; render(); return }
   try{
-    const paths=BEL.map(b=>b.asset).filter(Boolean);
-    if(paths.length) await sb.storage.from("belege").remove(paths);
-    await sb.from("belege").delete().eq("user_id",USER.id);
+    for(const f of FAELLE){
+      if(f.rolle==="besitzer"){
+        const {data:bl}=await sb.from("belege").select("pfad").eq("fall_id",f.id);
+        const paths=(bl||[]).map(b=>b.pfad).filter(Boolean); if(paths.length) await sb.storage.from("belege").remove(paths);
+        await sb.from("fall").delete().eq("id",f.id);
+      } else await sb.from("mitglied").delete().eq("fall_id",f.id).eq("user_id",USER.id);
+    }
     await sb.from("faelle").delete().eq("user_id",USER.id);
     lsSet("dein-anspruch-gast",null);
     toast("Alle deine Daten wurden gelöscht.");
   }catch(e){ toast("Löschen hat nicht vollständig geklappt. Bitte erneut versuchen."); return }
   await logout();
+}
+
+/* ---------- E-Mail-Erinnerungen ---------- */
+let ERI=null, eriLoaded=false;
+async function loadEri(){ if(!USER) return; const {data}=await sb.from("erinnerung").select("aktiv,email").eq("user_id",USER.id).maybeSingle(); ERI=data||null; eriLoaded=true; render() }
+async function setEri(aktiv,email){
+  const mail=(email||(ERI&&ERI.email)||USER.email||"").trim();
+  if(aktiv && !/^\S+@\S+\.\S+$/.test(mail)){ toast("Bitte eine gültige E-Mail-Adresse eingeben."); return }
+  const {error}=await sb.from("erinnerung").upsert({user_id:USER.id,aktiv,email:mail,updated_at:new Date().toISOString()});
+  if(error){ toast("Speichern hat nicht geklappt."); return }
+  ERI={aktiv,email:mail}; toast(aktiv?"Erinnerungen per E-Mail sind an.":"Erinnerungen per E-Mail sind aus."); render();
+}
+function eriCard(){
+  if(!USER) return "";
+  if(!eriLoaded){ loadEri(); return "" }
+  const on=ERI&&ERI.aktiv;
+  return `<section class="panel mini">
+    <div class="mini-head">${ic("bell")}<div><h3>Erinnerungen per E-Mail</h3><p class="small muted">Wir schreiben dir 14, 7 und 1 Tag vor jeder Frist, für alle Personen in deinem Konto.</p></div></div>
+    ${on?`<p class="small">An: <strong>${esc(ERI.email)}</strong></p><div class="btnrow"><button class="btn small ghost" type="button" data-act="eri-off">Ausschalten</button></div>`
+      :`<div class="grid2" style="align-items:end"><div class="field"><label for="eri-mail">E-Mail-Adresse</label><input type="email" id="eri-mail" value="${esc((ERI&&ERI.email)||USER.email||"")}"></div><div><button class="btn" type="button" data-act="eri-on">${ic("bell")}Einschalten</button></div></div>`}
+  </section>`;
 }
 
 render();

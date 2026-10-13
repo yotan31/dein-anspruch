@@ -160,6 +160,14 @@ ol.howsend{margin:0;padding-left:1.4em;display:flex;flex-direction:column;gap:12
 .mini-head>div{flex:1;min-width:0}
 .mini-num{text-align:right;flex:none!important}
 .mini-num b{display:block;font-family:var(--f-display);font-size:1.6rem;color:var(--money);font-variant-numeric:tabular-nums;line-height:1.1}
+.rbars{display:flex;flex-direction:column;gap:8px}
+.rbars>div{display:grid;grid-template-columns:minmax(0,11em) 1fr 3em;gap:10px;align-items:center;font-size:.93rem}
+.rbars .track{height:10px;border-radius:10px;background:var(--line);overflow:hidden}
+.rbars .track i{display:block;height:100%;background:var(--accent)}
+.rbars b{text-align:right;font-variant-numeric:tabular-nums}
+.langsel{width:auto;background:rgba(255,255,255,.08);color:var(--hero-fg);border:0;border-radius:999px;padding:4px 10px;font-size:.82rem;font-weight:700}
+.langsel option{color:#13233a}
+[dir="rtl"] .item .val{text-align:left}
 .yearchips{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 .notice{border-radius:12px;padding:12px 14px;font-size:.93rem;background:var(--warn-soft);color:var(--ink);display:flex;gap:10px;align-items:flex-start}
 .notice svg{color:var(--warn);margin-top:2px}
@@ -258,6 +266,13 @@ footer{font-size:.83rem;color:var(--muted);padding-top:6px;display:flex;flex-dir
 .orline{display:flex;align-items:center;gap:12px;color:var(--muted);font-size:.88rem}
 .orline::before,.orline::after{content:"";flex:1;border-top:1px solid var(--line)}
 .auth input[type=email],.auth input[type=password],.auth input[type=text]{font-size:1.1rem;padding:12px 14px}
+
+.acct.person{display:inline-flex;align-items:center;gap:6px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.acct.person svg{width:16px;height:16px}
+.members{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:6px}
+.members li{display:flex;justify-content:space-between;gap:10px;border:1px solid var(--line);border-radius:10px;padding:8px 12px;flex-wrap:wrap}
+hr.sep{border:0;border-top:1px solid var(--line);margin:4px 0}
+.recip code{display:block;padding:6px 0}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js" integrity="sha256-hZaWX+kY5lZgChtWjToWj1wNPSKmAIhrtvRKZVXbAec=" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js" crossorigin="anonymous" defer></script>
