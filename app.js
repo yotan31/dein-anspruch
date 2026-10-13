@@ -1322,6 +1322,7 @@ document.addEventListener("click", e=>{
       S.termine.eigene=[...(S.termine.eigene||[]),{id:String(Date.now()),t:`Antwort auf Antrag „${bb?bb.t:k}“ da?`,d:isoD(addDays(TODAY(),28)),n:"Falls noch keine Antwort da ist: bei der Kasse nachfragen. Das Datum des Antrags steht in der App."}];
       save(); render(); toast("Super! Wir erinnern dich in 4 Wochen."); break }
     case "dropphoto": if(pending){ if(pending.preview&&pending.preview.startsWith("blob:")) URL.revokeObjectURL(pending.preview); pending.file=null; pending.preview=""; if(pending.keepAsset) pending.dropAsset=true; render() } break;
+    case "au-google": googleLogin(); break;
     case "au-login": case "au-register": case "au-forgot": case "au-newpw": authAction(a); break;
     case "au-mode": authMode=t.dataset.mode; authMsg=""; render(); break;
     case "au-show": { const p=$("au-pw"); if(p){ p.type=p.type==="password"?"text":"password"; t.textContent=p.type==="password"?"Zeigen":"Verbergen" } break }
@@ -1523,6 +1524,8 @@ function viewLogin(){
   return `<section class="panel auth">
     <h2>${reg?"Konto anlegen":fg?"Passwort vergessen":"Willkommen"}</h2>
     <p class="muted">${reg?"Mit einem Konto sind deine Angaben und Belege sicher gespeichert und auf Handy und Computer gleich.":fg?"Gib deine E-Mail-Adresse ein. Wir schicken dir einen Link zum Zurücksetzen.":"Melde dich an, um deine Angaben und Belege zu sehen."}</p>
+    ${fg?"":`<button type="button" class="btn big gbtn" data-act="au-google"><svg viewBox="0 0 48 48" width="22" height="22" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>Mit Google anmelden</button>
+    <div class="orline"><span>oder mit E-Mail</span></div>`}
     <div class="field"><label for="au-mail">E-Mail-Adresse</label><input type="email" id="au-mail" autocomplete="email" inputmode="email" value="${esc(lsGet("dein-anspruch-mail")||"")}"></div>
     ${fg?"":`<div class="field"><label for="au-pw">Passwort${reg?" (mindestens 8 Zeichen)":""}</label><div class="euro"><input type="password" id="au-pw" autocomplete="${reg?"new-password":"current-password"}"><button type="button" class="btn small ghost" data-act="au-show">Zeigen</button></div></div>`}
     ${authMsg?`<p class="notice ${/fehl|falsch|nicht/i.test(authMsg)?"bad":"info"}">${ic("info")}<span>${esc(authMsg)}</span></p>`:""}
@@ -1552,6 +1555,11 @@ async function authAction(a){
     else if(a==="au-newpw"){ r=await sb.auth.updateUser({password:pw}); if(r.error) authMsg="Das neue Passwort konnte nicht gespeichert werden."; else { RECOVERY=false; authMsg=""; toast("Neues Passwort gespeichert") } }
   }catch(e){ authMsg="Keine Verbindung. Bitte Internet prüfen." }
   authBusy=false; render();
+}
+async function googleLogin(){
+  authBusy=true; authMsg=""; render();
+  const {error}=await sb.auth.signInWithOAuth({provider:"google",options:{redirectTo:location.origin+location.pathname}});
+  if(error){ authBusy=false; authMsg=/not enabled|provider/i.test(error.message)?"Die Anmeldung mit Google ist noch nicht eingeschaltet. Bitte vorerst mit E-Mail anmelden.":"Anmeldung mit Google hat nicht geklappt. Bitte erneut versuchen."; render() }
 }
 async function logout(){ try{ await sb.auth.signOut() }catch(e){} lsSet("dein-anspruch-modus",""); USER=null; GUEST=false; S=blank(); BEL=[]; URLS={}; canSave=false; ref=null; render(); scrollTop() }
 
