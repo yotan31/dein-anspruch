@@ -1,0 +1,17 @@
+# Hält die kostenlose Supabase-Datenbank wach (sie pausiert sonst nach 7 Tagen ohne Zugriff).
+name: Datenbank wach halten
+on:
+  schedule:
+    - cron: "23 5 * * *"
+  workflow_dispatch:
+permissions: {}
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Datenbank anpingen
+        run: |
+          curl -fsS -X POST "https://ssamgluufgwsxvkyvaob.supabase.co/rest/v1/rpc/ping" \
+            -H "apikey: sb_publishable_UiXPXKzQ6uKTyQF3SqFQiw_VtjqAAbd" \
+            -H "Content-Type: application/json" -d '{}'
+          echo " – Datenbank ist wach."
