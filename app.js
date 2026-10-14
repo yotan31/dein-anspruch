@@ -619,7 +619,7 @@ function viewWizard(){
       <p class="whelp">Tippe auf „Ändern“, wenn etwas nicht passt.${missing?` ${missing===1?"Eine Angabe ist":missing+" Angaben sind"} noch offen. Das ist nicht schlimm: Im Antrag steht dann eine Lücke, die du von Hand ausfüllen kannst.`:""}</p>
       <dl class="sum">${qs.map((q,j)=>`<div><dt>${esc(lab(q))}</dt><dd>${showVal(q)?esc(showVal(q)):'<span class="open">noch offen</span>'}</dd><button type="button" class="linkbtn" data-wnav="goto:${j}">Ändern</button></div>`).join("")||'<p class="muted">Für diesen Antrag brauchen wir keine weiteren Angaben.</p>'}</dl>
       ${b.k==="jahresbetrag"?vhpSummary():""}
-      <div class="nav big">${i>0?`<button class="btn ghost" type="button" data-wnav="back">Zurück</button>`:"<span></span>"}<button class="btn" type="button" data-wnav="next">Antrag erstellen</button></div>
+      <div class="nav big go">${i>0?`<button class="btn ghost" type="button" data-wnav="back">Zurück</button>`:"<span></span>"}<button class="btn" type="button" data-wnav="next">Antrag erstellen</button></div>
     </section>`;
   }
   if(step.type==="done") return viewDone(b);
@@ -627,7 +627,7 @@ function viewWizard(){
     <h2 class="wq"><label for="wq-${step.k}">${esc(lab(step))}</label></h2>
     ${step.help?`<p class="whelp">${ic("info")}<span>${esc(step.help)}</span></p>`:""}
     ${qInput(step)}
-    <div class="nav big">
+    <div class="nav big go">
       ${i>0?`<button class="btn ghost" type="button" data-wnav="back">Zurück</button>`:`<button class="btn ghost" type="button" data-wnav="close">Abbrechen</button>`}
       <span class="btnrow">${showVal(step)?"":`<button class="btn ghost" type="button" data-wnav="next">Weiß ich nicht</button>`}<button class="btn" type="button" data-wnav="next">Weiter</button></span>
     </div>
@@ -875,7 +875,7 @@ function viewRechner(){
     ${R.i===0?`<p class="small muted">Beantworte die Fragen so, wie es an einem normalen Tag ist, nicht an einem besonders guten.</p>`:""}
     <h2 class="wq">${esc(q.q)}</h2>
     <div class="choices big">${q.o.map(([v,t,s])=>`<label class="choice" for="rq-${v}"><input type="radio" id="rq-${v}" name="rq" data-rq="${v}" ${R.a[R.i]===v?"checked":""}><span>${esc(t)}${s?`<small>${esc(s)}</small>`:""}</span></label>`).join("")}</div>
-    <div class="nav big">${R.i>0?`<button class="btn ghost" type="button" data-act="r-back">Zurück</button>`:"<span></span>"}${R.a[R.i]!=null?`<button class="btn" type="button" data-act="r-next">Weiter</button>`:""}</div>
+    <div class="nav big go">${R.i>0?`<button class="btn ghost" type="button" data-act="r-back">Zurück</button>`:"<span></span>"}${R.a[R.i]!=null?`<button class="btn" type="button" data-act="r-next">Weiter</button>`:""}</div>
   </section>`;
 }
 
@@ -1190,8 +1190,88 @@ function choice(name,val,label,small,type="radio",checked=false){
   const id=`${name}-${val}`.replace(/[^a-zA-Z0-9-_]/g,"_");
   return `<label class="choice" for="${id}"><input type="${type}" id="${id}" name="${name}" value="${esc(val)}" ${checked?"checked":""}><span>${esc(label)}${small?`<small>${esc(small)}</small>`:""}</span></label>`;
 }
-function render(){ renderHero(); renderTabs(); renderMain(); try{ applyI18n(document.querySelector(".wrap")) }catch(e){} }
-function scrollTop(){ window.scrollTo({top:0}) }
+/* ---------- Sanftes Neuzeichnen: nur geänderte Teile austauschen, Bildschirmwechsel animieren ---------- */
+const RM=(()=>{ try{ return matchMedia("(prefers-reduced-motion: reduce)").matches }catch(e){ return false } })();
+const IH=Object.getOwnPropertyDescriptor(Element.prototype,"innerHTML");
+function sameNode(a,b){
+  if(a.nodeType!==b.nodeType||a.nodeName!==b.nodeName) return false;
+  if(a.nodeType!==1) return true;
+  if(a.id||b.id) return a.id===b.id;
+  if(a.nodeName==="INPUT" && a.type!==b.getAttribute("type")) return false;
+  return true;
+}
+function morphKids(par,np){
+  let o=par.firstChild, n=np.firstChild;
+  while(n){
+    const next=n.nextSibling;
+    if(o && sameNode(o,n)){ morphNode(o,n); o=o.nextSibling }
+    else {
+      let m=null;
+      if(n.nodeType===1 && n.id){ for(let c=o;c;c=c.nextSibling){ if(c.nodeType===1&&c.id===n.id){ m=c; break } } }
+      if(m){ par.insertBefore(m,o); morphNode(m,n) } else par.insertBefore(n,o);
+    }
+    n=next;
+  }
+  while(o){ const nx=o.nextSibling; par.removeChild(o); o=nx }
+}
+function morphNode(a,b){
+  if(a.nodeType!==1){ if(a.nodeValue!==b.nodeValue) a.nodeValue=b.nodeValue; return }
+  for(const at of [...a.attributes]) if(!b.hasAttribute(at.name)) a.removeAttribute(at.name);
+  for(const at of b.attributes) if(a.getAttribute(at.name)!==at.value) a.setAttribute(at.name,at.value);
+  const tag=a.nodeName;
+  if(tag==="INPUT"){
+    if(a.type==="checkbox"||a.type==="radio") a.checked=b.hasAttribute("checked");
+    else if(a.type!=="file" && document.activeElement!==a){ const v=b.getAttribute("value")||""; if(a.value!==v) a.value=v }
+    return;
+  }
+  if(tag==="TEXTAREA"){ if(document.activeElement!==a){ const v=b.textContent; if(a.value!==v) a.value=v } return }
+  morphKids(a,b);
+  if(tag==="SELECT"){ const s=a.querySelector("option[selected]"); if(s) a.value=s.value; else if(a.options.length && !b.querySelector("option[selected]")) a.selectedIndex=0 }
+}
+function smoothEl(el){
+  if(!el||el._smooth) return; el._smooth=true;
+  Object.defineProperty(el,"innerHTML",{configurable:true,get(){ return IH.get.call(this) },set(html){
+    const t=document.createElement("template"); IH.set.call(t,html); morphKids(this,t.content);
+  }});
+}
+["hero","tabs","main"].forEach(id=>smoothEl(document.getElementById(id)));
+const TAB_ORDER=["ansprueche","belege","termine"];
+function famKey(){
+  if(RECHNER) return "r";
+  if(typeof USER!=="undefined" && !USER && !GUEST) return "login";
+  if(typeof showPersons!=="undefined" && showPersons) return "persons";
+  if(S.wiz) return "w:"+S.wiz.k;
+  if(!S.done) return "q";
+  return "tab:"+(typeof FALL_ID!=="undefined"?FALL_ID:"");
+}
+function screenIdx(){ return RECHNER?RECHNER.i : S.wiz?S.wiz.i : !S.done?S.step : TAB_ORDER.indexOf(S.tab) }
+let lastFam=null, lastIdx=0, lastCash=null, figAnim=0;
+function animateScreen(dir){
+  if(RM) return; const m=$("main"); m.classList.remove("go-f","go-b","go-fade"); void m.offsetWidth; m.classList.add(dir);
+}
+function countFigure(){
+  const f=document.querySelector("#hero .figure"); if(!f){ lastCash=null; return }
+  const v=sums().cash; const from=lastCash; lastCash=v;
+  if(from==null||from===v||RM) return;
+  f.classList.remove("flash"); void f.offsetWidth; f.classList.add("flash");
+  const t0=performance.now(), d=700;
+  const step=now=>{ const p=Math.min(1,(now-t0)/d), e=1-Math.pow(1-p,3); f.textContent=eur(Math.round(from+(v-from)*e)); if(p<1) figAnim=requestAnimationFrame(step) };
+  figAnim=requestAnimationFrame(step);
+}
+function reveal(el){
+  if(!el) return; const r=el.getBoundingClientRect();
+  if(r.top<70 || r.top>innerHeight*0.45) el.scrollIntoView({block:"start",behavior:RM?"auto":"smooth"});
+}
+function render(){
+  const fam=famKey(), idx=screenIdx(), changed=lastFam!==null && (fam!==lastFam||idx!==lastIdx);
+  if(changed){ const a=document.activeElement; if(a && a!==document.body && a.blur && !(a.closest&&a.closest("#hero"))) try{ a.blur() }catch(e){} }
+  cancelAnimationFrame(figAnim);
+  renderHero(); renderTabs(); renderMain(); try{ applyI18n(document.querySelector(".wrap")) }catch(e){}
+  if(changed) animateScreen(fam===lastFam ? (idx>=lastIdx?"go-f":"go-b") : "go-fade");
+  lastFam=fam; lastIdx=idx;
+  countFigure();
+}
+function scrollTop(){ window.scrollTo({top:0,behavior:"instant"}) }
 
 function sums(){
   const all=applicable(); const offen=all.filter(b=>!S.genutzt[b.k]);
@@ -1206,7 +1286,7 @@ function renderHero(){
   const personBtn = curF ? `<button type="button" class="acct person" data-act="persons" aria-expanded="${showPersons}">${ic("user")}${esc(fallName(curF))} ▾</button>` : "";
   const acct = USER?`<button type="button" class="acct" data-act="logout" title="${esc(USER.email||"")}">Abmelden</button>`:GUEST?`<button type="button" class="acct" data-act="guest-register">Konto anlegen</button>`:"";
   const fontsw=`<div class="fontsw" role="group" aria-label="Schriftgröße">${[["1","A"],["1.15","A+"],["1.3","A++"]].map(([v,t])=>`<button type="button" data-font="${v}" aria-pressed="${(S.font||"1")===v}" aria-label="Schrift ${t}">${t}</button>`).join("")}</div>`;
-  if(S.wiz||RECHNER){ $("hero").innerHTML=`<div class="row">${brand}<div class="row" style="gap:12px">${langSelect()}${personBtn}${fontsw}${save}${acct}</div></div>`; return }
+  if(S.wiz||RECHNER||(S.done&&S.tab!=="ansprueche")){ $("hero").innerHTML=`<div class="row">${brand}<div class="row" style="gap:12px">${langSelect()}${personBtn}${fontsw}${save}${acct}</div></div>`; return }
   if(!S.done){
     $("hero").innerHTML=`<div class="row">${brand}<div class="row" style="gap:12px">${langSelect()}${personBtn}${fontsw}${save}${acct}</div></div>
      <p class="lead">Pflegegrad oder Schwerbehinderung: Wir prüfen, welche Leistungen 2026 noch offen sind, schreiben die Anträge vor, sortieren deine Belege und erinnern an Fristen.</p>`;
@@ -1253,7 +1333,7 @@ function stepper(){
   return `<div class="stepper"><div class="meta"><span>Schritt ${n} von ${vs.length}</span><span>${vs[S.step].label}</span></div><div class="bar"><i style="width:${Math.round(n/vs.length*100)}%"></i></div></div>`;
 }
 function nav(canNext=true,nextLabel="Weiter",why="Bitte beantworte zuerst die Frage oben."){
-  return `<p class="notice navwarn" id="navwarn" hidden>${ic("alert")}<span>${esc(why)}</span></p><div class="nav">${S.step>0?`<button class="btn ghost" type="button" data-act="back">Zurück</button>`:"<span></span>"}<button class="btn big" type="button" data-act="next" data-ok="${canNext?1:0}">${nextLabel}</button></div>`;
+  return `<p class="notice navwarn" id="navwarn" hidden>${ic("alert")}<span>${esc(why)}</span></p><div class="nav go">${S.step>0?`<button class="btn ghost" type="button" data-act="back">Zurück</button>`:"<span></span>"}<button class="btn big" type="button" data-act="next" data-ok="${canNext?1:0}">${nextLabel}</button></div>`;
 }
 const VIEWS = {
  start:()=>`<section class="panel">${stepper()}
@@ -1511,7 +1591,7 @@ function pendingForm(){
       <div class="field"><label for="pb">Betrag</label><div class="euro"><input type="text" inputmode="decimal" id="pb" data-pend="betrag" value="${esc(p.betrag)}" placeholder="z. B. 5,00"><span>€</span></div></div>
     </div>
     <div class="field"><label for="pt">Kurze Beschreibung (freiwillig)</label><input type="text" id="pt" data-pend="titel" value="${esc(p.titel)}" placeholder="z. B. Apotheke am Markt"></div>
-    <div class="nav big"><button class="btn ghost" type="button" data-act="cancelbeleg" ${busy?"disabled":""}>Abbrechen</button><button class="btn" type="button" data-act="savebeleg" ${busy?"disabled":""}>${busy?"Speichert …":p.editId?"Änderungen speichern":"Beleg speichern"}</button></div>
+    <div class="nav big go"><button class="btn ghost" type="button" data-act="cancelbeleg" ${busy?"disabled":""}>Abbrechen</button><button class="btn" type="button" data-act="savebeleg" ${busy?"disabled":""}>${busy?"Speichert …":p.editId?"Änderungen speichern":"Beleg speichern"}</button></div>
   </div>`;
 }
 /* ---------- Reiter: Termine ---------- */
@@ -1743,7 +1823,7 @@ document.addEventListener("click", e=>{
   if(t.dataset.subToggle){toggleSubmitted(t.dataset.subToggle);return}
   if(t.dataset.view){$("lbimg").src=blobUrl(t.dataset.view);$("lightbox").hidden=false;return}
   if(t.dataset.delown){S.termine.eigene=(S.termine.eigene||[]).filter(x=>x.id!==t.dataset.delown);save();render();return}
-  if(t.dataset.open){openKey = openKey===t.dataset.open?null:t.dataset.open; render(); const el=$("it-"+t.dataset.open); el&&el.scrollIntoView({block:"start"});return}
+  if(t.dataset.open){openKey = openKey===t.dataset.open?null:t.dataset.open; render(); if(openKey) reveal($("it-"+openKey));return}
   if(t.dataset.copy){const b=B.find(x=>x.k===t.dataset.copy);const L=curLetter(b);copy(`Betreff: ${L.subject}\n\n${L.body}`);return}
   if(t.dataset.pdf){makePDF(B.find(x=>x.k===t.dataset.pdf));return}
   if(t.dataset.resettx){delete S.texte[t.dataset.resettx];delete S.texte[t.dataset.resettx+"_sub"];save();render();return}
@@ -1813,7 +1893,7 @@ document.addEventListener("change", e=>{
   if(t.dataset.bd && bescheidDraft){ bescheidDraft[t.dataset.bd]=t.value; return }
   if(t.dataset.fall){ openFall(t.dataset.fall); scrollTop(); return }
   if(t.id==="entl-seit"){ S.entlSeit=t.value; save(); render(); return }
-  if(t.dataset.wq && t.type==="radio"){ const q=wizSteps().list.find(x=>x.k===t.dataset.wq); if(q){ setQ(q,t.value); render() } return }
+  if(t.dataset.wq && t.type==="radio"){ const q=wizSteps().list.find(x=>x.k===t.dataset.wq); if(q){ setQ(q,t.value); render(); const k=S.wiz.k, i=S.wiz.i; setTimeout(()=>{ if(S.wiz&&S.wiz.k===k&&S.wiz.i===i){ const nx=document.querySelector('.wiz .nav [data-wnav="next"]:not(.ghost)'); nx&&nx.click() } },420) } return }
   if(t.dataset.wqm){ const q=wizSteps().list.find(x=>x.k===t.dataset.wqm); if(q){ const cur=Array.isArray(getQ(q))?getQ(q):[]; setQ(q, t.checked?[...cur,t.value]:cur.filter(x=>x!==t.value)); render() } return }
   if(t.dataset.wq && t.type==="date"){ const q=wizSteps().list.find(x=>x.k===t.dataset.wq); if(q){ setQ(q,t.value); render() } return }
   if(n==="rolle") S.rolle=t.value;
