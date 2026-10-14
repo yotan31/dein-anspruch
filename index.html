@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'wasm-unsafe-eval'; worker-src 'self' blob: https://cdn.jsdelivr.net; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://cdn.jsdelivr.net data: blob:; img-src 'self' data: blob: https://*.supabase.co; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'wasm-unsafe-eval'; worker-src 'self' blob: https://cdn.jsdelivr.net; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://cdn.jsdelivr.net data: blob:; img-src 'self' data: blob: https://*.supabase.co; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'self'">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex, nofollow">
 <meta name="description" content="Pflegegrad oder Schwerbehinderung: Welche Leistungen stehen noch zu? Mit fertigen Anträgen, Belege-Ablage und Fristen.">
@@ -257,6 +257,17 @@ details.used summary{cursor:pointer;font-weight:700;padding:6px 0}
 
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:10px;font-size:.95rem;max-width:calc(100% - 32px);z-index:30}
 footer{font-size:.83rem;color:var(--muted);padding-top:6px;display:flex;flex-direction:column;gap:6px}
+/* Sammel-PDF */
+.bulklist{display:flex;flex-direction:column;gap:12px}
+.bulkitem{display:grid;grid-template-columns:96px 1fr;gap:12px;border:1.5px solid var(--line);border-radius:12px;padding:12px;background:var(--paper);transition:opacity .2s,border-color .2s}
+.bulkitem .bion{grid-column:1/-1;display:flex;align-items:center;gap:8px;font-weight:700;cursor:pointer}
+.bulkitem .bion input{width:22px;height:22px;accent-color:var(--accent)}
+.bulkitem.off{opacity:.5}
+.bulkitem .bthumb{width:96px;border:1px solid var(--line);border-radius:6px;background:#fff;align-self:start}
+.bulkitem .bfields{display:flex;flex-direction:column;gap:10px;min-width:0}
+.bulkitem .field select{width:100%}
+.bulkitem .miss{color:var(--danger);font-weight:700;font-size:.8rem}
+@media (max-width:460px){.bulkitem{grid-template-columns:64px 1fr}.bulkitem .bthumb{width:64px}.bulkitem .grid2{grid-template-columns:1fr}}
 /* Gefühl einer App: Rückmeldung beim Tippen, sanfte Wechsel */
 html{-webkit-tap-highlight-color:transparent}
 button,.btn,.choice,a,select,label{touch-action:manipulation}
@@ -287,6 +298,7 @@ button,.btn,.choice,a,select,label{touch-action:manipulation}
   .tabs button[aria-selected="true"]{background:var(--accent-soft);color:var(--accent)}
   .tabs .badge{position:absolute;top:2px;left:calc(50% + 8px)}
   .item{scroll-margin-top:12px}
+  body:has(#tabs:not([hidden])) .nav.go{bottom:calc(72px + env(safe-area-inset-bottom,0px))}
   body:has(#tabs:not([hidden])) .toast{bottom:calc(92px + env(safe-area-inset-bottom,0px))}
   .nav.go{position:sticky;bottom:0;z-index:6;display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 -22px;padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));background:var(--paper);border-top:1px solid var(--line);border-radius:0 0 var(--r) var(--r);box-shadow:0 -6px 16px rgba(19,35,58,.06)}
   .nav.go:last-child{margin-bottom:-22px}
@@ -332,6 +344,7 @@ hr.sep{border:0;border-top:1px solid var(--line);margin:4px 0}
 <div class="lightbox" id="lightbox" hidden><button class="btn small" type="button" id="lbclose">Schließen</button><img id="lbimg" alt="Beleg"></div>
 <input type="file" id="fileCam" accept="image/*" capture="environment" hidden>
 <input type="file" id="fileAny" accept="image/*,application/pdf" hidden>
+<input type="file" id="fileJson" accept="application/json,.json" hidden>
 
 <script src="app.js"></script>
 </body>
