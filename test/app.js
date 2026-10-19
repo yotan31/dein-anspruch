@@ -1,1663 +1,47 @@
-"use strict";
-
-/* ---------- Beträge und Grenzen (jedes Jahr im Dezember prüfen!) ----------
-   Alle Geldbeträge und Prozentsätze, die sich durch Gesetz oder Verordnung ändern, stehen nur hier.
-   Bei Änderungen: Werte anpassen, "stand" setzen, dann `node --test tests/` laufen lassen
-   (tests/rechnungen.test.mjs enthält die erwarteten Werte und muss mit angepasst werden). */
-const BETRAEGE = Object.freeze({
-  jahr: 2026,
-  stand: "Leistungsübersicht des Bundesgesundheitsministeriums, Stand 01.01.2026",
-
-  // Pflegeversicherung (SGB XI), Index = Pflegegrad 0–5, Euro pro Monat
-  pflegegeld:   [0, 0, 347, 599, 800, 990],         // § 37
-  sachleistung: [0, 0, 796, 1497, 1859, 2299],      // § 36
-  tagespflege:  [0, 0, 721, 1357, 1685, 2085],      // § 41
-  stationaer:   [0, 131, 805, 1319, 1855, 2096],    // § 43
-  rentenbeitrag:[0, 0, 198.62, 316.32, 514.94, 735.63], // Rentenbeiträge für die Pflegeperson (Höchstwerte)
-  entlastung: 131,          // § 45b, pro Monat
-  jahresbetrag: 3539,       // § 42a, gemeinsamer Jahresbetrag Verhinderungs- und Kurzzeitpflege
-  verbrauch: 42,            // § 40 Abs. 2, Pflegehilfsmittel zum Verbrauch pro Monat
-  wohnumfeld: 4180,         // § 40 Abs. 4, je Maßnahme
-  wg: 224,                  // § 38a, Wohngruppenzuschlag pro Monat
-  dipa: 40, dipaUnterstuetzung: 30, // § 40a/b, digitale Pflegeanwendungen pro Monat
-  eingliederungMax: 278,    // § 43a, Höchstbetrag pro Monat
-  heimZuschlag: [15, 30, 50, 75], // § 43c, Prozent des Eigenanteils nach 0/12/24/36 Monaten
-
-  kmPauschale: 0.20,        // Fahrtkosten der Ersatzpflegeperson je km (Verhinderungspflege)
-
-  // Steuer (EStG)
-  pflegePauschbetrag: [0, 0, 600, 1100, 1800, 1800],  // § 33b Abs. 6, pro Jahr nach Pflegegrad
-  behindertenPauschbetrag: {20:384, 30:620, 40:860, 50:1140, 60:1440, 70:1780, 80:2120, 90:2460, 100:2840}, // § 33b Abs. 3
-  behindertenPauschbetragErhoeht: 7400, // § 33b Abs. 3 Satz 3: Merkzeichen H, Bl, TBl oder Pflegegrad 4/5
-
-  // Sonstiges
-  rundfunkVoll: 18.36, rundfunkErmaessigt: 6.12, // Rundfunkbeitrag pro Monat
-  elternunterhaltGrenze: 100000,                  // Jahresbrutto, ab dem Kinder für Heimkosten zahlen
-  belastungsgrenzeProzent: 2, belastungsgrenzeChronischProzent: 1, // § 62 SGB V
-});
-
-/* ---------- Stammdaten (Beträge kommen aus 00-betraege.js) ---------- */
-const PG = {
-  pflegegeld:BETRAEGE.pflegegeld,
-  sachleistung:BETRAEGE.sachleistung,
-  tagespflege:BETRAEGE.tagespflege,
-  stationaer:BETRAEGE.stationaer,
-  rv:BETRAEGE.rentenbeitrag,
-  pflegePausch:BETRAEGE.pflegePauschbetrag,
-};
-const ENTLASTUNG=BETRAEGE.entlastung, JAHRESBETRAG=BETRAEGE.jahresbetrag, VERBRAUCH=BETRAEGE.verbrauch, WOHNUMFELD=BETRAEGE.wohnumfeld, WG=BETRAEGE.wg, DIPA=BETRAEGE.dipa, DIPA_UL=BETRAEGE.dipaUnterstuetzung;
-const BEHPAUSCH=BETRAEGE.behindertenPauschbetrag;
-
-const KASSEN = {
-  tk:{name:"Techniker Krankenkasse (TK)", pk:"TK-Pflegeversicherung", mail:"service@tk.de", app:"TK-App (sicherer Upload)"},
-  barmer:{name:"BARMER", pk:"BARMER Pflegekasse", mail:"service@barmer.de", app:"BARMER-App"},
-  dak:{name:"DAK-Gesundheit", pk:"DAK-Gesundheit Pflegekasse", mail:"service@dak.de", app:"Meine DAK (App)"},
-  aok:{name:"AOK", pk:"AOK-Pflegekasse", mail:"", app:"AOK Mein Leben (App)"},
-  ikk:{name:"IKK classic", pk:"IKK classic Pflegekasse", mail:"info@ikk-classic.de", app:"IKK classic App"},
-  andere:{name:"Andere Krankenkasse", pk:"Pflegekasse", mail:"", app:"App oder Online-Postfach deiner Kasse"},
-};
-const AOK_REGIONEN=["Baden-Württemberg","Bayern","PLUS (Sachsen/Thüringen)","Niedersachsen","Rheinland/Hamburg","NordWest","Hessen","Nordost","Rheinland-Pfalz/Saarland","Sachsen-Anhalt","Bremen/Bremerhaven"];
-const WOHNEN = {
-  angehoerige:{t:"Zu Hause, Pflege durch Angehörige/Bekannte", s:"ohne Pflegedienst"},
-  gemischt:{t:"Zu Hause, Angehörige + Pflegedienst", s:"Kombination"},
-  pflegedienst:{t:"Zu Hause, überwiegend Pflegedienst", s:"Sachleistung"},
-  wg:{t:"Ambulant betreute Wohngruppe", s:"Pflege-WG"},
-  heim:{t:"Pflegeheim (vollstationär)", s:"dauerhaft im Heim"},
-  eingliederung:{t:"Wohnheim der Eingliederungshilfe", s:"Einrichtung für Menschen mit Behinderung"},
-};
-const MZ = {G:"G – erheblich gehbehindert",aG:"aG – außergewöhnlich gehbehindert",H:"H – hilflos",Bl:"Bl – blind",TBl:"TBl – taubblind",Gl:"Gl – gehörlos",B:"B – Begleitperson nötig",RF:"RF – Rundfunkbeitrag-Ermäßigung"};
-
-/* ---------- Zustand ---------- */
-const blank = () => ({
-  step:0, done:false, tab:"ansprueche", brutto:"", bruttoJahr:{}, chronisch:"", welcomeSeen:false, bescheid:null, entlSeit:"", ans:{}, sent:{}, wiz:null, font:"1", belegFilter:{jahre:[],kat:""},
-  vhp:{grund:"urlaub",art:"tage",haupt:"",von:"",bis:"",stunden:"",ersatz:"angehoerig",eName:"",eAdresse:"",eBez:"",satz:"",rechnung:"",km:"",verdienst:"",verbraucht:"",auszahlung:"versicherte",iban:""}, termine:{dienst:"",tel:"",besuche:[],eigene:[],wertmarke:""},
-  rolle:"", bereiche:{pflege:true,sb:false},
-  kasse:"", aokRegion:"", kasseAndere:"",
-  pg:"", wohnen:"", verschlechtert:false,
-  pp:{vorhanden:true, stunden10:"", arbeit:""},
-  sb:{status:"", gdb:"", mz:{}, arbeit:false, auto:false, grundsicherung:false},
-  genutzt:{}, status:{}, checks:{}, texte:{},
-  person:{name:"",geb:"",vnr:"",strasse:"",ort:"",absender:"",beziehung:"",absStrasse:"",absOrt:"",tel:"",mail:""},
-});
-let S = blank();
-const isHome = () => ["angehoerige","gemischt","pflegedienst","wg"].includes(S.wohnen);
-const pg = () => Number(S.pg)||0;
-const gdb = () => Number(S.sb.gdb)||0;
-const mz = k => !!S.sb.mz[k];
-const eur = (n,d=0) => n.toLocaleString("de-DE",{minimumFractionDigits:d,maximumFractionDigits:d})+" €";
-const esc = s => String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-
-/* ---------- Leistungskatalog ---------- */
-const PK="pflegekasse", KK="krankenkasse", VA="versorgungsamt", FA="finanzamt";
-const B = [
- {k:"pg_antrag", area:"Pflege", t:"Pflegegrad beantragen", p:"§ 14, § 18 SGB XI",
-  when:()=>S.bereiche.pflege && pg()===0, val:()=>null, short:"Ohne Pflegegrad gibt es keine Leistungen der Pflegekasse. Leistungen gelten ab dem Monat der Antragstellung.",
-  steps:["Antrag formlos bei der Pflegekasse stellen (Brief, E-Mail oder App). Das Datum zählt ab sofort.","Pflegetagebuch über 1–2 Wochen führen: Was klappt nicht mehr allein?","Begutachtung durch den Medizinischen Dienst zu Hause, Angehörige dabei sein.","Bescheid prüfen. Gegen eine zu niedrige Einstufung innerhalb eines Monats Widerspruch einlegen."],
-  docs:["Versichertenkarte/Versichertennummer","Arztberichte, Medikamentenplan","Pflegetagebuch","Vollmacht (wenn Angehörige den Antrag stellen)"],
-  to:PK, ask:"beantrage ich hiermit die Feststellung der Pflegebedürftigkeit und Leistungen der Pflegeversicherung nach dem SGB XI. Bitte beauftragen Sie den Medizinischen Dienst mit der Begutachtung und bieten Sie mir eine Pflegeberatung nach § 7a SGB XI an."},
- {k:"pg_hoch", area:"Pflege", t:"Höheren Pflegegrad beantragen", p:"§ 14, § 18 SGB XI",
-  when:()=>S.bereiche.pflege && pg()>=1 && pg()<5, val:()=>null, opt:true,
-  short:()=>`Wenn der Hilfebedarf gestiegen ist. Pflegegrad ${pg()+1} bringt z. B. ${eur(PG.pflegegeld[pg()+1]-PG.pflegegeld[pg()])} mehr Pflegegeld im Monat.`,
-  steps:["Änderungen der letzten Monate notieren (Stürze, Demenz, nächtliche Hilfe, Inkontinenz).","Antrag auf Höherstufung formlos stellen.","Neue Begutachtung vorbereiten: Pflegetagebuch, aktuelle Arztberichte.","Bescheid prüfen, ggf. Widerspruch innerhalb eines Monats."],
-  docs:["aktuelle Arztberichte","Pflegetagebuch","Bisheriger Pflegegrad-Bescheid"],
-  to:PK, ask:"beantrage ich hiermit eine Höherstufung des Pflegegrades, da sich der Hilfebedarf deutlich erhöht hat. Bitte veranlassen Sie eine erneute Begutachtung durch den Medizinischen Dienst."},
- {k:"pflegegeld", area:"Pflege", t:"Pflegegeld", p:"§ 37 SGB XI", cash:true,
-  when:()=>pg()>=2 && ["angehoerige","gemischt","wg"].includes(S.wohnen),
-  val:()=>PG.pflegegeld[pg()]*12, mon:()=>PG.pflegegeld[pg()],
-  short:()=>`${eur(PG.pflegegeld[pg()])} im Monat, frei verwendbar für pflegende Angehörige. Mit Pflegedienst anteilig als Kombinationsleistung (§ 38).`,
-  steps:["Pflegegeld bei der Pflegekasse beantragen und Pflegeperson benennen.","Kontoverbindung angeben.","Halbjährlichen Beratungsbesuch nach § 37 Abs. 3 einplanen, sonst wird das Pflegegeld gekürzt."],
-  docs:["Name und Anschrift der Pflegeperson(en)","IBAN"],
-  to:PK, ask:()=>`beantrage ich hiermit Pflegegeld nach § 37 SGB XI (bei gleichzeitiger Nutzung eines Pflegedienstes als Kombinationsleistung nach § 38 SGB XI). Die Pflege übernimmt: [Name der Pflegeperson]. Bitte überweisen Sie das Pflegegeld auf folgendes Konto: [IBAN].`},
- {k:"sachleistung", area:"Pflege", t:"Pflegesachleistung (Pflegedienst)", p:"§ 36, § 38 SGB XI",
-  when:()=>pg()>=2 && isHome() , val:()=>null, mon:()=>PG.sachleistung[pg()],
-  short:()=>`Bis ${eur(PG.sachleistung[pg()])} im Monat für einen zugelassenen Pflegedienst. Ungenutztes Budget wird als anteiliges Pflegegeld ausgezahlt.`,
-  steps:["Zugelassenen Pflegedienst auswählen (Preisvergleichsliste der Pflegekasse).","Pflegevertrag abschließen, der Dienst rechnet direkt mit der Kasse ab.","Bei Kombination mit Pflegegeld: Kombinationsleistung beantragen.","Bis zu 40 % des Budgets dürfen in Angebote zur Unterstützung im Alltag umgewandelt werden (§ 45a Abs. 4)."],
-  docs:["Kostenvoranschlag/Pflegevertrag des Pflegedienstes"],
-  to:PK, ask:"beantrage ich hiermit Pflegesachleistungen nach § 36 SGB XI bzw. die Kombinationsleistung nach § 38 SGB XI. Die Versorgung übernimmt der Pflegedienst: [Name des Pflegedienstes]."},
- {k:"entlastung", area:"Pflege", t:"Entlastungsbetrag", p:"§ 45b SGB XI", cash:true,
-  when:()=>pg()>=1 && isHome(), val:()=>ENTLASTUNG*12, mon:()=>ENTLASTUNG,
-  short:`${ENTLASTUNG} € im Monat (${eur(ENTLASTUNG*12)} im Jahr) für Haushaltshilfe, Alltagsbegleitung, Tagespflege oder Kurzzeitpflege. Wird als Erstattung gegen Rechnung gezahlt.`,
-  steps:["Anerkannten Anbieter für Unterstützung im Alltag suchen (Liste bei der Pflegekasse, in BW auch Nachbarschaftshilfe).","Rechnung an die Pflegekasse schicken oder Abtretungserklärung unterschreiben, dann rechnet der Anbieter direkt ab.","Nicht genutzte Beträge werden ins nächste Halbjahr übertragen und verfallen am 30. Juni des Folgejahres."],
-  docs:["Rechnungen des anerkannten Anbieters","ggf. Abtretungserklärung"],
-  to:PK, ask:"beantrage ich hiermit die Erstattung von Aufwendungen aus dem Entlastungsbetrag nach § 45b SGB XI. Die Rechnungen des anerkannten Anbieters [Name] liegen bei. Bitte teilen Sie mir außerdem mit, wie hoch das noch verfügbare Guthaben aus dem Vorjahr ist."},
- {k:"jahresbetrag", area:"Pflege", t:"Verhinderungs- und Kurzzeitpflege", p:"§ 39, § 42, § 42a SGB XI", cash:true,
-  when:()=>pg()>=2 && isHome(), val:()=>JAHRESBETRAG,
-  short:()=>`Gemeinsamer Jahresbetrag von ${eur(JAHRESBETRAG)} für Ersatzpflege, wenn die Hauptpflegeperson verhindert ist (Urlaub, Krankheit, Auszeit), und für Kurzzeitpflege im Heim. Durch nahe Angehörige bis ${eur(PG.pflegegeld[pg()]*2)} plus nachgewiesene Kosten.`,
-  steps:["Unten ausfüllen: Wer pflegt sonst, wer war verhindert, wer hat in dieser Zeit gepflegt.","Belege sammeln (Beispiele siehe unten). Für Privatpersonen reicht eine unterschriebene Quittung, die Vorlage gibt es hier als PDF.","Antrag mit Belegen an die Pflegekasse schicken. Seit 2026 ist kein Antrag vorab nötig.","Frist: spätestens bis 31.12. des Folgejahres (Ausschlussfrist)."],
-  docs:()=>vhpDocs(),
-  to:PK, ask:()=>vhpAsk()},
- {k:"tagespflege", area:"Pflege", t:"Tages- oder Nachtpflege", p:"§ 41 SGB XI",
-  when:()=>pg()>=2 && isHome(), val:()=>null, mon:()=>PG.tagespflege[pg()],
-  short:()=>`Eigenes Budget bis ${eur(PG.tagespflege[pg()])} im Monat, zusätzlich zu Pflegegeld oder Pflegedienst. Ideal, wenn Angehörige berufstätig sind.`,
-  steps:["Tagespflege in der Nähe suchen und Probetag vereinbaren.","Antrag auf teilstationäre Pflege stellen.","Pflegekosten zahlt die Kasse bis zum Budget, Verpflegung und Fahrten teils selbst (dafür Entlastungsbetrag nutzbar)."],
-  docs:["Angebot/Vertrag der Tagespflege"],
-  to:PK, ask:"beantrage ich hiermit Leistungen der Tages- und Nachtpflege nach § 41 SGB XI in der Einrichtung [Name der Tagespflege] ab dem [Datum]."},
- {k:"verbrauch", area:"Pflege", t:"Pflegehilfsmittel zum Verbrauch", p:"§ 40 Abs. 2 SGB XI", cash:true,
-  when:()=>pg()>=1 && isHome(), val:()=>VERBRAUCH*12, mon:()=>VERBRAUCH,
-  short:`Bis ${VERBRAUCH} € im Monat für Handschuhe, Desinfektion, Bettschutzeinlagen, Mundschutz. Viele Anbieter liefern monatlich kostenlos.`,
-  steps:["Anbieter (Apotheke, Sanitätshaus oder Versand) wählen.","Antrag auf Kostenübernahme unterschreiben, der Anbieter reicht ihn meist ein.","Box wird jeden Monat geliefert, keine Zuzahlung."],
-  docs:["Antragsformular des Anbieters oder dieses Schreiben"],
-  to:PK, ask:"beantrage ich hiermit die Kostenübernahme für zum Verbrauch bestimmte Pflegehilfsmittel nach § 40 Abs. 2 SGB XI bis zur Höhe von 42 Euro monatlich. Die Versorgung soll erfolgen durch: [Anbieter]."},
- {k:"technisch", area:"Pflege", t:"Hausnotruf, Pflegebett & technische Hilfsmittel", p:"§ 40 Abs. 1 SGB XI",
-  when:()=>pg()>=1 && isHome(), val:()=>null,
-  short:"Pflegekasse übernimmt die Kosten, Zuzahlung höchstens 10 %, maximal 25 € je Hilfsmittel. Hausnotruf wird in der Regel monatlich bezuschusst.",
-  steps:["Bedarf klären: Hausnotruf, Pflegebett, Lagerungshilfen, Rollator (bei Krankheit über die Krankenkasse).","Kostenvoranschlag beim Sanitätshaus oder Hausnotruf-Anbieter holen.","Antrag mit Kostenvoranschlag einreichen. Erst nach Bewilligung bestellen."],
-  docs:["Kostenvoranschlag","Empfehlung aus dem MD-Gutachten (falls vorhanden)"],
-  to:PK, ask:"beantrage ich hiermit die Versorgung mit folgendem technischen Pflegehilfsmittel nach § 40 Abs. 1 SGB XI: [Hilfsmittel, z. B. Hausnotruf / Pflegebett]. Ein Kostenvoranschlag liegt bei."},
- {k:"wohnumfeld", area:"Pflege", t:"Zuschuss zum Wohnungsumbau", p:"§ 40 Abs. 4 SGB XI",
-  when:()=>pg()>=1 && isHome(), val:()=>null, once:WOHNUMFELD,
-  short:`Bis ${eur(WOHNUMFELD)} je Maßnahme, z. B. bodengleiche Dusche, Treppenlift, Türverbreiterung. Wohnen mehrere Pflegebedürftige zusammen, bis ${eur(WOHNUMFELD*4)}.`,
-  steps:["Umbau planen, zwei Angebote einholen.","Antrag VOR Baubeginn stellen.","Nach Bewilligung bauen lassen und Rechnung einreichen."],
-  docs:["Kostenvoranschläge","Fotos der Ist-Situation","Einverständnis des Vermieters (bei Miete)"],
-  to:PK, ask:"beantrage ich hiermit einen Zuschuss für Maßnahmen zur Verbesserung des individuellen Wohnumfeldes nach § 40 Abs. 4 SGB XI für folgende Maßnahme: [z. B. Umbau der Badewanne zu einer bodengleichen Dusche]. Kostenvoranschläge liegen bei."},
- {k:"dipa", area:"Pflege", t:"Digitale Pflegeanwendungen (DiPA)", p:"§ 40a, § 40b SGB XI",
-  when:()=>pg()>=1 && isHome(), val:()=>null, mon:()=>DIPA+DIPA_UL,
-  short:`Bis ${DIPA} € im Monat für eine zugelassene Pflege-App plus ${DIPA_UL} € für ergänzende Unterstützung durch einen Pflegedienst.`,
-  steps:["Zugelassene DiPA im BfArM-Verzeichnis aussuchen.","Antrag bei der Pflegekasse stellen.","Freischaltcode nach Bewilligung erhalten."],
-  docs:["Name der DiPA"], to:PK, ask:"beantrage ich hiermit die Versorgung mit der digitalen Pflegeanwendung [Name] nach § 40a SGB XI sowie ergänzende Unterstützungsleistungen nach § 39a SGB XI."},
- {k:"wg", area:"Pflege", t:"Wohngruppenzuschlag", p:"§ 38a SGB XI", cash:true,
-  when:()=>pg()>=1 && S.wohnen==="wg", val:()=>WG*12, mon:()=>WG,
-  short:`${WG} € im Monat pauschal für Bewohner ambulant betreuter Wohngruppen.`,
-  steps:["Antrag stellen mit Nachweis über die Wohngruppe und die beauftragte Präsenzkraft."],
-  docs:["Mietvertrag der WG","Vereinbarung mit der Präsenzkraft"], to:PK, ask:"beantrage ich hiermit den Wohngruppenzuschlag nach § 38a SGB XI für die ambulant betreute Wohngruppe [Name, Anschrift]."},
- {k:"beratung", area:"Pflege", t:"Kostenlose Pflegeberatung", p:"§ 7a SGB XI",
-  when:()=>S.bereiche.pflege, val:()=>null,
-  short:"Persönliche Beratung durch die Pflegekasse oder den Pflegestützpunkt, auf Wunsch zu Hause. Sinnvoll, um alle Budgets zu planen.",
-  steps:["Termin bei der Pflegekasse oder dem Pflegestützpunkt vereinbaren.","Diese Ergebnisliste mitnehmen."], docs:["Pflegegrad-Bescheid"],
-  to:PK, ask:"bitte ich um einen Termin für eine individuelle Pflegeberatung nach § 7a SGB XI, gern bei mir zu Hause."},
- {k:"pflegekurs", area:"Pflege", t:"Kostenloser Pflegekurs für Angehörige", p:"§ 45 SGB XI",
-  when:()=>S.bereiche.pflege && S.rolle==="angehoerig", val:()=>null,
-  short:"Kurse und häusliche Schulungen für pflegende Angehörige, auch online. Kostenlos.",
-  steps:["Kursangebot bei der Pflegekasse erfragen oder online buchen."], docs:[],
-  to:PK, ask:"bitte ich um Informationen zu kostenlosen Pflegekursen bzw. einer häuslichen Schulung nach § 45 SGB XI für pflegende Angehörige."},
- {k:"rv", area:"Pflegeperson", t:"Rentenbeiträge für die Pflegeperson", p:"§ 44 SGB XI",
-  when:()=>pg()>=2 && isHome() && S.wohnen!=="pflegedienst" && S.pp.stunden10==="ja" && S.pp.arbeit!=="ueber30",
-  val:()=>null, mon:()=>PG.rv[pg()],
-  short:()=>`Die Pflegekasse zahlt bis ${eur(PG.rv[pg()],2)} im Monat in die Rentenversicherung der Pflegeperson, dazu Arbeitslosen- und Unfallversicherung.`,
-  steps:["Fragebogen zur Zahlung der Beiträge zur sozialen Sicherung für Pflegepersonen bei der Pflegekasse anfordern.","Pflegezeit angeben: mind. 10 Stunden an mind. 2 Tagen pro Woche, Pflegeperson arbeitet höchstens 30 Stunden.","Rentenkonto später prüfen."],
-  docs:["Angaben zur Pflegeperson (Rentenversicherungsnummer, Arbeitszeit)"],
-  to:PK, ask:"beantrage ich hiermit die Zahlung von Beiträgen zur Renten- und Arbeitslosenversicherung für die Pflegeperson [Name, Rentenversicherungsnummer] nach § 44 SGB XI. Die Pflege umfasst mindestens 10 Stunden an mindestens 2 Tagen pro Woche. Bitte senden Sie mir den entsprechenden Fragebogen zu."},
- {k:"pug", area:"Pflegeperson", t:"Pflegeunterstützungsgeld bei akuter Pflegesituation", p:"§ 44a SGB XI, § 2 PflegeZG",
-  when:()=>S.bereiche.pflege && S.pp.arbeit && S.pp.arbeit!=="nein", val:()=>null, opt:true,
-  short:"Berufstätige Angehörige können bis zu 10 Arbeitstage im Jahr freinehmen und erhalten 90 % des Nettolohns von der Pflegekasse.",
-  steps:["Arbeitgeber sofort über die Freistellung informieren.","Ärztliche Bescheinigung über die akute Pflegesituation holen.","Antrag bei der Pflegekasse des Pflegebedürftigen stellen."],
-  docs:["ärztliche Bescheinigung","Entgeltbescheinigung des Arbeitgebers"],
-  to:PK, ask:"beantrage ich hiermit Pflegeunterstützungsgeld nach § 44a Abs. 3 SGB XI für die kurzzeitige Arbeitsverhinderung der Pflegeperson [Name] im Zeitraum [von – bis]. Die ärztliche Bescheinigung liegt bei."},
- {k:"pflegepausch", area:"Steuer", t:"Pflege-Pauschbetrag in der Steuererklärung", p:"§ 33b Abs. 6 EStG",
-  when:()=>pg()>=2 && isHome() && S.rolle==="angehoerig", val:()=>null, frei:()=>PG.pflegePausch[pg()],
-  short:()=>`Pflegende Angehörige können ${eur(PG.pflegePausch[pg()])} pro Jahr steuerlich absetzen, wenn sie unentgeltlich pflegen.`,
-  steps:["In der Einkommensteuererklärung (Anlage Außergewöhnliche Belastungen) eintragen.","Pflegegrad-Bescheid und Steuer-ID der gepflegten Person bereithalten."],
-  docs:["Pflegegrad-Bescheid","Steuer-ID der gepflegten Person"], to:FA},
- {k:"stationaer", area:"Pflegeheim", t:"Leistungsbetrag vollstationäre Pflege", p:"§ 43 SGB XI",
-  when:()=>pg()>=1 && S.wohnen==="heim", val:()=>null, mon:()=>PG.stationaer[pg()],
-  short:()=>`${eur(PG.stationaer[pg()])} im Monat zahlt die Pflegekasse direkt ans Heim.`,
-  steps:["Heimvertrag an die Pflegekasse schicken, das Heim rechnet direkt ab."], docs:["Heimvertrag"],
-  to:PK, ask:"beantrage ich hiermit Leistungen der vollstationären Pflege nach § 43 SGB XI in der Einrichtung [Name des Heims] ab dem [Datum]."},
- {k:"zuschlag", area:"Pflegeheim", t:"Leistungszuschlag zum Eigenanteil prüfen", p:"§ 43c SGB XI",
-  when:()=>pg()>=2 && S.wohnen==="heim", val:()=>null,
-  short:`Die Kasse übernimmt ${BETRAEGE.heimZuschlag[0]} % des pflegebedingten Eigenanteils, nach 12 Monaten ${BETRAEGE.heimZuschlag[1]} %, nach 24 Monaten ${BETRAEGE.heimZuschlag[2]} %, nach 36 Monaten ${BETRAEGE.heimZuschlag[3]} %. Frühere Heimaufenthalte zählen mit.`,
-  steps:["Heimrechnung prüfen: Ist der Zuschlag abgezogen und die richtige Stufe angesetzt?","Frühere Heimzeiten (auch in anderen Heimen) der Kasse melden.","Bei Fehlern schriftlich Neuberechnung verlangen."],
-  docs:["Heimrechnungen","Nachweise früherer Heimaufenthalte"],
-  to:PK, ask:"bitte ich um Prüfung und ggf. Neuberechnung des Leistungszuschlags nach § 43c SGB XI. Der Aufenthalt in vollstationärer Pflege begann am [Datum]. Frühere Aufenthalte: [Einrichtung, Zeitraum]."},
- {k:"hzp", area:"Pflegeheim", t:"Hilfe zur Pflege vom Sozialamt", p:"§ 61 ff. SGB XII",
-  when:()=>S.bereiche.pflege && (S.wohnen==="heim"), val:()=>null, opt:true,
-  short:`Reichen Rente und Vermögen nicht für den Eigenanteil, übernimmt das Sozialamt den Rest. Kinder zahlen erst ab ${eur(BETRAEGE.elternunterhaltGrenze)} Jahresbrutto.`,
-  steps:["Antrag beim Sozialamt stellen, sobald das Geld knapp wird. Leistungen gibt es erst ab Antrag.","Einkommens- und Vermögensnachweise sammeln."],
-  docs:["Rentenbescheid","Kontoauszüge","Heimvertrag und Rechnungen"], to:"sozialamt",
-  ask:"beantrage ich hiermit Hilfe zur Pflege nach §§ 61 ff. SGB XII, da Einkommen und Vermögen nicht ausreichen, um die Kosten der vollstationären Pflege zu decken."},
- {k:"eingliederung", area:"Pflege", t:"Pauschale in Einrichtungen der Eingliederungshilfe", p:"§ 43a SGB XI",
-  when:()=>pg()>=2 && S.wohnen==="eingliederung", val:()=>null, mon:()=>BETRAEGE.eingliederungMax,
-  short:`Die Pflegekasse übernimmt 15 % der Vergütung, höchstens ${BETRAEGE.eingliederungMax} € im Monat. An Wochenenden zu Hause kann anteilig Pflegegeld fließen.`,
-  steps:["Einrichtung fragen, ob die Pauschale abgerechnet wird.","Für Tage zu Hause anteiliges Pflegegeld beantragen."], docs:["Bescheinigung der Einrichtung über Heimfahrtstage"],
-  to:PK, ask:"beantrage ich hiermit anteiliges Pflegegeld für die Tage der häuslichen Pflege außerhalb der Einrichtung [Name] (Nachweis liegt bei)."},
- {k:"fahrten", area:"Krankenkasse", t:"Fahrten zur ambulanten Behandlung", p:"§ 60 SGB V",
-  when:()=>pg()>=3 || mz("aG") || mz("Bl") || mz("H"), val:()=>null,
-  short:"Bei Pflegegrad 4 oder 5 bzw. Merkzeichen aG, Bl oder H gelten Taxifahrten zu ambulanten Arztterminen als genehmigt. Bei Pflegegrad 3 mit dauerhaft eingeschränkter Mobilität auf Antrag.",
-  steps:["Ärztin oder Arzt stellt die Verordnung einer Krankenbeförderung aus.","Bei Pflegegrad 3 vorab Genehmigung bei der Krankenkasse holen.","Zuzahlung 10 %, mind. 5 €, max. 10 € je Fahrt (auf Belastungsgrenze anrechenbar)."],
-  docs:["Verordnung Krankenbeförderung","Pflegegrad-Bescheid oder Ausweis"],
-  to:KK, ask:"beantrage ich hiermit die Genehmigung von Krankenfahrten zu ambulanten Behandlungen nach § 60 Abs. 1 SGB V. Die ärztliche Verordnung liegt bei."},
- {k:"chroniker", area:"Krankenkasse", t:"Zuzahlungen begrenzen (1 % statt 2 %)", p:"§ 62 SGB V",
-  when:()=>pg()>=3 || gdb()>=60, val:()=>null,
-  short:"Wer als schwerwiegend chronisch krank gilt (z. B. ab Pflegegrad 3 oder GdB 60 wegen der Erkrankung), zahlt höchstens 1 % des Bruttoeinkommens pro Jahr zu. Darüber gibt es Befreiung.",
-  steps:["Quittungen für Zuzahlungen (Apotheke, Fahrten, Therapie) sammeln.","Ärztliche Bescheinigung über die Dauerbehandlung holen.","Befreiung beantragen, sobald die Grenze erreicht ist, rückwirkend für das Jahr."],
-  docs:["Quittungen","Einkommensnachweise des Haushalts","Bescheinigung der Dauerbehandlung"],
-  to:KK, ask:"beantrage ich hiermit die Befreiung von Zuzahlungen nach § 62 SGB V bzw. die Anerkennung als schwerwiegend chronisch krank (Belastungsgrenze 1 %). Nachweise liegen bei."},
- /* Schwerbehinderung */
- {k:"sb_antrag", area:"Schwerbehinderung", t:"Schwerbehindertenausweis beantragen", p:"§ 152 SGB IX",
-  when:()=>S.bereiche.sb && S.sb.status==="nein", val:()=>null,
-  short:"Ab GdB 50 gibt es den Ausweis und viele Nachteilsausgleiche. Auch GdB 20–40 bringt Steuervorteile. Bei Pflegegrad liegt oft ein GdB vor.",
-  steps:["Antrag beim Versorgungsamt stellen (in Baden-Württemberg: Landratsamt oder Stadtkreis), oft auch online.","Alle Diagnosen und behandelnden Ärzte angeben, Merkzeichen gleich mit beantragen.","Bescheid prüfen, Widerspruch innerhalb eines Monats möglich."],
-  docs:["Arztberichte, Krankenhausberichte","Liste der behandelnden Ärzte mit Schweigepflichtentbindung","Passfoto (für Ausweis)"],
-  to:VA, ask:"beantrage ich hiermit die Feststellung einer Behinderung und des Grades der Behinderung (GdB) nach § 152 SGB IX sowie die Ausstellung eines Schwerbehindertenausweises. Zudem beantrage ich die Prüfung folgender Merkzeichen: [z. B. G, B, H]. Eine Liste der behandelnden Ärztinnen und Ärzte liegt bei."},
- {k:"sb_neu", area:"Schwerbehinderung", t:"Höheren GdB oder Merkzeichen beantragen", p:"§ 152 SGB IX",
-  when:()=>S.bereiche.sb && S.sb.status==="ja" && (gdb()<100 || (pg()>=4 && !mz("H"))), val:()=>null, opt:true,
-  short:()=> (pg()>=4 && !mz("H")) ? "Bei Pflegegrad 4 oder 5 lohnt sich oft der Antrag auf Merkzeichen H: kostenlose Wertmarke und Kfz-Steuerbefreiung." : "Haben sich Erkrankungen verschlechtert oder sind neue hinzugekommen, lohnt ein Neufeststellungsantrag.",
-  steps:["Neue Diagnosen und Befunde sammeln.","Neufeststellungsantrag beim Versorgungsamt stellen.","Gewünschte Merkzeichen ausdrücklich nennen."],
-  docs:["neue Arztberichte","bisheriger Bescheid","Pflegegrad-Bescheid"],
-  to:VA, ask:"beantrage ich hiermit die Neufeststellung des Grades der Behinderung wegen Verschlimmerung bzw. hinzugekommener Gesundheitsstörungen sowie die Prüfung folgender Merkzeichen: [z. B. H, G, B]. Aktuelle Befunde liegen bei."},
- {k:"behpausch", area:"Steuer", t:"Behinderten-Pauschbetrag", p:"§ 33b EStG",
-  when:()=>gdb()>=20 || pg()>=4, val:()=>null,
-  frei:()=>{ if(mz("H")||mz("Bl")||mz("TBl")||pg()>=4) return BETRAEGE.behindertenPauschbetragErhoeht; const g=Math.min(100,Math.floor(gdb()/10)*10); return BEHPAUSCH[g]||0; },
-  short:()=>`Steuerfreibetrag von ${eur(B.find(x=>x.k==="behpausch").frei())} pro Jahr. Kann auf Eltern oder Kinder übertragen werden, wenn die Person selbst keine Steuern zahlt.`,
-  steps:["In der Steuererklärung eintragen (Anlage Außergewöhnliche Belastungen).",`Bescheid bzw. Ausweis bereithalten. Bei Pflegegrad 4/5 genügt der Pflegegrad-Bescheid für ${eur(BETRAEGE.behindertenPauschbetragErhoeht)}.`,"Rückwirkend für noch offene Steuerjahre beantragen."],
-  docs:["Ausweis/Bescheid oder Pflegegrad-Bescheid"], to:FA},
- {k:"fahrtpausch", area:"Steuer", t:"Behinderungsbedingte Fahrtkostenpauschale", p:"§ 33 Abs. 2a EStG",
-  when:()=>(gdb()>=80) || (gdb()>=70 && mz("G")) || mz("aG")||mz("Bl")||mz("TBl")||mz("H")||pg()>=4, val:()=>null,
-  frei:()=> (mz("aG")||mz("Bl")||mz("TBl")||mz("H")||pg()>=4) ? 4500 : 900,
-  short:()=>`${eur(B.find(x=>x.k==="fahrtpausch").frei())} pro Jahr zusätzlich steuerlich absetzbar, ohne Einzelnachweis.`,
-  steps:["In der Steuererklärung (Anlage Außergewöhnliche Belastungen) eintragen."], docs:["Ausweis/Bescheid"], to:FA},
- {k:"wertmarke", area:"Schwerbehinderung", t:"Freifahrt im Nahverkehr (Wertmarke)", p:"§ 228 SGB IX",
-  when:()=>S.sb.status==="ja" && (mz("G")||mz("aG")||mz("Gl")||mz("H")||mz("Bl")), val:()=>null,
-  short:()=> (mz("H")||mz("Bl")||S.sb.grundsicherung) ? "Kostenlose Wertmarke: Bus, Bahn und Regionalverkehr in ganz Deutschland frei." : "Wertmarke für 104 € im Jahr (53 € halbjährlich): Bus, Bahn und Regionalverkehr in ganz Deutschland. Alternative zur Kfz-Steuerermäßigung.",
-  steps:["Beiblatt mit Wertmarke beim Versorgungsamt beantragen.","Bei Merkzeichen H, Bl oder Bezug von Grundsicherung/Bürgergeld kostenlos.","Mit Merkzeichen B fährt eine Begleitperson immer kostenlos mit, auch im Fernverkehr der Bahn."],
-  docs:["Ausweis","ggf. Bescheid über Grundsicherung/Bürgergeld"],
-  to:VA, ask:"beantrage ich hiermit die Ausstellung eines Beiblatts mit Wertmarke für die unentgeltliche Beförderung im öffentlichen Personennahverkehr nach § 228 SGB IX."},
- {k:"kfz", area:"Schwerbehinderung", t:"Kfz-Steuer-Befreiung oder -Ermäßigung", p:"§ 3a KraftStG",
-  when:()=>S.sb.auto && (mz("aG")||mz("Bl")||mz("TBl")||mz("H")||mz("G")||mz("Gl")), val:()=>null,
-  short:()=> (mz("aG")||mz("Bl")||mz("TBl")||mz("H")) ? "100 % Befreiung von der Kfz-Steuer, zusätzlich zur kostenlosen Wertmarke möglich." : "50 % Ermäßigung der Kfz-Steuer. Gilt nicht gleichzeitig mit der Wertmarke, also abwägen.",
-  steps:["Antrag beim Hauptzollamt (zuständig für die Kfz-Steuer) stellen.","Fahrzeug muss auf die schwerbehinderte Person zugelassen sein."],
-  docs:["Ausweis","Fahrzeugschein"], to:"hauptzollamt",
-  ask:"beantrage ich hiermit die Steuerbefreiung bzw. -ermäßigung nach § 3a Kraftfahrzeugsteuergesetz für das Fahrzeug mit dem amtlichen Kennzeichen [Kennzeichen]."},
- {k:"park", area:"Schwerbehinderung", t:"Blauer EU-Parkausweis", p:"§ 46 StVO",
-  when:()=>mz("aG")||mz("Bl")||mz("TBl"), val:()=>null,
-  short:"Parken auf Behindertenparkplätzen und Parkerleichterungen in ganz Europa.",
-  steps:["Antrag bei der Straßenverkehrsbehörde bzw. dem Bürgeramt stellen.","Passfoto und Ausweis mitbringen."], docs:["Ausweis","Passfoto"], to:"strassenverkehrsbehoerde",
-  ask:"beantrage ich hiermit die Ausstellung eines Parkausweises für Menschen mit Behinderung (blauer EU-Parkausweis)."},
- {k:"rundfunk", area:"Schwerbehinderung", t:"Ermäßigter Rundfunkbeitrag", p:"§ 4 RBStV", cash:true,
-  when:()=>mz("RF")||mz("TBl"), val:()=> mz("TBl")?Math.round(BETRAEGE.rundfunkVoll*12*100)/100:Math.round((BETRAEGE.rundfunkVoll-BETRAEGE.rundfunkErmaessigt)*12*100)/100,
-  short:()=> mz("TBl") ? `Taubblinde Menschen werden ganz befreit (${eur(BETRAEGE.rundfunkVoll,2)} im Monat gespart).` : `Nur ${eur(BETRAEGE.rundfunkErmaessigt,2)} statt ${eur(BETRAEGE.rundfunkVoll,2)} im Monat zahlen.`,
-  steps:["Antrag beim ARD ZDF Deutschlandradio Beitragsservice stellen (online oder per Formular).","Kopie des Ausweises mit Merkzeichen beilegen."], docs:["Ausweis (Vorder- und Rückseite)"], to:"beitragsservice",
-  ask:"beantrage ich hiermit die Ermäßigung bzw. Befreiung vom Rundfunkbeitrag nach § 4 Rundfunkbeitragsstaatsvertrag. Eine Kopie des Schwerbehindertenausweises liegt bei. Beitragsnummer: [Beitragsnummer]."},
- {k:"blind", area:"Schwerbehinderung", t:"Blindengeld / Landesblindenhilfe", p:"Landesrecht, § 72 SGB XII",
-  when:()=>mz("Bl")||mz("TBl"), val:()=>null,
-  short:"Monatliche Geldleistung des Bundeslandes, unabhängig vom Einkommen. Höhe je nach Land.",
-  steps:["Antrag beim Versorgungsamt bzw. Landratsamt stellen.","Teile des Pflegegeldes werden angerechnet."], docs:["Augenärztliche Befunde","Ausweis"], to:VA,
-  ask:"beantrage ich hiermit Blindengeld bzw. Landesblindenhilfe nach den landesrechtlichen Vorschriften."},
- {k:"urlaub", area:"Arbeit", t:"5 Tage Zusatzurlaub", p:"§ 208 SGB IX",
-  when:()=>S.sb.arbeit && gdb()>=50, val:()=>null,
-  short:"Schwerbehinderte Beschäftigte haben eine Arbeitswoche mehr Urlaub im Jahr, dazu besonderen Kündigungsschutz.",
-  steps:["Arbeitgeber schriftlich über die Schwerbehinderung informieren.","Zusatzurlaub beantragen, auch rückwirkend für das laufende Jahr."], docs:["Kopie des Ausweises"], to:"arbeitgeber",
-  ask:"teile ich Ihnen mit, dass bei mir eine Schwerbehinderung mit einem GdB von [GdB] festgestellt ist. Ich beantrage daher den Zusatzurlaub nach § 208 SGB IX für das laufende Kalenderjahr."},
- {k:"gleich", area:"Arbeit", t:"Gleichstellung mit Schwerbehinderten", p:"§ 2 Abs. 3 SGB IX",
-  when:()=>S.sb.arbeit && gdb()>=30 && gdb()<50, val:()=>null,
-  short:"Mit GdB 30 oder 40 schützt die Gleichstellung den Arbeitsplatz (Kündigungsschutz, Förderung), aber ohne Zusatzurlaub.",
-  steps:["Antrag bei der Agentur für Arbeit stellen.","Darlegen, warum der Arbeitsplatz gefährdet ist."], docs:["GdB-Bescheid","Arbeitsvertrag"], to:"arbeitsagentur",
-  ask:"beantrage ich hiermit die Gleichstellung mit einem schwerbehinderten Menschen nach § 2 Abs. 3 SGB IX. Der GdB beträgt [GdB]. Ohne Gleichstellung ist der Arbeitsplatz gefährdet, weil [Begründung]."},
- {k:"rente", area:"Arbeit", t:"Altersrente für schwerbehinderte Menschen", p:"§ 37, § 236a SGB VI",
-  when:()=>S.sb.arbeit && gdb()>=50, val:()=>null, opt:true,
-  short:"Bis zu 2 Jahre früher abschlagsfrei in Rente (35 Versicherungsjahre nötig). Der GdB muss bei Rentenbeginn anerkannt sein.",
-  steps:["Kostenlose Beratung bei der Deutschen Rentenversicherung buchen.","Rentenauskunft anfordern."], docs:["Ausweis","Versicherungsverlauf"], to:"rentenversicherung",
-  ask:"bitte ich um eine Rentenauskunft und Beratung zur Altersrente für schwerbehinderte Menschen. Der GdB beträgt [GdB]."},
-];
-
-const RECIP = {
-  pflegekasse:()=>({name: kassePK(), hint: kasseMail()?`E-Mail: ${kasseMail()} (Adresse bitte prüfen). Sicherer: Upload über ${kasseInfo().app}.`:`Adresse steht auf deinem Bescheid oder der Webseite deiner Kasse. Sicher hochladen über ${kasseInfo().app}.`, mail:kasseMail()}),
-  krankenkasse:()=>({name: kasseName(), hint: kasseMail()?`E-Mail: ${kasseMail()} (bitte prüfen) oder ${kasseInfo().app}.`:`Adresse steht auf deiner Versichertenkarte bzw. der Webseite deiner Kasse.`, mail:kasseMail()}),
-  versorgungsamt:()=>({name:"Versorgungsamt", hint:"In Baden-Württemberg: Landratsamt bzw. Stadtkreis deines Wohnortes. In vielen Ländern auch online beantragbar.", mail:""}),
-  finanzamt:()=>({name:"Finanzamt", hint:"Kein Antrag nötig: in der Einkommensteuererklärung eintragen (z. B. über ELSTER).", mail:""}),
-  sozialamt:()=>({name:"Sozialamt", hint:"Sozialamt der Stadt oder des Landkreises am Wohnort.", mail:""}),
-  hauptzollamt:()=>({name:"Hauptzollamt", hint:"Das für deinen Wohnort zuständige Hauptzollamt (zoll.de).", mail:""}),
-  strassenverkehrsbehoerde:()=>({name:"Straßenverkehrsbehörde", hint:"Bürgeramt bzw. Straßenverkehrsbehörde deiner Stadt.", mail:""}),
-  beitragsservice:()=>({name:"ARD ZDF Deutschlandradio Beitragsservice", hint:"Am einfachsten online über rundfunkbeitrag.de.", mail:""}),
-  arbeitgeber:()=>({name:"Arbeitgeber / Personalabteilung", hint:"Direkt an die Personalabteilung.", mail:""}),
-  arbeitsagentur:()=>({name:"Agentur für Arbeit", hint:"Zuständige Agentur für Arbeit am Wohnort.", mail:""}),
-  rentenversicherung:()=>({name:"Deutsche Rentenversicherung", hint:"Beratung kostenlos, Termine über deutsche-rentenversicherung.de.", mail:""}),
-};
-function kasseInfo(){return KASSEN[S.kasse]||KASSEN.andere}
-function kasseName(){ if(S.kasse==="aok") return "AOK "+(S.aokRegion||""); if(S.kasse==="andere") return S.kasseAndere||"Krankenkasse"; return kasseInfo().name }
-function kassePK(){ if(S.kasse==="aok") return "AOK-Pflegekasse "+(S.aokRegion||""); if(S.kasse==="andere") return "Pflegekasse bei der "+(S.kasseAndere||"Krankenkasse"); return kasseInfo().pk }
-function kasseMail(){ return S.kasse==="aok"||S.kasse==="andere" ? "" : kasseInfo().mail }
-
-const txt = (v)=> typeof v==="function"?v():v;
-function applicable(){ return B.filter(b=>{ try{return b.when()}catch(e){return false} }) }
-
-
-/* ---------- Icons ---------- */
-const ICON={
- heart:"M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.5-7 10-7 10z",
- user:"M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8z M4 21a8 8 0 0 1 16 0",
- form:"M5 3h14v18H5z M9 8h6 M9 12h6 M9 16h3",
- building:"M5 21V5h14v16 M9 9h2 M13 9h2 M9 13h2 M13 13h2 M10 21v-4h4v4",
- cross:"M10 4h4v6h6v4h-6v6h-4v-6H4v-4h6z",
- access:"M12 5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z M6 8h12 M12 8v6 M9 21l3-7 3 7",
- case:"M4 8h16v11H4z M9 8V5h6v3 M4 13h16",
- receipt:"M6 3h12v18l-3-2-3 2-3-2-3 2z M9 8h6 M9 12h6 M9 16h3",
- cal:"M4 6h16v14H4z M4 10h16 M8 3v4 M16 3v4",
- list:"M9 6h11 M9 12h11 M9 18h11 M4 6h.01 M4 12h.01 M4 18h.01",
- camera:"M4 8h3l2-3h6l2 3h3v11H4z M12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z",
- file:"M6 3h8l4 4v14H6z M14 3v4h4",
- info:"M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z M12 11v5 M12 8h.01",
- alert:"M12 3l9 16H3z M12 10v4 M12 17h.01",
- check:"M5 12l4 4 10-10",
- down:"M12 4v11 M7 10l5 5 5-5 M5 20h14",
- plus:"M12 5v14 M5 12h14",
- bell:"M6 16V11a6 6 0 0 1 12 0v5l2 2H4z M10 21h4",
-};
-const ic=(n,c="i")=>`<svg class="${c}" viewBox="0 0 24 24" aria-hidden="true"><path d="${ICON[n]}"/></svg>`;
-const AREA_ICON={Pflege:"heart",Pflegeperson:"user",Steuer:"form",Pflegeheim:"building",Krankenkasse:"cross",Schwerbehinderung:"access",Arbeit:"case"};
-
-/* ---------- Datum ---------- */
-const TODAY=()=>{const d=new Date();d.setHours(0,0,0,0);return d};
-const isoD=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
-const parseIso=s=>{if(!s||!/^\d{4}-\d{2}-\d{2}$/.test(s))return null;const [y,m,d]=s.split("-").map(Number);return new Date(y,m-1,d)};
-const deD=d=>d.toLocaleDateString("de-DE");
-const daysUntil=d=>Math.round((d-TODAY())/864e5);
-const addDays=(d,n)=>{const x=new Date(d);x.setDate(x.getDate()+n);return x};
-const MON=["Jan","Feb","Mär","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"];
-function halfOf(d){const h=d.getMonth()<6?1:2;const y=d.getFullYear();return {y,h,start:new Date(y,h===1?0:6,1),end:new Date(y,h===1?5:11,h===1?30:31),label:`${h}. Halbjahr ${y}`}}
-function shiftHalf(H,n){let y=H.y,h=H.h+n;while(h>2){h-=2;y++}while(h<1){h+=2;y--}return halfOf(new Date(y,h===1?0:6,1))}
-
-/* ---------- Befreiungs-Antrag (nur aus Belegen) ---------- */
-B.push({k:"befreiung", area:"Krankenkasse", t:"Antrag auf Befreiung von Zuzahlungen", p:"§ 62 SGB V", when:()=>false, val:()=>null, short:"", steps:[],
-  docs:["Zuzahlungsbelege (siehe Belegübersicht)","Einkommensnachweise aller Haushaltsmitglieder","ggf. Bescheinigung über die Dauerbehandlung (chronisch krank)"], to:KK, ask:()=>{const z=zuz(befJahr);return `beantrage ich hiermit die Befreiung von Zuzahlungen bzw. die Erstattung von Zuzahlungen über der Belastungsgrenze nach § 62 SGB V für das Jahr ${befJahr}. Die Belastungsgrenze beträgt ${z.grenze?eur(z.grenze,2):"[Betrag]"} (${z.pct} % der jährlichen Bruttoeinnahmen zum Lebensunterhalt). Bisher wurden Zuzahlungen in Höhe von ${eur(z.sum,2)} geleistet. Die Belege liegen in Kopie bei. Bitte erstatten Sie den Betrag, der die Belastungsgrenze übersteigt${String(befJahr)===String(new Date().getFullYear())?", und stellen Sie eine Befreiungsbescheinigung für den Rest des Jahres aus":""}.`}});
-
-/* ---------- Verhinderungspflege-Assistent ---------- */
-const KM_SATZ=BETRAEGE.kmPauschale;
-const numDE=x=>Number(String(x??"").replace(/\s/g,"").replace(/\.(?=\d{3}(\D|$))/g,"").replace(",","."))||0;
-const VHP_GRUND={urlaub:"Urlaub",krank:"Krankheit",kur:"Kur oder Reha",termine:"Termine, Erholung oder andere wichtige Gründe"};
-const VHP_ERSATZ={
-  angehoerig:{t:"Nahe Angehörige oder Haushaltsmitglied",s:"verwandt/verschwägert bis 2. Grad (z. B. Kind, Enkel, Geschwister, Schwiegerkind) oder wohnt im selben Haushalt"},
-  privat:{t:"Andere Privatperson",s:"Nachbarin, Freund, Bekannte, entferntere Verwandte (z. B. Nichte, Cousin)"},
-  dienst:{t:"Pflegedienst oder Betreuungsdienst",s:"stellt eine Rechnung"},
-  heim:{t:"Kurzzeitpflege im Heim",s:"vorübergehend in einer Einrichtung"},
-};
-function vhpTage(){const a=parseIso(S.vhp.von), b=parseIso(S.vhp.bis)||a; return a&&b&&b>=a?Math.round((b-a)/864e5)+1:0}
-function vhpCalc(){
-  const v=S.vhp, rest=Math.max(0,JAHRESBETRAG-numDE(v.verbraucht));
-  const basis = (v.ersatz==="dienst"||v.ersatz==="heim") ? numDE(v.rechnung) : numDE(v.stunden)*numDE(v.satz);
-  const cap = v.ersatz==="angehoerig" ? PG.pflegegeld[pg()]*2 : rest;
-  const pflege = basis ? Math.min(basis,cap) : 0;
-  const fahrt = (v.ersatz==="heim") ? 0 : numDE(v.km)*KM_SATZ;
-  const verd = v.ersatz==="angehoerig" ? numDE(v.verdienst) : 0;
-  const total = Math.min(rest, pflege+fahrt+verd);
-  return {rest,basis,cap,pflege,fahrt,verd,total,gekappt:basis>cap};
-}
-function vhpDocs(){
-  const v=S.vhp, d=[];
-  if(v.ersatz==="heim") d.push("Rechnung der Kurzzeitpflege-Einrichtung (Zeitraum, Pflegekosten getrennt von Unterkunft/Verpflegung)");
-  else if(v.ersatz==="dienst") d.push("Rechnung des Pflegedienstes mit Zeitraum und erbrachten Leistungen");
-  else d.push(`Unterschriebene ${v.ersatz==="angehoerig"?"Bestätigung":"Quittung"} der Ersatzpflegeperson mit Zeitraum, Stunden und Betrag (Vorlage als PDF)`);
-  if(v.ersatz!=="heim" && numDE(v.km)) d.push("Fahrtkosten-Aufstellung: Datum, Strecke von–nach, Kilometer je Fahrt");
-  if(v.ersatz==="angehoerig" && numDE(v.verdienst)) d.push("Nachweis Verdienstausfall: Bescheinigung des Arbeitgebers über unbezahlten Urlaub oder Lohnabrechnung");
-  if(v.grund==="krank") d.push("Optional: Krankmeldung der Hauptpflegeperson (manche Kassen fragen danach)");
-  if(v.auszahlung==="ersatz") d.push("Kontoverbindung der Ersatzpflegeperson");
-  return d;
-}
-function vhpZeitraum(){const a=parseIso(S.vhp.von), b=parseIso(S.vhp.bis); return a ? (b&&+b!==+a?`vom ${deD(a)} bis ${deD(b)}`:`am ${deD(a)}`) : "im Zeitraum [von – bis]"}
-function vhpAsk(){
-  const v=S.vhp, c=vhpCalc(), zr=vhpZeitraum();
-  const pay = `Bitte überweisen Sie den Erstattungsbetrag ${v.auszahlung==="ersatz"?`direkt an die Ersatzpflegeperson ${v.eName||"[Name]"}, IBAN: ${v.iban||"[IBAN]"}`:`auf folgendes Konto: ${v.iban||"[IBAN]"}`}.`;
-  if(v.ersatz==="heim") return `beantrage ich hiermit Leistungen der Kurzzeitpflege nach § 42 SGB XI aus dem gemeinsamen Jahresbetrag nach § 42a SGB XI. Die Kurzzeitpflege erfolgte ${zr} in der Einrichtung ${v.eName||"[Name der Einrichtung]"}${v.eAdresse?", "+v.eAdresse:""}. Die Rechnung${c.basis?` über ${eur(c.basis,2)}`:""} liegt bei. Sofern die Einrichtung nicht direkt mit Ihnen abrechnet: ${pay}`;
-  const who = v.ersatz==="angehoerig" ? ` (${v.eBez||"[Verwandtschaftsverhältnis, z. B. Tochter]"})` : v.ersatz==="dienst" ? " (Pflegedienst)" : " (nicht verwandt, nicht erwerbsmäßig)";
-  let kosten;
-  if(v.ersatz==="dienst") kosten = `- Rechnung des Pflegedienstes: ${c.basis?eur(c.basis,2):"[Betrag]"}`;
-  else if(numDE(v.stunden)&&numDE(v.satz)) kosten = `- Ersatzpflege: ${numDE(v.stunden)} Stunden × ${eur(numDE(v.satz),2)} = ${eur(c.basis,2)}${c.gekappt?` (erstattungsfähig bis ${eur(c.cap,2)})`:""}`;
-  else kosten = `- Ersatzpflege: [Stunden] × [Stundensatz] = [Betrag]${v.ersatz==="angehoerig"?` (höchstens das 2-fache Pflegegeld, ${eur(PG.pflegegeld[pg()]*2)})`:""}`;
-  if(c.fahrt) kosten += `\n- Fahrtkosten: ${numDE(v.km)} km × ${eur(KM_SATZ,2)} = ${eur(c.fahrt,2)}`;
-  if(c.verd) kosten += `\n- Verdienstausfall: ${eur(c.verd,2)}`;
-  if(c.total) kosten += `\nBeantragter Betrag insgesamt: ${eur(c.total,2)}`;
-  const stunden = v.art==="stunden" ? `\n\nDie Ersatzpflege erfolgte stundenweise (Verhinderung unter 8 Stunden am Tag). Ich bitte daher um ungekürzte Weiterzahlung des Pflegegeldes.` : "";
-  return `beantrage ich hiermit die Erstattung von Kosten der Verhinderungspflege nach § 39 SGB XI aus dem gemeinsamen Jahresbetrag nach § 42a SGB XI.\n\nDie Hauptpflegeperson ${v.haupt||"[Name]"} war ${zr} wegen ${v.grund==="termine"?"anderer wichtiger Gründe (z. B. Arzttermine, Erholung)":(VHP_GRUND[v.grund]||"[Grund]")} an der Pflege gehindert. In dieser Zeit hat die Pflege übernommen: ${v.eName||"[Name]"}, ${v.eAdresse||"[Anschrift]"}${who}.${stunden}\n\nAufwendungen:\n${kosten}\n\n${pay} Die Nachweise liegen bei.`;
-}
-function vhpForm(){
-  const v=S.vhp, c=vhpCalc(), tage=vhpTage(), pgv=PG.pflegegeld[pg()];
-  const r=(name,val,label,small)=>`<label class="choice" for="vhp-${name}-${val}"><input type="radio" id="vhp-${name}-${val}" name="vhp-${name}" data-vhp="${name}" value="${val}" ${v[name]===val?"checked":""}><span>${esc(label)}${small?`<small>${esc(small)}</small>`:""}</span></label>`;
-  const f=(k,label,type="text",ph="",im="")=>`<div class="field"><label for="vhp-${k}">${label}</label><input type="${type}" id="vhp-${k}" data-vhp="${k}" value="${esc(v[k])}" placeholder="${esc(ph)}" ${im?`inputmode="${im}"`:""}></div>`;
-  const priv = v.ersatz==="angehoerig"||v.ersatz==="privat";
-  const pgInfo = v.art==="stunden"
-    ? `Stundenweise (unter 8 Stunden am Tag): Das Pflegegeld läuft ungekürzt weiter, und diese Tage zählen nicht zu den 8 Wochen.`
-    : `Ganze Tage: Für die Tage dazwischen gibt es das halbe Pflegegeld, am ersten und letzten Tag das volle.${tage?` Bei ${tage} Tagen sind das grob ${eur(Math.max(0,tage-2)*pgv/30/2,0)} weniger Pflegegeld.`:""}`;
-  return `<div class="vhp">
-   <h4>Schritt 1 · Wer war verhindert?</h4>
-   <div class="grid2">${f("haupt","Wer pflegt sonst? (Hauptpflegeperson)","text","z. B. Maria Beispiel")}
-     <div class="field"><label for="vhp-grund">Warum verhindert?</label><select id="vhp-grund" data-vhp="grund">${Object.entries(VHP_GRUND).map(([k,t])=>`<option value="${k}" ${v.grund===k?"selected":""}>${t}</option>`).join("")}</select></div></div>
-   <div class="choices">${r("art","tage","Ganze Tage","z. B. eine Woche Urlaub")}${r("art","stunden","Stundenweise","unter 8 Stunden am Tag, z. B. Arzttermin, Einkauf")}</div>
-   <div class="grid2">${f("von","Von","date")}${f("bis","Bis","date")}</div>
-   <p class="small muted">${pgInfo}</p>
-
-   <h4>Schritt 2 · Wer hat stattdessen gepflegt?</h4>
-   <div class="choices">${Object.entries(VHP_ERSATZ).map(([k,o])=>r("ersatz",k,o.t,o.s)).join("")}</div>
-   <div class="grid2">${f("eName",v.ersatz==="dienst"||v.ersatz==="heim"?"Name des Dienstes / der Einrichtung":"Name der Ersatzpflegeperson")}${f("eAdresse","Anschrift")}${v.ersatz==="angehoerig"?f("eBez","Verwandtschaft","text","z. B. Enkel, Schwester"):""}</div>
-
-   <h4>Schritt 3 · Kosten</h4>
-   <div class="grid2">
-     ${priv?f("stunden","Stunden insgesamt","text","z. B. 40","decimal")+f("satz","Vereinbarter Stundensatz (€)","text","z. B. 15","decimal"):f("rechnung","Rechnungsbetrag (€)","text","","decimal")}
-     ${v.ersatz!=="heim"?f("km","Gefahrene Kilometer (Ersatzperson)","text","z. B. 120","decimal"):""}
-     ${v.ersatz==="angehoerig"?f("verdienst","Verdienstausfall (€)","text","nur mit Nachweis","decimal"):""}
-     ${f("verbraucht","Dieses Jahr schon verbraucht (€)","text","0","decimal")}
-   </div>
-   <div class="calc">
-     <div><span>Noch verfügbar vom Jahresbetrag</span><b>${eur(c.rest,2)}</b></div>
-     ${v.ersatz==="angehoerig"?`<div><span>Grenze für Angehörige (2 × Pflegegeld)</span><b>${eur(c.cap,2)}</b></div>`:""}
-     ${c.pflege?`<div><span>Ersatzpflege${c.gekappt?" (gekappt)":""}</span><b>${eur(c.pflege,2)}</b></div>`:""}
-     ${c.fahrt?`<div><span>Fahrtkosten (${eur(KM_SATZ,2)}/km)</span><b>${eur(c.fahrt,2)}</b></div>`:""}
-     ${c.verd?`<div><span>Verdienstausfall</span><b>${eur(c.verd,2)}</b></div>`:""}
-     <div class="tot"><span>Voraussichtliche Erstattung</span><b>${c.total?eur(c.total,2):"Beträge eintragen"}</b></div>
-   </div>
-   ${v.ersatz==="angehoerig"?`<p class="small muted">Für nahe Angehörige zahlt die Kasse den Pflegeaufwand bis zum 2-fachen Pflegegeld. Fahrtkosten und Verdienstausfall kommen mit Nachweis dazu, alles zusammen bis zum Jahresbetrag. Der Kilometersatz ist ein Richtwert, manche Kassen zahlen mehr.</p>`:""}
-
-   <h4>Schritt 4 · Wer bekommt das Geld?</h4>
-   <div class="choices">${r("auszahlung","versicherte","Auf unser Konto","die Pflegekasse erstattet der pflegebedürftigen Person; ihr bezahlt die Ersatzperson selbst")}${r("auszahlung","ersatz","Direkt an die Ersatzpflegeperson","die meisten Kassen überweisen auf Wunsch direkt")}</div>
-   ${f("iban",v.auszahlung==="ersatz"?"IBAN der Ersatzpflegeperson":"IBAN für die Erstattung","text","DE..")}
-
-   <div class="notice info">${ic("info")}<span><strong>Welche Belege brauche ich?</strong><br>
-     ${v.ersatz==="heim"?"Die Rechnung des Heims. Viele Heime rechnen direkt mit der Pflegekasse ab, dann musst du nichts vorstrecken.":
-       v.ersatz==="dienst"?"Die Rechnung des Pflegedienstes mit Zeitraum und Leistungen. Der Dienst kann oft direkt mit der Kasse abrechnen.":
-       `Beispiel Quittung: „Ich, ${v.eName||"Max Nachbar"}, habe ${v.haupt?"für "+v.haupt+" ":""}die Pflege von ${S.person.name||"Erna Beispiel"} vom 03.08. bis 17.08. übernommen, insgesamt 40 Stunden à 15 €, und dafür 600 € erhalten.“ Datum, Unterschrift. Bei Fahrten: kleine Liste „05.08. Stuttgart–Esslingen und zurück, 28 km“.`}
-     <br><br><strong>Geht es ohne Belege?</strong> Ganz ohne Nachweis zahlt die Kasse nicht. Bei Angehörigen und Privatpersonen reicht aber eine selbst geschriebene, unterschriebene Quittung oder Bestätigung. Eine offizielle Rechnung ist nicht nötig. Die Vorlage unten füllt das für dich aus.</span></div>
-   ${priv?`<div class="btnrow"><button class="btn small soft" type="button" data-act="vhp-quittung">${ic("down")}${v.ersatz==="angehoerig"?"Bestätigung":"Quittung"} zum Unterschreiben (PDF)</button></div>`:""}
-   ${priv?`<p class="small muted">Gut zu wissen: Für Angehörige und Bekannte, die aus Gefälligkeit einspringen, ist das Geld in der Regel steuerfrei (§ 3 Nr. 36 EStG). Wer regelmäßig für viele Familien einspringt, sollte das prüfen.</p>`:""}
-  </div>`;
-}
-async function makeQuittung(){
-  const doc=newDoc(); if(!doc) return; const v=S.vhp, c=vhpCalc(), a=v.ersatz==="angehoerig";
-  const L0=25,W=160; let y=30;
-  doc.setFont("helvetica","bold"); doc.setFontSize(15); doc.text(a?"Bestätigung über Ersatzpflege":"Quittung über Ersatzpflege",L0,y); y+=6;
-  doc.setFont("helvetica","normal"); doc.setFontSize(9); doc.text("Verhinderungspflege nach § 39 SGB XI",L0,y); y+=12; doc.setFontSize(11);
-  const rows=[["Pflegebedürftige Person",`${S.person.name||""}${S.person.geb?", geb. "+S.person.geb:""}`],["Versichertennummer",S.person.vnr||""],["Hauptpflegeperson (verhindert)",v.haupt||""],["Grund",VHP_GRUND[v.grund]||""],["Zeitraum",vhpZeitraum().replace(/^vom |^am /,"")],["Art",v.art==="stunden"?"stundenweise (unter 8 Std./Tag)":"ganztägig"],["Ersatzpflegeperson",v.eName||""],["Anschrift",v.eAdresse||""]];
-  if(a) rows.push(["Verwandtschaftsverhältnis",v.eBez||""]);
-  rows.push(["Geleistete Stunden",numDE(v.stunden)?String(numDE(v.stunden)):""],["Stundensatz",numDE(v.satz)?eur(numDE(v.satz),2):""]);
-  if(c.fahrt) rows.push(["Fahrtkosten",`${numDE(v.km)} km × ${eur(KM_SATZ,2)} = ${eur(c.fahrt,2)}`]);
-  for(const [k,val] of rows){ doc.setFont("helvetica","bold"); doc.text(k+":",L0,y); doc.setFont("helvetica","normal"); doc.text(val||"________________________________",L0+62,y); y+=8 }
-  y+=4; const sum=(c.basis||0)+(c.fahrt||0);
-  const txt = a ? `Ich bestätige, dass ich die Pflege in dem genannten Zeitraum übernommen habe.${sum?` Dafür sind mir Aufwendungen in Höhe von ${eur(sum,2)} entstanden.`:""}` : `Ich bestätige, dass ich die Pflege in dem genannten Zeitraum übernommen und dafür ${sum?eur(sum,2):"________ €"} erhalten habe.`;
-  doc.text(doc.splitTextToSize(txt,W),L0,y); y+=24;
-  doc.line(L0,y,L0+60,y); doc.line(L0+80,y,L0+160,y); doc.setFontSize(8);
-  doc.text("Ort, Datum",L0,y+4); doc.text("Unterschrift Ersatzpflegeperson",L0+80,y+4);
-  y+=22; doc.setFontSize(9); doc.setTextColor(90);
-  doc.text(doc.splitTextToSize("Bei Fahrtkosten bitte eine Aufstellung beilegen (Datum, Strecke, Kilometer). Bei Verdienstausfall eine Bescheinigung des Arbeitgebers.",W),L0,y);
-  await saveFile(a?"Bestaetigung-Ersatzpflege.pdf":"Quittung-Ersatzpflege.pdf",doc.output("blob"),"PDF gespeichert");
-}
-
-
-/* ---------- Antrags-Assistent: Fragen je Anspruch ---------- */
-const OPT=a=>a.map(x=>typeof x==="string"?{v:x,t:x}:x);
-const HILFE=["Waschen und Anziehen","Essen und Trinken","Toilette / Inkontinenz","Gehen, Aufstehen, Treppen","Medikamente","Vergesslichkeit / Orientierung","Haushalt und Einkaufen","Hilfe in der Nacht"];
-function ansObj(k){ if(k==="jahresbetrag") return S.vhp; S.ans=S.ans||{}; return (S.ans[k]=S.ans[k]||{}) }
-function av(k,f,ph){ const v=ansObj(k)[f]; if(Array.isArray(v)) return v.length?v.join(", "):`[${ph}]`; return (v!=null&&String(v).trim()!=="")?String(v).trim():`[${ph}]` }
-function ad(k,f,ph){ const d=parseIso(ansObj(k)[f]); return d?deD(d):`[${ph}]` }
-function has(k,f){ const v=ansObj(k)[f]; return Array.isArray(v)?v.length>0:(v!=null&&String(v).trim()!=="") }
-const IBAN_Q={k:"iban",label:"Auf welches Konto soll das Geld?",help:"Die IBAN steht auf der Bankkarte oder im Online-Banking. Sie beginnt mit DE.",ph:"DE00 0000 0000 0000 0000 00"};
-
-const ASSIST={
- pg_antrag:{q:[
-   {k:"seit",label:"Seit wann wird Hilfe gebraucht?",ph:"z. B. seit März 2026",help:"Ungefähr reicht völlig."},
-   {k:"was",type:"multi",label:"Wobei wird Hilfe gebraucht?",help:"Alles ankreuzen, was zutrifft.",opts:OPT(HILFE)},
-   {k:"tel",label:"Unter welcher Telefonnummer ist jemand für den Termin mit dem Gutachter erreichbar?",ph:"z. B. 0711 123456",type:"tel"}],
-  ask:()=>`beantrage ich hiermit die Feststellung der Pflegebedürftigkeit und Leistungen der Pflegeversicherung nach dem SGB XI. Hilfe wird ${has("pg_antrag","seit")?av("pg_antrag","seit")+" ":""}benötigt, vor allem bei: ${av("pg_antrag","was","Bereiche")}.\n\nBitte beauftragen Sie den Medizinischen Dienst mit der Begutachtung. Für die Terminabsprache bin ich erreichbar unter: ${av("pg_antrag","tel","Telefonnummer")}. Außerdem bitte ich um eine Pflegeberatung nach § 7a SGB XI.`},
- pg_hoch:{q:[
-   {k:"seit",label:"Seit wann ist es schlechter geworden?",ph:"z. B. seit dem Sturz im Juli"},
-   {k:"was",type:"multi",label:"Wobei wird jetzt mehr Hilfe gebraucht?",opts:OPT([...HILFE,"Nach Sturz oder Krankenhaus"])},
-   {k:"tel",label:"Telefonnummer für den Gutachter-Termin",type:"tel",ph:"z. B. 0711 123456"}],
-  ask:()=>`beantrage ich hiermit eine Höherstufung des Pflegegrades. Der Hilfebedarf hat sich ${has("pg_hoch","seit")?av("pg_hoch","seit")+" ":""}deutlich erhöht, vor allem bei: ${av("pg_hoch","was","Bereiche")}.\n\nBitte veranlassen Sie eine erneute Begutachtung durch den Medizinischen Dienst. Erreichbar unter: ${av("pg_hoch","tel","Telefonnummer")}.`},
- pflegegeld:{q:[
-   {k:"pp",label:"Wer pflegt hauptsächlich?",help:"Das ist die Pflegeperson. Es können auch mehrere sein.",ph:"Vor- und Nachname"},
-   {k:"ab",type:"date",label:"Seit wann wird so gepflegt?",help:"Pflegegeld gibt es frühestens ab dem Monat, in dem der Antrag gestellt wird."},
-   IBAN_Q],
-  ask:()=>`beantrage ich hiermit Pflegegeld nach § 37 SGB XI (bei gleichzeitiger Nutzung eines Pflegedienstes als Kombinationsleistung nach § 38 SGB XI) ab dem ${ad("pflegegeld","ab","Datum")}. Die Pflege übernimmt: ${av("pflegegeld","pp","Name der Pflegeperson")}.\n\nBitte überweisen Sie das Pflegegeld auf folgendes Konto: ${av("pflegegeld","iban","IBAN")}.`},
- sachleistung:{q:[
-   {k:"dienst",label:"Welcher Pflegedienst soll kommen?",ph:"Name des Pflegedienstes",help:"Noch keinen gefunden? Überspringen. Die Pflegekasse schickt eine Liste."},
-   {k:"ab",type:"date",label:"Ab wann?"},
-   {k:"kombi",type:"choice",label:"Pflegen Angehörige zusätzlich mit?",opts:OPT([{v:"ja",t:"Ja",s:"dann gibt es zusätzlich anteiliges Pflegegeld"},{v:"nein",t:"Nein"}])}],
-  ask:()=>`beantrage ich hiermit Pflegesachleistungen nach § 36 SGB XI${ansObj("sachleistung").kombi==="ja"?" als Kombinationsleistung mit anteiligem Pflegegeld nach § 38 SGB XI":""} ab dem ${ad("sachleistung","ab","Datum")}. Die Versorgung übernimmt der Pflegedienst: ${av("sachleistung","dienst","Name des Pflegedienstes")}.`},
- entlastung:{q:[
-   {k:"anbieter",label:"Wer hilft im Alltag?",help:"Zum Beispiel Haushaltshilfe, Nachbarschaftshilfe, Betreuungsdienst. Der Anbieter muss anerkannt sein.",ph:"Name des Anbieters"},
-   {k:"zeitraum",label:"Für welchen Zeitraum ist die Rechnung?",ph:"z. B. September 2026"},
-   {k:"betrag",type:"money",label:"Wie hoch ist die Rechnung?",help:"Mehrere Rechnungen einfach zusammenzählen."},
-   {k:"weg",type:"choice",label:"Wie soll bezahlt werden?",opts:OPT([{v:"erstattung",t:"Wir haben schon bezahlt",s:"die Kasse soll uns das Geld zurückzahlen"},{v:"direkt",t:"Direkt an den Anbieter",s:"der Anbieter rechnet mit der Kasse ab"}])},
-   {...IBAN_Q,show:()=>ansObj("entlastung").weg!=="direkt"}],
-  ask:()=>{const o=ansObj("entlastung"); return `beantrage ich hiermit Leistungen aus dem Entlastungsbetrag nach § 45b SGB XI für Leistungen von ${av("entlastung","anbieter","Name des Anbieters")} im Zeitraum ${av("entlastung","zeitraum","Zeitraum")} in Höhe von ${has("entlastung","betrag")?eur(numDE(o.betrag),2):"[Betrag]"}. ${o.weg==="direkt"?"Bitte rechnen Sie direkt mit dem Anbieter ab. Eine Abtretungserklärung liegt bei.":`Die Rechnung liegt bei. Bitte erstatten Sie den Betrag auf folgendes Konto: ${av("entlastung","iban","IBAN")}.`}\n\nBitte teilen Sie mir außerdem mit, wie hoch das noch verfügbare Guthaben aus dem Vorjahr ist.`}},
- tagespflege:{q:[
-   {k:"einr",label:"Welche Tagespflege soll es sein?",ph:"Name und Ort",help:"Noch keine gefunden? Überspringen."},
-   {k:"ab",type:"date",label:"Ab wann?"},
-   {k:"tage",type:"choice",label:"An wie vielen Tagen pro Woche?",opts:OPT(["1","2","3","4","5"])}],
-  ask:()=>`beantrage ich hiermit Leistungen der Tages- und Nachtpflege nach § 41 SGB XI ab dem ${ad("tagespflege","ab","Datum")} an ${av("tagespflege","tage","Anzahl")} Tagen pro Woche in der Einrichtung ${av("tagespflege","einr","Name der Tagespflege")}.`},
- verbrauch:{q:[{k:"anbieter",label:"Wer soll die Pflegehilfsmittel liefern?",help:"Apotheke, Sanitätshaus oder Versandanbieter. Noch keinen? Überspringen.",ph:"Name des Anbieters"}],
-  ask:()=>`beantrage ich hiermit die Kostenübernahme für zum Verbrauch bestimmte Pflegehilfsmittel nach § 40 Abs. 2 SGB XI (z. B. Einmalhandschuhe, Desinfektion, Bettschutzeinlagen) bis zur Höhe von ${VERBRAUCH} Euro monatlich. Die Versorgung soll erfolgen durch: ${av("verbrauch","anbieter","Anbieter")}.`},
- technisch:{q:[
-   {k:"was",type:"multi",label:"Was wird gebraucht?",opts:OPT(["Hausnotruf","Pflegebett","Lagerungskissen","Duschstuhl","Badewannenlift","Anderes"])},
-   {k:"anbieter",label:"Von welchem Anbieter gibt es ein Angebot?",ph:"z. B. Sanitätshaus Müller",help:"Noch keins? Überspringen."}],
-  ask:()=>`beantrage ich hiermit die Versorgung mit folgenden technischen Pflegehilfsmitteln nach § 40 Abs. 1 SGB XI: ${av("technisch","was","Hilfsmittel")}. ${has("technisch","anbieter")?`Ein Kostenvoranschlag von ${av("technisch","anbieter")} liegt bei.`:""}`},
- wohnumfeld:{q:[
-   {k:"was",type:"multi",label:"Was soll umgebaut werden?",opts:OPT(["Bodengleiche Dusche","Treppenlift","Haltegriffe","Türen verbreitern","Rampe","Anderes"])},
-   {k:"kosten",type:"money",label:"Was kostet es laut Angebot?",help:"Wichtig: Erst bauen, wenn die Kasse zugesagt hat."},
-   {k:"miete",type:"choice",label:"Wohnung oder Haus?",opts:OPT([{v:"eigentum",t:"Eigentum"},{v:"miete",t:"Miete",s:"Vermieter muss zustimmen"}])}],
-  ask:()=>`beantrage ich hiermit einen Zuschuss für Maßnahmen zur Verbesserung des individuellen Wohnumfeldes nach § 40 Abs. 4 SGB XI für: ${av("wohnumfeld","was","Maßnahme")}. Die Kosten betragen laut Angebot ${has("wohnumfeld","kosten")?eur(numDE(ansObj("wohnumfeld").kosten),2):"[Betrag]"}. Kostenvoranschläge liegen bei.${ansObj("wohnumfeld").miete==="miete"?" Die Zustimmung des Vermieters liegt bei.":""}`},
- dipa:{q:[{k:"name",label:"Welche Pflege-App soll es sein?",ph:"Name der App"}],
-  ask:()=>`beantrage ich hiermit die Versorgung mit der digitalen Pflegeanwendung ${av("dipa","name","Name")} nach § 40a SGB XI sowie ergänzende Unterstützungsleistungen nach § 39a SGB XI.`},
- wg:{q:[{k:"wg",label:"Wie heißt die Wohngruppe und wo ist sie?",ph:"Name, Anschrift"}],
-  ask:()=>`beantrage ich hiermit den Wohngruppenzuschlag nach § 38a SGB XI für die ambulant betreute Wohngruppe ${av("wg","wg","Name, Anschrift")}.`},
- beratung:{q:[
-   {k:"wo",type:"choice",label:"Wie soll die Beratung stattfinden?",opts:OPT(["Bei uns zu Hause","Telefonisch","Per Video"])},
-   {k:"zeit",label:"Wann passt es am besten?",ph:"z. B. vormittags, nicht mittwochs"}],
-  ask:()=>`bitte ich um einen Termin für eine individuelle Pflegeberatung nach § 7a SGB XI, gewünscht: ${av("beratung","wo","Art")}. Am besten passt: ${av("beratung","zeit","Zeit")}.`},
- pflegekurs:{q:[{k:"art",type:"choice",label:"Welche Art von Kurs?",opts:OPT(["Kurs vor Ort","Online-Kurs","Schulung bei uns zu Hause"])}],
-  ask:()=>`bitte ich um Informationen zu kostenlosen Pflegekursen nach § 45 SGB XI für pflegende Angehörige, gewünscht: ${av("pflegekurs","art","Kursart")}.`},
- rv:{q:[
-   {k:"pp",label:"Wie heißt die pflegende Person?",ph:"Vor- und Nachname"},
-   {k:"rvnr",label:"Wie lautet ihre Rentenversicherungsnummer?",help:"Steht auf dem Sozialversicherungsausweis oder der jährlichen Renteninformation. Nicht zur Hand? Überspringen, die Kasse fragt nach.",ph:"z. B. 12 150385 M 012"},
-   {k:"std",type:"choice",label:"Wie viele Stunden pro Woche wird gepflegt?",opts:OPT(["10 bis 20 Stunden","20 bis 30 Stunden","mehr als 30 Stunden"])}],
-  ask:()=>`beantrage ich hiermit die Zahlung von Beiträgen zur Renten- und Arbeitslosenversicherung für die Pflegeperson ${av("rv","pp","Name")} (Rentenversicherungsnummer: ${av("rv","rvnr","Nummer")}) nach § 44 SGB XI. Die Pflege umfasst ${av("rv","std","Stunden")} pro Woche, verteilt auf mindestens 2 Tage. Bitte senden Sie mir den Fragebogen zur Zahlung der Beiträge zur sozialen Sicherung für Pflegepersonen zu.`},
- pug:{q:[{k:"pp",label:"Wer nimmt frei?",ph:"Vor- und Nachname"},{k:"von",type:"date",label:"Ab wann?"},{k:"bis",type:"date",label:"Bis wann?",help:"Höchstens 10 Arbeitstage im Jahr."}],
-  ask:()=>`beantrage ich hiermit Pflegeunterstützungsgeld nach § 44a Abs. 3 SGB XI für die kurzzeitige Arbeitsverhinderung der Pflegeperson ${av("pug","pp","Name")} vom ${ad("pug","von","Datum")} bis ${ad("pug","bis","Datum")}. Die ärztliche Bescheinigung liegt bei.`},
- stationaer:{q:[{k:"heim",label:"Wie heißt das Pflegeheim?",ph:"Name und Ort"},{k:"ab",type:"date",label:"Seit wann?"}],
-  ask:()=>`beantrage ich hiermit Leistungen der vollstationären Pflege nach § 43 SGB XI in der Einrichtung ${av("stationaer","heim","Name des Heims")} ab dem ${ad("stationaer","ab","Datum")}.`},
- zuschlag:{q:[{k:"seit",type:"date",label:"Seit wann ist die Person im Heim?"},{k:"frueher",type:"long",label:"Gab es vorher schon Heimaufenthalte?",help:"Auch in anderen Heimen. Die Zeit zählt mit und erhöht den Zuschuss.",ph:"z. B. 2024 Haus Sonnenschein, 5 Monate"}],
-  ask:()=>`bitte ich um Prüfung und ggf. Neuberechnung des Leistungszuschlags nach § 43c SGB XI. Der Aufenthalt in vollstationärer Pflege begann am ${ad("zuschlag","seit","Datum")}. Frühere Aufenthalte: ${has("zuschlag","frueher")?av("zuschlag","frueher"):"keine"}.`},
- hzp:{q:[{k:"heim",label:"In welchem Heim lebt die Person?",ph:"Name und Ort"}],
-  ask:()=>`beantrage ich hiermit Hilfe zur Pflege nach §§ 61 ff. SGB XII, da Einkommen und Vermögen nicht ausreichen, um die Kosten der vollstationären Pflege in der Einrichtung ${av("hzp","heim","Name des Heims")} zu decken.`},
- eingliederung:{q:[{k:"einr",label:"In welcher Einrichtung lebt die Person?",ph:"Name"},{k:"tage",type:"number",label:"An wie vielen Tagen im Monat ist sie zu Hause?"}],
-  ask:()=>`beantrage ich hiermit anteiliges Pflegegeld für die Tage der häuslichen Pflege außerhalb der Einrichtung ${av("eingliederung","einr","Name")} (durchschnittlich ${av("eingliederung","tage","Anzahl")} Tage im Monat, Nachweis liegt bei).`},
- fahrten:{q:[{k:"wohin",label:"Zu welcher Behandlung muss gefahren werden?",ph:"z. B. Dialyse, Facharzt, Strahlentherapie"}],
-  ask:()=>`beantrage ich hiermit die Genehmigung von Krankenfahrten zu ambulanten Behandlungen (${av("fahrten","wohin","Behandlung")}) nach § 60 Abs. 1 SGB V. Die ärztliche Verordnung liegt bei.`},
- sb_antrag:{q:[
-   {k:"leiden",type:"long",label:"Welche Erkrankungen oder Einschränkungen gibt es?",help:"Alles aufschreiben, auch Kleinigkeiten. Je vollständiger, desto besser.",ph:"z. B. Diabetes, Herzschwäche, Arthrose im Knie, Schwerhörigkeit"},
-   {k:"aerzte",type:"long",label:"Welche Ärztinnen und Ärzte behandeln?",ph:"z. B. Dr. Maier, Hausarzt, Stuttgart"},
-   {k:"mz",type:"multi",label:"Welche Merkzeichen kommen in Frage?",help:"Unsicher? Lass es offen, das Amt prüft das.",opts:OPT(["G (Gehen ist schwer)","aG (kaum gehen möglich)","B (Begleitung nötig)","H (hilflos)","RF (Rundfunkbeitrag)"])}],
-  ask:()=>`beantrage ich hiermit die Feststellung einer Behinderung und des Grades der Behinderung (GdB) nach § 152 SGB IX sowie die Ausstellung eines Schwerbehindertenausweises.\n\nFolgende Gesundheitsstörungen liegen vor: ${av("sb_antrag","leiden","Erkrankungen")}.\n\nBehandelnde Ärztinnen und Ärzte: ${av("sb_antrag","aerzte","Ärzte")}.${has("sb_antrag","mz")?`\n\nZudem beantrage ich die Prüfung folgender Merkzeichen: ${av("sb_antrag","mz")}.`:""}`},
- sb_neu:{q:[
-   {k:"leiden",type:"long",label:"Was ist neu oder schlimmer geworden?",ph:"z. B. Herzinfarkt 2026, Knie-OP, Demenz-Diagnose"},
-   {k:"mz",type:"multi",label:"Welche Merkzeichen sollen geprüft werden?",opts:OPT(["G (Gehen ist schwer)","aG (kaum gehen möglich)","B (Begleitung nötig)","H (hilflos)","RF (Rundfunkbeitrag)"])}],
-  ask:()=>`beantrage ich hiermit die Neufeststellung des Grades der Behinderung wegen Verschlimmerung bzw. hinzugekommener Gesundheitsstörungen: ${av("sb_neu","leiden","Gesundheitsstörungen")}.${has("sb_neu","mz")?` Außerdem beantrage ich die Prüfung folgender Merkzeichen: ${av("sb_neu","mz")}.`:""} Aktuelle Befunde liegen bei.`},
- kfz:{q:[{k:"kz",label:"Wie lautet das Kennzeichen des Autos?",ph:"z. B. S-AB 1234"}],
-  ask:()=>`beantrage ich hiermit die Steuerbefreiung bzw. -ermäßigung nach § 3a Kraftfahrzeugsteuergesetz für das Fahrzeug mit dem amtlichen Kennzeichen ${av("kfz","kz","Kennzeichen")}.`},
- rundfunk:{q:[{k:"nr",label:"Wie lautet die Beitragsnummer?",help:"Steht oben auf jedem Brief vom Beitragsservice (9 Ziffern).",ph:"z. B. 123 456 789"}],
-  ask:()=>`beantrage ich hiermit die Ermäßigung bzw. Befreiung vom Rundfunkbeitrag nach § 4 Rundfunkbeitragsstaatsvertrag. Eine Kopie des Schwerbehindertenausweises liegt bei. Beitragsnummer: ${av("rundfunk","nr","Beitragsnummer")}.`},
- gleich:{q:[{k:"grund",type:"long",label:"Warum ist der Arbeitsplatz in Gefahr?",ph:"z. B. viele Krankheitstage, Arbeit ist körperlich schwer"}],
-  ask:()=>`beantrage ich hiermit die Gleichstellung mit einem schwerbehinderten Menschen nach § 2 Abs. 3 SGB IX. Der GdB beträgt ${gdb()||"[GdB]"}. Ohne Gleichstellung ist der Arbeitsplatz gefährdet: ${av("gleich","grund","Begründung")}.`},
- urlaub:{q:[], ask:()=>`teile ich Ihnen mit, dass bei mir eine Schwerbehinderung mit einem GdB von ${gdb()||"[GdB]"} festgestellt ist. Ich beantrage daher den Zusatzurlaub nach § 208 SGB IX für das laufende Kalenderjahr.`},
- rente:{q:[], ask:()=>`bitte ich um eine Rentenauskunft und Beratung zur Altersrente für schwerbehinderte Menschen. Der GdB beträgt ${gdb()||"[GdB]"}.`},
- jahresbetrag:{q:[
-   {k:"haupt",label:"Wer pflegt sonst normalerweise?",help:"Die Person, die verhindert war. Zum Beispiel du selbst oder die Ehefrau.",ph:"Vor- und Nachname"},
-   {k:"grund",type:"choice",label:"Warum konnte sie nicht pflegen?",opts:OPT([{v:"urlaub",t:"Urlaub"},{v:"krank",t:"Krankheit"},{v:"kur",t:"Kur oder Reha"},{v:"termine",t:"Etwas anderes",s:"z. B. Arzttermin, Erholung, Familienfeier"}])},
-   {k:"art",type:"choice",label:"Ganze Tage oder nur ein paar Stunden am Tag?",opts:OPT([{v:"tage",t:"Ganze Tage",s:"z. B. eine Woche Urlaub"},{v:"stunden",t:"Nur ein paar Stunden am Tag",s:"weniger als 8 Stunden, z. B. Arzttermin"}])},
-   {k:"von",type:"date",label:"Ab wann?"},
-   {k:"bis",type:"date",label:"Bis wann?",help:"War es nur ein Tag? Dann dasselbe Datum noch einmal."},
-   {k:"ersatz",type:"choice",label:"Wer hat in dieser Zeit gepflegt?",opts:Object.entries(VHP_ERSATZ).map(([v,o])=>({v,t:o.t,s:o.s}))},
-   {k:"eName",label:()=>["dienst","heim"].includes(S.vhp.ersatz)?"Wie heißt der Dienst bzw. das Heim?":"Wie heißt die Person, die gepflegt hat?",ph:"Name"},
-   {k:"eAdresse",label:()=>["dienst","heim"].includes(S.vhp.ersatz)?"Wo ist er?":"Wo wohnt diese Person?",ph:"Straße, PLZ Ort"},
-   {k:"eBez",label:"Wie ist sie mit der gepflegten Person verwandt?",ph:"z. B. Enkel, Schwester, Schwiegertochter",show:()=>S.vhp.ersatz==="angehoerig"},
-   {k:"stunden",type:"number",label:"Wie viele Stunden wurde insgesamt gepflegt?",help:"Grob geschätzt reicht. Beispiel: 2 Wochen mit je 3 Stunden am Tag sind 42 Stunden.",ph:"z. B. 42",show:()=>["angehoerig","privat"].includes(S.vhp.ersatz)},
-   {k:"satz",type:"money",label:"Wie viel Euro pro Stunde wurden vereinbart?",help:"Üblich sind etwa 10 bis 20 Euro. Bei Angehörigen zahlt die Kasse insgesamt höchstens das Doppelte des Pflegegeldes.",ph:"z. B. 15",show:()=>["angehoerig","privat"].includes(S.vhp.ersatz)},
-   {k:"rechnung",type:"money",label:"Wie hoch ist die Rechnung?",show:()=>["dienst","heim"].includes(S.vhp.ersatz)},
-   {k:"km",type:"number",label:"Wie viele Kilometer ist die Ersatzperson dafür gefahren?",help:"Alle Fahrten hin und zurück zusammenzählen. Keine Fahrten? Einfach überspringen.",ph:"z. B. 120",show:()=>S.vhp.ersatz!=="heim"},
-   {k:"verdienst",type:"money",label:"Hat die Ersatzperson dafür auf Lohn verzichtet?",help:"Nur wenn sie unbezahlt frei genommen hat. Sonst überspringen.",show:()=>S.vhp.ersatz==="angehoerig"},
-   {k:"verbraucht",type:"money",label:"Wurde in diesem Jahr schon Verhinderungs- oder Kurzzeitpflege bezahlt?",help:"Wenn ja: ungefähr wie viel Euro? Wenn nein: überspringen."},
-   {k:"auszahlung",type:"choice",label:"Wohin soll die Kasse das Geld überweisen?",opts:OPT([{v:"versicherte",t:"Auf unser Konto",s:"ihr bezahlt die Ersatzperson selbst"},{v:"ersatz",t:"Direkt an die Ersatzperson",s:"die meisten Kassen machen das auf Wunsch"}])},
-   {k:"iban",label:()=>S.vhp.auszahlung==="ersatz"?"IBAN der Ersatzperson":"Auf welches Konto soll das Geld?",help:"Die IBAN steht auf der Bankkarte oder im Online-Banking. Sie beginnt mit DE.",ph:"DE00 0000 0000 0000 0000 00"}]},
-};
-for(const [k,a] of Object.entries(ASSIST)){ const b=B.find(x=>x.k===k); if(!b) continue; b.q=a.q; if(a.ask) b.ask=a.ask }
-
-/* ---------- Assistent: Ablauf ---------- */
-function personQs(b,a){
-  const p=S.person, L=[];
-  if(!p.name) L.push("name");
-  if((b.to===PK||b.to===KK) && !p.vnr) L.push("vnr");
-  if(!p.strasse||!p.ort) L.push("adresse");
-  if(a && !p.absender) L.push("absender");
-  if(a && !p.beziehung) L.push("beziehung");
-  return L;
-}
-function personQ(k){
-  const a=S.rolle==="angehoerig";
-  return ({
-    name:{k:"name",store:"person",label:a?"Wie heißt die Person, um die es geht?":"Wie heißt du?",ph:"Vor- und Nachname"},
-    vnr:{k:"vnr",store:"person",label:"Wie lautet die Versichertennummer?",help:"Steht auf der Gesundheitskarte (Krankenkassenkarte). Sie beginnt mit einem Buchstaben, zum Beispiel A123456789.",ph:"z. B. A123456789"},
-    adresse:{k:"adresse",store:"person",type:"addr",label:a?"Wo wohnt die Person?":"Wo wohnst du?"},
-    absender:{k:"absender",store:"person",label:"Und wie heißt du?",help:"Du schreibst den Antrag für die Person. Dein Name steht unter dem Brief.",ph:"Vor- und Nachname"},
-    beziehung:{k:"beziehung",store:"person",type:"choice",label:"Wie bist du mit der Person verbunden?",opts:OPT(["Tochter","Sohn","Ehefrau","Ehemann","Enkelin","Enkel","Rechtliche Betreuung","Andere"])},
-  })[k];
-}
-function wizSteps(){
-  const w=S.wiz, b=B.find(x=>x.k===w.k);
-  // leichte Fragen zuerst, Adresse und Versichertennummer am Ende
-  const pq=w.pq||[], early=["name","beziehung"].filter(k=>pq.includes(k)), late=pq.filter(k=>!early.includes(k)).sort((x,y)=>["absender","adresse","vnr"].indexOf(x)-["absender","adresse","vnr"].indexOf(y));
-  const qs=[...early.map(personQ), ...(b.q||[]).filter(q=>!q.show||q.show()), ...late.map(personQ)];
-  return {b, list:[...qs,{type:"summary"},{type:"done"}]};
-}
-function startWiz(k){
-  const b=B.find(x=>x.k===k);
-  S.wiz={k,i:0,pq:personQs(b,S.rolle==="angehoerig")};
-  if(!b.q?.length && !S.wiz.pq.length) S.wiz.i=1; // direkt zur Prüfung
-  save(); render(); scrollTop();
-}
-function getQ(q){ if(q.store==="person") return S.person[q.k]; return ansObj(S.wiz.k)[q.k] }
-function setQ(q,v){ if(q.store==="person") S.person[q.k]=v; else ansObj(S.wiz.k)[q.k]=v; delete S.texte[S.wiz.k]; delete S.texte[S.wiz.k+"_sub"]; save() }
-const lab=q=>txt(q.label);
-function showVal(q){
-  if(q.type==="addr") return [S.person.strasse,S.person.ort].filter(Boolean).join(", ");
-  const v=getQ(q); if(Array.isArray(v)) return v.join(", ");
-  if(v==null||String(v).trim()==="") return "";
-  if(q.type==="date"){const d=parseIso(v);return d?deD(d):v}
-  if(q.type==="choice"){const o=(q.opts||[]).find(o=>o.v===v);return o?o.t:v}
-  if(q.type==="money") return eur(numDE(v),2);
-  return String(v);
-}
-function qInput(q){
-  const v=getQ(q), id="wq-"+q.k;
-  if(q.type==="choice") return `<div class="choices big">${q.opts.map(o=>`<label class="choice" for="${id}-${esc(o.v)}"><input type="radio" id="${id}-${esc(o.v)}" name="${id}" data-wq="${q.k}" value="${esc(o.v)}" ${v===o.v?"checked":""}><span>${esc(o.t)}${o.s?`<small>${esc(o.s)}</small>`:""}</span></label>`).join("")}</div>`;
-  if(q.type==="multi"){ const arr=Array.isArray(v)?v:[]; return `<div class="choices big">${q.opts.map(o=>`<label class="choice" for="${id}-${esc(o.v)}"><input type="checkbox" id="${id}-${esc(o.v)}" data-wqm="${q.k}" value="${esc(o.v)}" ${arr.includes(o.v)?"checked":""}><span>${esc(o.t)}</span></label>`).join("")}</div>` }
-  if(q.type==="addr") return `<div class="grid2"><div class="field"><label for="wq-strasse">Straße und Hausnummer</label><input type="text" id="wq-strasse" data-wqp="strasse" value="${esc(S.person.strasse)}" autocomplete="street-address"></div><div class="field"><label for="wq-ort">PLZ und Ort</label><input type="text" id="wq-ort" data-wqp="ort" value="${esc(S.person.ort)}" placeholder="z. B. 70173 Stuttgart"></div></div>`;
-  if(q.type==="long") return `<textarea id="${id}" data-wq="${q.k}" rows="4" placeholder="${esc(q.ph||"")}" style="min-height:120px">${esc(v||"")}</textarea>`;
-  const t = q.type==="date"?"date":q.type==="tel"?"tel":"text";
-  const im = q.type==="money"||q.type==="number"?' inputmode="decimal"':"";
-  const inp=`<input type="${t}" id="${id}" data-wq="${q.k}" value="${esc(v||"")}" placeholder="${esc(q.ph||"")}"${im}>`;
-  return q.type==="money"?`<div class="euro">${inp}<span>€</span></div>`:inp;
-}
-function viewWizard(){
-  const {b,list}=wizSteps(); let i=Math.min(S.wiz.i,list.length-1); S.wiz.i=i;
-  const step=list[i], nQ=list.length-2;
-  const top=`<div class="wiztop"><button type="button" class="btn small ghost" data-wnav="close">← Zur Übersicht</button><span class="small muted">${esc(b.t)}</span></div>`;
-  if(step.type==="summary"){
-    const qs=list.slice(0,-2);
-    const missing=qs.filter(q=>!showVal(q)).length;
-    return `<section class="panel wiz">${top}${bar(nQ+1,nQ+1,"Prüfen")}
-      <h2 class="wq">Stimmt alles?</h2>
-      <p class="whelp">Tippe auf „Ändern“, wenn etwas nicht passt.${missing?` ${missing===1?"Eine Angabe ist":missing+" Angaben sind"} noch offen. Das ist nicht schlimm: Im Antrag steht dann eine Lücke, die du von Hand ausfüllen kannst.`:""}</p>
-      <dl class="sum">${qs.map((q,j)=>`<div><dt>${esc(lab(q))}</dt><dd>${showVal(q)?esc(showVal(q)):'<span class="open">noch offen</span>'}</dd><button type="button" class="linkbtn" data-wnav="goto:${j}">Ändern</button></div>`).join("")||'<p class="muted">Für diesen Antrag brauchen wir keine weiteren Angaben.</p>'}</dl>
-      ${b.k==="jahresbetrag"?vhpSummary():""}
-      <div class="nav big go">${i>0?`<button class="btn ghost" type="button" data-wnav="back">Zurück</button>`:"<span></span>"}<button class="btn" type="button" data-wnav="next">Antrag erstellen</button></div>
-    </section>`;
-  }
-  if(step.type==="done") return viewDone(b);
-  return `<section class="panel wiz">${top}${bar(i+1,nQ+1,`Frage ${i+1} von ${nQ}`)}
-    <h2 class="wq"><label for="wq-${step.k}">${esc(lab(step))}</label></h2>
-    ${step.help?`<p class="whelp">${ic("info")}<span>${esc(step.help)}</span></p>`:""}
-    ${qInput(step)}
-    <div class="nav big go">
-      ${i>0?`<button class="btn ghost" type="button" data-wnav="back">Zurück</button>`:`<button class="btn ghost" type="button" data-wnav="close">Abbrechen</button>`}
-      <span class="btnrow">${showVal(step)?"":`<button class="btn ghost" type="button" data-wnav="next">Weiß ich nicht</button>`}<button class="btn" type="button" data-wnav="next">Weiter</button></span>
-    </div>
-  </section>`;
-}
-function bar(n,of,label){return `<div class="stepper"><div class="meta"><span>${esc(label)}</span><span>${Math.round(n/of*100)} %</span></div><div class="bar"><i style="width:${Math.round(n/of*100)}%"></i></div></div>`}
-function vhpSummary(){
-  const c=vhpCalc(), v=S.vhp;
-  return `<div class="calc">
-     <div><span>Noch verfügbar vom Jahresbetrag</span><b>${eur(c.rest,2)}</b></div>
-     ${v.ersatz==="angehoerig"?`<div><span>Höchstens für Angehörige (2 × Pflegegeld)</span><b>${eur(c.cap,2)}</b></div>`:""}
-     ${c.pflege?`<div><span>Ersatzpflege${c.gekappt?" (auf Höchstbetrag gekürzt)":""}</span><b>${eur(c.pflege,2)}</b></div>`:""}
-     ${c.fahrt?`<div><span>Fahrtkosten (${eur(KM_SATZ,2)} pro km)</span><b>${eur(c.fahrt,2)}</b></div>`:""}
-     ${c.verd?`<div><span>Verdienstausfall</span><b>${eur(c.verd,2)}</b></div>`:""}
-     <div class="tot"><span>Voraussichtlich bekommt ihr</span><b>${c.total?eur(c.total,2):"–"}</b></div></div>
-     <p class="small muted">${v.art==="stunden"?"Weil es nur stundenweise war, läuft das Pflegegeld ungekürzt weiter.":"In dieser Zeit gibt es das halbe Pflegegeld (am ersten und letzten Tag das volle)."}</p>`;
-}
-function viewDone(b){
-  const L=curLetter(b), r=RECIP[b.to](), docs=docsFor(b), st=S.status[b.k]||"offen";
-  const priv=b.k==="jahresbetrag"&&["angehoerig","privat"].includes(S.vhp.ersatz);
-  return `<section class="panel wiz">
-    <div class="wiztop"><button type="button" class="btn small ghost" data-wnav="back">← Angaben ändern</button><button type="button" class="btn small ghost" data-wnav="close">Zur Übersicht</button></div>
-    <h2 class="wq">${ic("check")} Dein Antrag ist fertig</h2>
-    <div class="btnrow big">
-      <button class="btn" type="button" data-pdf="${b.k}">${ic("down")}Als PDF speichern</button>
-      <button class="btn soft" type="button" data-copy="${b.k}">Text kopieren</button>
-      ${r.mail?`<a class="btn ghost" href="${mailto(b,r.mail)}" target="_blank" rel="noopener">Per E-Mail öffnen</a>`:""}
-    </div>
-    <div class="paper"><p class="subj">${esc(L.subject)}</p><p>${esc(L.body)}</p></div>
-    ${/\[[^\]]+\]/.test(L.body)?`<p class="notice">${ic("alert")}<span>Stellen in [eckigen Klammern] bitte vor dem Abschicken von Hand ausfüllen oder oben unter „Angaben ändern“ nachtragen.</span></p>`:""}
-    <h3>So schickst du ihn ab</h3>
-    <ol class="howsend">
-      <li><strong>PDF ausdrucken und unterschreiben.</strong> Oder den Text in die App oder das Online-Postfach der Kasse kopieren.</li>
-      ${docs.length?`<li><strong>Diese Unterlagen beilegen:</strong><ul class="checks">${docs.map((c,j)=>`<li><label><input type="checkbox" data-check="${b.k}:${j}" ${S.checks[b.k+":"+j]?"checked":""}><span>${esc(c)}</span></label></li>`).join("")}</ul>${priv?`<button class="btn small soft" type="button" data-act="vhp-quittung" style="margin-top:8px">${ic("down")}${S.vhp.ersatz==="angehoerig"?"Bestätigung":"Quittung"} zum Unterschreiben (PDF)</button>`:""}</li>`:""}
-      <li><strong>Abschicken an:</strong> ${esc(r.name)}.<br><span class="small muted">${esc(r.hint)}</span>${r.mail?`<br><span class="small">E-Mail: <code>${esc(r.mail)}</code></span>`:""}</li>
-      <li><strong>Hier abhaken, wenn es raus ist.</strong> Wir erinnern dich in 4 Wochen, falls noch keine Antwort da ist.</li>
-    </ol>
-    ${st==="offen"?`<button class="btn big" type="button" data-act="sent" data-k="${b.k}">${ic("check")}Ich habe den Antrag abgeschickt</button>`:`<p class="notice good">${ic("check")}<span>Abgeschickt${S.sent&&S.sent[b.k]?" am "+deD(parseIso(S.sent[b.k])):""}. Status: ${esc(st)}.</span></p>`}
-    <details><summary class="small">Text selbst ändern (für Geübte)</summary>
-      <div class="field" style="margin-top:10px"><input type="text" data-sub="${b.k}" value="${esc(L.subject)}" aria-label="Betreff"><textarea data-tx="${b.k}" aria-label="Antragstext">${esc(L.body)}</textarea>
-      ${S.texte[b.k]!=null?`<button class="btn small ghost" type="button" data-resettx="${b.k}">Änderungen verwerfen</button>`:""}</div>
-    </details>
-  </section>`;
-}
-
-
-/* ---------- Bescheid & Widerspruch ---------- */
-const PG_GRENZEN=[12.5,27,47.5,70,90]; // ab diesen Punkten gilt Pflegegrad 1..5
-function pgAusPunkten(p){ let g=0; PG_GRENZEN.forEach((t,i)=>{ if(p>=t) g=i+1 }); return g }
-function bescheidInfo(){
-  const b=S.bescheid; if(!b) return null;
-  const pts=numDE(b.punkte), hasPts=String(b.punkte||"").trim()!=="";
-  const g=Number(b.pg)|| (hasPts?pgAusPunkten(pts):0);
-  const next = g<5 ? PG_GRENZEN[g] : null;
-  const fehlt = hasPts && next!=null ? Math.max(0, next-pts) : null;
-  const ein=parseIso(b.eingang); let frist=null;
-  if(ein){ frist=new Date(ein); frist.setMonth(frist.getMonth()+1) }
-  const knapp = fehlt!=null && fehlt<=7.5;
-  const abgelehnt = g===0 && (hasPts || b.art==="ablehnung");
-  return {g,pts,hasPts,next,fehlt,frist,knapp,abgelehnt,offen: frist && daysUntil(frist)>=0};
-}
-let ocrBusy=false, ocrMsg="";
-async function loadTesseract(){
-  if(window.Tesseract) return window.Tesseract;
-  return new Promise((res,rej)=>{ const s=document.createElement("script"); s.src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"; s.integrity="sha256-qOKZGNCYsrBuEBK9rv+0rsBEXF1WVHCQI+C9H0QqgOg="; s.crossOrigin="anonymous"; s.onload=()=>res(window.Tesseract); s.onerror=rej; document.head.appendChild(s) });
-}
-const GUT_HINWEISE=[[/pflegebett/i,"Pflegebett","technisch"],[/hausnotruf/i,"Hausnotruf","technisch"],[/rollator/i,"Rollator (über die Krankenkasse)","technisch"],[/duschstuhl|duschhocker|badewannenlift|badewannen/i,"Hilfe im Bad","technisch"],[/haltegriff|treppenlift|umbau|wohnumfeld|schwelle/i,"Wohnungsumbau","wohnumfeld"],[/tagespflege/i,"Tagespflege","tagespflege"],[/reha|rehabilitation/i,"Reha-Empfehlung","beratung"],[/pflegekurs|schulung/i,"Pflegekurs","pflegekurs"]];
-function parseBescheid(t){
-  const out={};
-  const txt=t.replace(/\s+/g," ");
-  let m=txt.match(/Pflegegrad\s*[:\-]?\s*([1-5])\b/i); if(m) out.pg=m[1];
-  m=txt.match(/(gesamtpunkt\w*|gewichtete\w*\s+gesamtpunkt\w*|punktwert|gesamtpunktzahl)[^0-9]{0,30}(\d{1,3}(?:[.,]\d{1,2})?)/i); if(m) out.punkte=m[2].replace(".",",");
-  if(/abgelehnt|keine pflegebedürftigkeit|nicht pflegebedürftig/i.test(txt) && !out.pg) out.art="ablehnung";
-  m=txt.match(/(?:vom|datum)\s*:?\s*(\d{1,2})\.(\d{1,2})\.(\d{4})/i); if(m) out.datum=`${m[3]}-${m[2].padStart(2,"0")}-${m[1].padStart(2,"0")}`;
-  out.hinweise=[...new Set(GUT_HINWEISE.filter(([re])=>re.test(txt)).map(([,t,k])=>t+"|"+k))];
-  return out;
-}
-async function scanBescheid(file){
-  if(!file) return;
-  bescheidDraft={...(S.bescheid||{}), pg:S.bescheid?.pg||String(pg()||""), file};
-  ocrBusy=true; ocrMsg="Das Dokument wird gelesen. Das dauert beim ersten Mal etwa 20 bis 40 Sekunden …"; render();
-  try{
-    const T=await loadTesseract();
-    const {data}=await T.recognize(file,"deu");
-    const r=parseBescheid(data.text||"");
-    Object.assign(bescheidDraft, Object.fromEntries(Object.entries(r).filter(([k,v])=>v&&(!Array.isArray(v)||v.length))));
-    ocrMsg = (r.pg||r.punkte) ? "Das haben wir erkannt. Bitte prüfen und bei Bedarf korrigieren." : "Wir konnten nicht alles sicher lesen. Bitte die Angaben vom Bescheid abtippen.";
-  }catch(e){ ocrMsg="Lesen hat nicht geklappt. Bitte die Angaben einfach abtippen." }
-  ocrBusy=false; render();
-}
-let bescheidDraft=null;
-function bescheidCard(){
-  if(!S.bereiche.pflege) return "";
-  const i=bescheidInfo();
-  if(bescheidDraft) return bescheidForm();
-  if(!i) return `<section class="panel mini">
-     <div class="mini-head">${ic("file")}<div><h3>Bescheid oder Gutachten bekommen?</h3><p class="small muted">Foto machen: Wir prüfen, ob sich ein Widerspruch lohnt, und behalten die Frist im Blick.</p></div></div>
-     <div class="btnrow"><button class="btn small" type="button" data-act="bes-cam">${ic("camera")}Foto machen</button><button class="btn small ghost" type="button" data-act="bes-manual">Abtippen</button><button class="linkbtn" type="button" data-act="r-start">Pflegegrad selbst einschätzen</button></div>
-   </section>`;
-  const tage=i.frist?daysUntil(i.frist):null;
-  const lohnt = (i.knapp||i.abgelehnt) && i.offen;
-  return `<section class="panel mini ${lohnt?"warn":""}">
-     <div class="mini-head">${ic("file")}<div><h3>Dein Bescheid${S.bescheid.datum?` vom ${deD(parseIso(S.bescheid.datum))}`:""}</h3>
-       <p class="small">${i.g?`Pflegegrad ${i.g}`:"Kein Pflegegrad"}${i.hasPts?` · ${String(S.bescheid.punkte).replace(".",",")} Punkte`:""}${i.fehlt!=null&&i.g<5?` · noch ${String(i.fehlt.toFixed(1)).replace(".",",")} Punkte bis Pflegegrad ${i.g+1}`:""}</p></div></div>
-     ${lohnt?`<p class="notice">${ic("alert")}<span><strong>Ein Widerspruch kann sich lohnen.</strong> ${i.abgelehnt?"Der Antrag wurde abgelehnt.":"Bis zum nächsten Pflegegrad fehlen nur wenige Punkte."} Frist: <strong>${deD(i.frist)}</strong> (${urgTxt(i.frist)}).</span></p>`
-       : i.offen ? `<p class="small muted">Widerspruch möglich bis ${deD(i.frist)} (${urgTxt(i.frist)}).</p>`
-       : i.frist ? `<p class="small muted">Die Widerspruchsfrist ist abgelaufen. Wird es schlechter, geht jederzeit ein Antrag auf Höherstufung.</p>`:""}
-     ${(S.bescheid.hinweise||[]).length?`<p class="small">Im Gutachten erwähnt: ${S.bescheid.hinweise.map(h=>{const [t,k]=h.split("|");return `<button type="button" class="chip" data-gotoclaim="${k}">${esc(t)}</button>`}).join(" ")}</p>`:""}
-     <div class="btnrow">${i.offen?`<button class="btn small ${lohnt?"":"ghost"}" type="button" data-wopen="widerspruch">Widerspruch schreiben</button>`:""}<button class="btn small ghost" type="button" data-act="bes-edit">Ändern</button></div>
-   </section>`;
-}
-function bescheidForm(){
-  const d=bescheidDraft;
-  return `<section class="panel mini">
-    <h3>Angaben aus dem Bescheid</h3>
-    ${ocrBusy?`<p class="notice info">${ic("info")}<span>${esc(ocrMsg)}</span></p>`:ocrMsg?`<p class="small muted">${esc(ocrMsg)}</p>`:""}
-    <div class="grid2">
-      <div class="field"><label for="bd-pg">Festgestellter Pflegegrad</label><select id="bd-pg" data-bd="pg"><option value="0" ${d.pg==="0"?"selected":""}>Abgelehnt / keiner</option>${[1,2,3,4,5].map(n=>`<option value="${n}" ${String(d.pg)===String(n)?"selected":""}>Pflegegrad ${n}</option>`).join("")}</select></div>
-      <div class="field"><label for="bd-pt">Gesamtpunkte (im Gutachten)</label><input type="text" inputmode="decimal" id="bd-pt" data-bd="punkte" value="${esc(d.punkte||"")}" placeholder="z. B. 44,25"></div>
-      <div class="field"><label for="bd-dat">Datum des Bescheids</label><input type="date" id="bd-dat" data-bd="datum" value="${esc(d.datum||"")}"></div>
-      <div class="field"><label for="bd-ein">Wann kam er bei euch an?</label><input type="date" id="bd-ein" data-bd="eingang" value="${esc(d.eingang||isoD(TODAY()))}"></div>
-    </div>
-    <p class="small muted">Die Punktzahl steht im Gutachten des Medizinischen Dienstes, meist als „Gesamtpunkte“. Fehlt das Gutachten, darfst du es bei der Pflegekasse anfordern.</p>
-    <div class="nav"><button class="btn ghost" type="button" data-act="bes-cancel">Abbrechen</button><button class="btn" type="button" data-act="bes-save" ${ocrBusy?"disabled":""}>Speichern</button></div>
-  </section>`;
-}
-async function saveBescheid(){
-  const d=bescheidDraft; if(!d) return;
-  const file=d.file; delete d.file;
-  S.bescheid={pg:String(d.pg||""),punkte:d.punkte||"",datum:d.datum||"",eingang:d.eingang||isoD(TODAY()),art:d.art||"",hinweise:d.hinweise||[]};
-  if(Number(S.bescheid.pg)>0) S.pg=S.bescheid.pg;
-  bescheidDraft=null; ocrMsg=""; delete S.texte.widerspruch; delete S.texte.widerspruch_sub;
-  save(); render(); toast("Bescheid gespeichert");
-  if(file && ASSETS && BCOL){ try{ const {blob,type}=await prepareFile(file); const up=await ASSETS.upload(blob,{type}); await BCOL.add({kat:"bescheid",datum:S.bescheid.datum||isoD(TODAY()),jahr:(parseIso(S.bescheid.datum)||TODAY()).getFullYear(),betrag:"",titel:"Pflegegrad-Bescheid",asset:up.id,ctype:up.contentType,eingereicht:false,created:new Date().toISOString()}) }catch(e){} }
-}
-B.push({k:"widerspruch", area:"Pflege", t:"Widerspruch gegen den Pflegegrad-Bescheid", p:"§ 84 SGG, § 18 SGB XI",
-  when:()=>false, val:()=>null, short:"", to:PK,
-  steps:["Fristwahrend reicht ein kurzer Widerspruch. Die ausführliche Begründung kannst du nachreichen.","Gutachten anfordern, falls es nicht beilag, und Punkt für Punkt prüfen, wo Hilfe zu niedrig bewertet wurde.","Pflegetagebuch über 1–2 Wochen führen und beilegen.","Bei der zweiten Begutachtung eine vertraute Person dabei haben."],
-  docs:["Kopie des Bescheids","Pflegetagebuch (wenn vorhanden)","Aktuelle Arztberichte"]});
-ASSIST.widerspruch={q:[
-  {k:"grund",type:"multi",label:"Was wurde im Gutachten zu niedrig eingeschätzt?",help:"Alles ankreuzen, was zutrifft. Unsicher? Dann „Weiß ich nicht“ – der Widerspruch gilt trotzdem.",opts:OPT([...HILFE,"Der Gutachter war nur sehr kurz da","Es war ein „guter Tag“, sonst ist es schlechter"])},
-  {k:"gutachten",type:"choice",label:"Liegt euch das Gutachten vor?",opts:OPT([{v:"ja",t:"Ja"},{v:"nein",t:"Nein",s:"wir fordern es im Widerspruch mit an"}])},
-  {k:"tel",type:"tel",label:"Telefonnummer für eine neue Begutachtung",ph:"z. B. 0711 123456"}],
- ask:()=>{const b=S.bescheid||{}; const o=ansObj("widerspruch");
-  return `lege ich hiermit Widerspruch gegen den Bescheid${b.datum?` vom ${deD(parseIso(b.datum))}`:" vom [Datum]"} über die Feststellung der Pflegebedürftigkeit ein${Number(b.pg)>0?` (festgestellt: Pflegegrad ${b.pg})`:""}.\n\nDer tatsächliche Hilfebedarf wurde im Gutachten nicht ausreichend berücksichtigt${has("widerspruch","grund")?`, insbesondere in folgenden Bereichen: ${av("widerspruch","grund")}`:""}. Eine ausführliche Begründung reiche ich nach.\n\n${o.gutachten==="ja"?"":"Bitte senden Sie mir das vollständige Gutachten des Medizinischen Dienstes zu. "}Ich beantrage eine erneute Begutachtung, möglichst durch eine andere Gutachterin oder einen anderen Gutachter. Für die Terminabsprache bin ich erreichbar unter: ${av("widerspruch","tel","Telefonnummer")}.`}};
-B.find(x=>x.k==="widerspruch").q=ASSIST.widerspruch.q; B.find(x=>x.k==="widerspruch").ask=ASSIST.widerspruch.ask;
-
-/* ---------- Entlastungsbetrag-Konto ---------- */
-function entlKonto(){
-  if(!(pg()>=1 && isHome())) return null;
-  const t=TODAY(), y=t.getFullYear();
-  const seit=parseIso(S.entlSeit?S.entlSeit+"-01":"");
-  const monate=(jahr,bisMonat)=>{ let von=0; if(seit){ if(seit.getFullYear()>jahr) return 0; if(seit.getFullYear()===jahr) von=seit.getMonth() } return Math.max(0,bisMonat-von) };
-  const used=(jahr,nurH1)=>BEL.filter(b=>b.kat==="entl"&&String(b.jahr)===String(jahr)&&(!nurH1||(parseIso(b.datum)||t).getMonth()<6)).reduce((s,b)=>s+(Number(b.betrag)||0),0);
-  const vorjBudget=ENTLASTUNG*monate(y-1,12), vorjRest=Math.max(0,vorjBudget-used(y-1));
-  const h1=used(y,true), ausVorj=Math.min(vorjRest,h1);
-  const vorjOffen = t<=new Date(y,5,30) ? vorjRest-ausVorj : 0;
-  const bisHeute=ENTLASTUNG*monate(y,t.getMonth()+1), jahr=ENTLASTUNG*monate(y,12);
-  const genutzt=used(y)-ausVorj;
-  const frei=Math.max(0,bisHeute-genutzt)+vorjOffen;
-  return {y,frei,vorjOffen,verfall:new Date(y,5,30),genutzt:used(y),bisHeute,jahr,belege:BEL.filter(b=>b.kat==="entl").length};
-}
-function entlCard(){
-  const k=entlKonto(); if(!k) return "";
-  const pct=k.bisHeute?Math.min(100,(k.genutzt/(k.bisHeute+(k.vorjOffen||0)))*100):0;
-  return `<section class="panel mini">
-    <div class="mini-head">${ic("receipt")}<div><h3>Entlastungsbetrag</h3><p class="small muted">${ENTLASTUNG} € im Monat für Haushaltshilfe, Betreuung oder Tagespflege</p></div>
-      <div class="mini-num"><span class="small muted">jetzt frei</span><b>${eur(k.frei)}</b></div></div>
-    <div class="meter"><div class="track"><i style="width:${pct}%"></i></div>
-      <div class="nums"><span>${k.y} genutzt: <strong>${eur(k.genutzt,2)}</strong></span><span>Anspruch bis heute: <strong>${eur(k.bisHeute)}</strong></span></div></div>
-    ${k.vorjOffen>0?`<p class="notice ${daysUntil(k.verfall)<=60?"":"info"}">${ic("alert")}<span><strong>${eur(k.vorjOffen)} aus ${k.y-1}</strong> verfallen am 30.06.${k.y} (${urgTxt(k.verfall)}). Jetzt Hilfe organisieren und Rechnung einreichen.</span></p>`:""}
-    ${!k.belege?`<p class="small muted">Trag jede Rechnung als Beleg „Entlastungsbetrag“ ein, dann rechnet die App automatisch mit.</p>`:""}
-    <div class="btnrow"><button class="btn small" type="button" data-act="entl-add">${ic("plus")}Rechnung erfassen</button><button class="btn small ghost" type="button" data-wopen="entlastung">Erstattung beantragen</button>
-      <label class="small muted" style="display:flex;align-items:center;gap:6px">Pflegegrad seit <input type="month" id="entl-seit" value="${esc(S.entlSeit||"")}" style="width:auto;padding:4px 8px"></label></div>
-  </section>`;
-}
-
-
-/* ---------- Pflegegrad-Rechner (Selbsteinschätzung nach dem Begutachtungsinstrument) ---------- */
-const SELB=[["0","Selbstständig","schafft es allein"],["1","Überwiegend selbstständig","braucht ab und zu etwas Hilfe"],["2","Überwiegend unselbstständig","schafft nur einen kleinen Teil allein"],["3","Unselbstständig","schafft es nicht allein"]];
-const FAEH=[["0","Ja, ohne Probleme",""],["1","Meistens",""],["2","Nur selten",""],["3","Nein, gar nicht",""]];
-const HAEUF=[["0","Nie",""],["1","Selten","1- bis 3-mal im Monat"],["3","Oft","mehrmals pro Woche"],["5","Täglich",""]];
-const RQ=[
- {m:1,q:"Im Bett die Lage wechseln (umdrehen, aufsetzen)",o:SELB},
- {m:1,q:"Sicher sitzen, ohne zur Seite zu kippen",o:SELB},
- {m:1,q:"Aufstehen vom Stuhl oder Bett und sich umsetzen",o:SELB},
- {m:1,q:"In der Wohnung von Raum zu Raum gehen",o:SELB},
- {m:1,q:"Treppen steigen",o:SELB},
- {m:2,q:"Erkennt vertraute Personen aus dem Umfeld",o:FAEH},
- {m:2,q:"Weiß, welcher Tag und welche Tageszeit ist",o:FAEH},
- {m:2,q:"Trifft Entscheidungen im Alltag (z. B. was anziehen)",o:FAEH},
- {m:2,q:"Kann einem Gespräch folgen und es verstehen",o:FAEH},
- {m:3,q:"Ist nachts unruhig, läuft umher oder ruft",o:HAEUF},
- {m:3,q:"Wehrt sich gegen Pflege oder Hilfe",o:HAEUF},
- {m:3,q:"Hat starke Ängste oder ist sehr niedergeschlagen",o:HAEUF},
- {m:4,q:"Oberkörper waschen",o:SELB,w:1},
- {m:4,q:"Duschen oder baden (inkl. Haare waschen)",o:SELB,w:1},
- {m:4,q:"Oberkörper an- und auskleiden",o:SELB,w:1},
- {m:4,q:"Unterkörper an- und auskleiden (Hose, Socken, Schuhe)",o:SELB,w:1},
- {m:4,q:"Essen (mundgerecht zubereitetes Essen zum Mund führen)",o:SELB,w:3},
- {m:4,q:"Trinken (genug und selbstständig)",o:SELB,w:2},
- {m:4,q:"Toilette benutzen",o:SELB,w:2},
- {m:5,q:"Wie oft wird Hilfe bei Medikamenten, Spritzen, Verbänden oder Messungen gebraucht?",o:[["0","Nie oder selten",""],["1","Wöchentlich",""],["3","Täglich",""],["5","Mehrmals täglich",""]]},
- {m:5,q:"Wie oft muss jemand zu Arzt- oder Therapieterminen begleiten?",o:[["0","Nie",""],["1","Etwa einmal im Monat",""],["2","Jede Woche",""]]},
- {m:6,q:"Den Tag einteilen und sich an Abläufe halten",o:SELB},
- {m:6,q:"Sich sinnvoll beschäftigen",o:SELB},
- {m:6,q:"Kontakt zu Familie, Nachbarn, Freunden halten",o:SELB},
-];
-const MOD={1:{n:"Mobilität",max:15,t:[[2,2.5],[4,5],[6,7.5],[10,10]]},2:{n:"Verstehen und Erinnern",max:33,t:[[2,3.75],[6,7.5],[11,11.25],[17,15]]},3:{n:"Verhalten und Psyche",t:[[1,3.75],[3,7.5],[5,11.25],[7,15]]},4:{n:"Selbstversorgung",max:54,t:[[3,10],[8,20],[19,30],[37,40]]},5:{n:"Krankheitsbedingte Hilfe",t:[[1,5],[2,10],[4,15],[6,20]]},6:{n:"Alltag und Kontakte",max:18,t:[[1,3.75],[4,7.5],[7,11.25],[12,15]]}};
-let RECHNER=null; // {i, a:[]}
-function rechnerErgebnis(a){
-  const roh={1:0,2:0,3:0,4:0,5:0,6:0}, mx={1:0,2:0,3:0,4:0,5:0,6:0};
-  RQ.forEach((q,i)=>{ const v=Number(a[i]||0)*(q.w||1); roh[q.m]+=v; mx[q.m]+=Number(q.o[q.o.length-1][0])*(q.w||1) });
-  const gew={};
-  for(const m of [1,2,3,4,5,6]){
-    let r=roh[m]; if(MOD[m].max && mx[m]) r=r/mx[m]*MOD[m].max; // auf das echte Modul hochrechnen
-    let g=0; MOD[m].t.forEach(([ab,p])=>{ if(r>=ab-1e-9) g=p }); gew[m]=g;
-  }
-  const m23=Math.max(gew[2],gew[3]);
-  const summe=gew[1]+m23+gew[4]+gew[5]+gew[6];
-  return {summe,grad:pgAusPunkten(summe),gew,m23};
-}
-function startRechner(){ RECHNER={i:0,a:[]}; render(); scrollTop() }
-function viewRechner(){
-  const R=RECHNER, n=RQ.length;
-  if(R.i>=n){
-    const e=rechnerErgebnis(R.a); const hat=(typeof USER!=='undefined'&&USER)||(typeof GUEST!=='undefined'&&GUEST); const aktuell=pg();
-    const next=e.grad<5?PG_GRENZEN[e.grad]:null;
-    const bars=[[1,"Mobilität",10,e.gew[1]],[23,"Verstehen / Verhalten",15,e.m23],[4,"Selbstversorgung",40,e.gew[4]],[5,"Krankheitsbedingte Hilfe",20,e.gew[5]],[6,"Alltag und Kontakte",15,e.gew[6]]];
-    return `<section class="panel wiz">
-      <div class="wiztop"><button type="button" class="btn small ghost" data-act="r-close">← Schließen</button><span class="small muted">Pflegegrad-Rechner</span></div>
-      <h2 class="wq">${e.grad?`Voraussichtlich Pflegegrad ${e.grad}`:"Voraussichtlich noch kein Pflegegrad"}</h2>
-      <p class="whelp">${ic("info")}<span>Geschätzt ${String(e.summe.toFixed(1)).replace(".",",")} von 100 Punkten.${next?` Ab ${String(next).replace(".",",")} Punkten gäbe es Pflegegrad ${e.grad+1}.`:""} Das ist eine Schätzung. Die Entscheidung trifft der Medizinische Dienst bei einem Hausbesuch.</span></p>
-      <div class="rbars">${bars.map(([k,l,mx,v])=>`<div><span>${l}</span><div class="track"><i style="width:${Math.round(v/mx*100)}%"></i></div><b>${String(v).replace(".",",")}</b></div>`).join("")}</div>
-      ${e.grad>=1&&(!aktuell||e.grad>aktuell)?`<p class="notice good">${ic("check")}<span>${aktuell?`Das wäre höher als der jetzige Pflegegrad ${aktuell}. Ein Antrag auf Höherstufung kann sich lohnen.`:`Ein Antrag auf einen Pflegegrad kann sich lohnen. Ab Pflegegrad 1 gibt es schon ${ENTLASTUNG} € im Monat Entlastungsbetrag und mehr.`}</span></p>`:""}
-      <div class="btnrow big">${hat?(e.grad>=1&&(!aktuell||e.grad>aktuell)?`<button class="btn" type="button" data-act="r-antrag">${aktuell?"Höherstufung beantragen":"Pflegegrad beantragen"}</button>`:"")
-        :`<button class="btn" type="button" data-act="r-konto">Antrag vorbereiten (kostenlos)</button>`}
+(()=>{var Ka=Object.defineProperty;var M=(e,n)=>{for(var a in n)Ka(e,a,{get:n[a],enumerable:!0})};var t={};var Lt={};M(Lt,{BETRAEGE:()=>z});var z=Object.freeze({jahr:2026,stand:"Leistungs\xFCbersicht des Bundesgesundheitsministeriums, Stand 01.01.2026",pflegegeld:[0,0,347,599,800,990],sachleistung:[0,0,796,1497,1859,2299],tagespflege:[0,0,721,1357,1685,2085],stationaer:[0,131,805,1319,1855,2096],rentenbeitrag:[0,0,198.62,316.32,514.94,735.63],entlastung:131,jahresbetrag:3539,verbrauch:42,wohnumfeld:4180,wg:224,dipa:40,dipaUnterstuetzung:30,eingliederungMax:278,heimZuschlag:[15,30,50,75],kmPauschale:.2,pflegePauschbetrag:[0,0,600,1100,1800,1800],behindertenPauschbetrag:{20:384,30:620,40:860,50:1140,60:1440,70:1780,80:2120,90:2460,100:2840},behindertenPauschbetragErhoeht:7400,rundfunkVoll:18.36,rundfunkErmaessigt:6.12,elternunterhaltGrenze:1e5,belastungsgrenzeProzent:2,belastungsgrenzeChronischProzent:1});var Gt={};M(Gt,{AOK_REGIONEN:()=>Ft,BEHPAUSCH:()=>Mt,DIPA:()=>tt,DIPA_UL:()=>nt,ENTLASTUNG:()=>U,JAHRESBETRAG:()=>ve,KASSEN:()=>we,MZ:()=>Nt,PG:()=>T,VERBRAUCH:()=>ue,VHP_ERSATZ:()=>Tt,WG:()=>Re,WOHNEN:()=>Rt,WOHNUMFELD:()=>Fe,blank:()=>C,esc:()=>d,eur:()=>h,gdb:()=>I,isHome:()=>K,mz:()=>k,pg:()=>b});var T={pflegegeld:z.pflegegeld,sachleistung:z.sachleistung,tagespflege:z.tagespflege,stationaer:z.stationaer,rv:z.rentenbeitrag,pflegePausch:z.pflegePauschbetrag},U=z.entlastung,ve=z.jahresbetrag,ue=z.verbrauch,Fe=z.wohnumfeld,Re=z.wg,tt=z.dipa,nt=z.dipaUnterstuetzung,Mt=z.behindertenPauschbetrag,we={tk:{name:"Techniker Krankenkasse (TK)",pk:"TK-Pflegeversicherung",mail:"service@tk.de",app:"TK-App (sicherer Upload)"},barmer:{name:"BARMER",pk:"BARMER Pflegekasse",mail:"service@barmer.de",app:"BARMER-App"},dak:{name:"DAK-Gesundheit",pk:"DAK-Gesundheit Pflegekasse",mail:"service@dak.de",app:"Meine DAK (App)"},aok:{name:"AOK",pk:"AOK-Pflegekasse",mail:"",app:"AOK Mein Leben (App)"},ikk:{name:"IKK classic",pk:"IKK classic Pflegekasse",mail:"info@ikk-classic.de",app:"IKK classic App"},andere:{name:"Andere Krankenkasse",pk:"Pflegekasse",mail:"",app:"App oder Online-Postfach deiner Kasse"}},Ft=["Baden-W\xFCrttemberg","Bayern","PLUS (Sachsen/Th\xFCringen)","Niedersachsen","Rheinland/Hamburg","NordWest","Hessen","Nordost","Rheinland-Pfalz/Saarland","Sachsen-Anhalt","Bremen/Bremerhaven"],Rt={angehoerige:{t:"Zu Hause, Pflege durch Angeh\xF6rige/Bekannte",s:"ohne Pflegedienst"},gemischt:{t:"Zu Hause, Angeh\xF6rige + Pflegedienst",s:"Kombination"},pflegedienst:{t:"Zu Hause, \xFCberwiegend Pflegedienst",s:"Sachleistung"},wg:{t:"Ambulant betreute Wohngruppe",s:"Pflege-WG"},heim:{t:"Pflegeheim (vollstation\xE4r)",s:"dauerhaft im Heim"},eingliederung:{t:"Wohnheim der Eingliederungshilfe",s:"Einrichtung f\xFCr Menschen mit Behinderung"}},Nt={G:"G \u2013 erheblich gehbehindert",aG:"aG \u2013 au\xDFergew\xF6hnlich gehbehindert",H:"H \u2013 hilflos",Bl:"Bl \u2013 blind",TBl:"TBl \u2013 taubblind",Gl:"Gl \u2013 geh\xF6rlos",B:"B \u2013 Begleitperson n\xF6tig",RF:"RF \u2013 Rundfunkbeitrag-Erm\xE4\xDFigung"};function C(){return{step:0,done:!1,tab:"ansprueche",brutto:"",bruttoJahr:{},chronisch:"",welcomeSeen:!1,bescheid:null,entlSeit:"",ans:{},sent:{},wiz:null,font:"1",belegFilter:{jahre:[],kat:""},vhp:{grund:"urlaub",art:"tage",haupt:"",von:"",bis:"",stunden:"",ersatz:"angehoerig",eName:"",eAdresse:"",eBez:"",satz:"",rechnung:"",km:"",verdienst:"",verbraucht:"",auszahlung:"versicherte",iban:""},termine:{dienst:"",tel:"",besuche:[],eigene:[],wertmarke:""},rolle:"",bereiche:{pflege:!0,sb:!1},kasse:"",aokRegion:"",kasseAndere:"",pg:"",wohnen:"",verschlechtert:!1,pp:{vorhanden:!0,stunden10:"",arbeit:""},sb:{status:"",gdb:"",mz:{},arbeit:!1,auto:!1,grundsicherung:!1},genutzt:{},status:{},checks:{},texte:{},person:{name:"",geb:"",vnr:"",strasse:"",ort:"",absender:"",beziehung:"",absStrasse:"",absOrt:"",tel:"",mail:""}}}t.S=C();function K(){return["angehoerige","gemischt","pflegedienst","wg"].includes(t.S.wohnen)}function b(){return Number(t.S.pg)||0}function I(){return Number(t.S.sb.gdb)||0}function k(e){return!!t.S.sb.mz[e]}function h(e,n=0){return e.toLocaleString("de-DE",{minimumFractionDigits:n,maximumFractionDigits:n})+" \u20AC"}function d(e){return String(e??"").replace(/[&<>"]/g,n=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"})[n])}var Tt={angehoerig:{t:"Nahe Angeh\xF6rige oder Haushaltsmitglied",s:"verwandt/verschw\xE4gert bis 2. Grad (z. B. Kind, Enkel, Geschwister, Schwiegerkind) oder wohnt im selben Haushalt"},privat:{t:"Andere Privatperson",s:"Nachbarin, Freund, Bekannte, entferntere Verwandte (z. B. Nichte, Cousin)"},dienst:{t:"Pflegedienst oder Betreuungsdienst",s:"stellt eine Rechnung"},heim:{t:"Kurzzeitpflege im Heim",s:"vor\xFCbergehend in einer Einrichtung"}};var ba={};M(ba,{B:()=>R,FA:()=>Pe,KK:()=>Q,PK:()=>D,RECIP:()=>_e,VA:()=>Qe,applicable:()=>Et,kasseName:()=>mt,kassePK:()=>ht,txt:()=>he});var pa={};M(pa,{KM_SATZ:()=>De,makeQuittung:()=>Vn,numDE:()=>P,vhpAsk:()=>ha,vhpCalc:()=>Xe,vhpDocs:()=>ga});var ca={};M(ca,{AREA_ICON:()=>Yn,MON:()=>Yt,TODAY:()=>x,addDays:()=>X,daysUntil:()=>fe,deD:()=>A,halfOf:()=>Dt,ic:()=>g,isoD:()=>F,parseIso:()=>B,shiftHalf:()=>Ye,start03:()=>da});var ua={};M(ua,{KATS:()=>L,beratungRelevant:()=>gt,beratungStatus:()=>Se,besuche:()=>Ie,bruttoOf:()=>yt,chronisch:()=>At,deadlines:()=>le,gcal:()=>Jt,ocal:()=>Xt,selYears:()=>J,urg:()=>te,urgTxt:()=>Z,visSteps:()=>Ee,zuz:()=>qe});var oa={};M(oa,{PG_GRENZEN:()=>Ne,bescheidCard:()=>zt,bescheidInfo:()=>xt,entlCard:()=>Bt,entlKonto:()=>Ta,loadTesseract:()=>kt,parseBescheid:()=>Na,pgAusPunkten:()=>lt,saveBescheid:()=>On,scanBescheid:()=>_n,start06:()=>la});var ia={};M(ia,{ASSIST:()=>xe,HILFE:()=>Je,OPT:()=>G,ansObj:()=>O,av:()=>w,bar:()=>de,getQ:()=>Ae,has:()=>ee,setQ:()=>ye,start05:()=>ra,startWiz:()=>$t,viewWizard:()=>sa,wizSteps:()=>oe});var aa={};M(aa,{$:()=>f,famKey:()=>vt,render:()=>c,reveal:()=>Un,scrollTop:()=>E,start11:()=>na,sums:()=>Ze});var Kt={};M(Kt,{RQ:()=>rt,rechnerErgebnis:()=>ma,startRechner:()=>it,viewRechner:()=>Ht});var j=[["0","Selbstst\xE4ndig","schafft es allein"],["1","\xDCberwiegend selbstst\xE4ndig","braucht ab und zu etwas Hilfe"],["2","\xDCberwiegend unselbstst\xE4ndig","schafft nur einen kleinen Teil allein"],["3","Unselbstst\xE4ndig","schafft es nicht allein"]],at=[["0","Ja, ohne Probleme",""],["1","Meistens",""],["2","Nur selten",""],["3","Nein, gar nicht",""]],It=[["0","Nie",""],["1","Selten","1- bis 3-mal im Monat"],["3","Oft","mehrmals pro Woche"],["5","T\xE4glich",""]],rt=[{m:1,q:"Im Bett die Lage wechseln (umdrehen, aufsetzen)",o:j},{m:1,q:"Sicher sitzen, ohne zur Seite zu kippen",o:j},{m:1,q:"Aufstehen vom Stuhl oder Bett und sich umsetzen",o:j},{m:1,q:"In der Wohnung von Raum zu Raum gehen",o:j},{m:1,q:"Treppen steigen",o:j},{m:2,q:"Erkennt vertraute Personen aus dem Umfeld",o:at},{m:2,q:"Wei\xDF, welcher Tag und welche Tageszeit ist",o:at},{m:2,q:"Trifft Entscheidungen im Alltag (z. B. was anziehen)",o:at},{m:2,q:"Kann einem Gespr\xE4ch folgen und es verstehen",o:at},{m:3,q:"Ist nachts unruhig, l\xE4uft umher oder ruft",o:It},{m:3,q:"Wehrt sich gegen Pflege oder Hilfe",o:It},{m:3,q:"Hat starke \xC4ngste oder ist sehr niedergeschlagen",o:It},{m:4,q:"Oberk\xF6rper waschen",o:j,w:1},{m:4,q:"Duschen oder baden (inkl. Haare waschen)",o:j,w:1},{m:4,q:"Oberk\xF6rper an- und auskleiden",o:j,w:1},{m:4,q:"Unterk\xF6rper an- und auskleiden (Hose, Socken, Schuhe)",o:j,w:1},{m:4,q:"Essen (mundgerecht zubereitetes Essen zum Mund f\xFChren)",o:j,w:3},{m:4,q:"Trinken (genug und selbstst\xE4ndig)",o:j,w:2},{m:4,q:"Toilette benutzen",o:j,w:2},{m:5,q:"Wie oft wird Hilfe bei Medikamenten, Spritzen, Verb\xE4nden oder Messungen gebraucht?",o:[["0","Nie oder selten",""],["1","W\xF6chentlich",""],["3","T\xE4glich",""],["5","Mehrmals t\xE4glich",""]]},{m:5,q:"Wie oft muss jemand zu Arzt- oder Therapieterminen begleiten?",o:[["0","Nie",""],["1","Etwa einmal im Monat",""],["2","Jede Woche",""]]},{m:6,q:"Den Tag einteilen und sich an Abl\xE4ufe halten",o:j},{m:6,q:"Sich sinnvoll besch\xE4ftigen",o:j},{m:6,q:"Kontakt zu Familie, Nachbarn, Freunden halten",o:j}],st={1:{n:"Mobilit\xE4t",max:15,t:[[2,2.5],[4,5],[6,7.5],[10,10]]},2:{n:"Verstehen und Erinnern",max:33,t:[[2,3.75],[6,7.5],[11,11.25],[17,15]]},3:{n:"Verhalten und Psyche",t:[[1,3.75],[3,7.5],[5,11.25],[7,15]]},4:{n:"Selbstversorgung",max:54,t:[[3,10],[8,20],[19,30],[37,40]]},5:{n:"Krankheitsbedingte Hilfe",t:[[1,5],[2,10],[4,15],[6,20]]},6:{n:"Alltag und Kontakte",max:18,t:[[1,3.75],[4,7.5],[7,11.25],[12,15]]}};t.RECHNER=null;function ma(e){let n={1:0,2:0,3:0,4:0,5:0,6:0},a={1:0,2:0,3:0,4:0,5:0,6:0};rt.forEach((l,o)=>{let u=Number(e[o]||0)*(l.w||1);n[l.m]+=u,a[l.m]+=Number(l.o[l.o.length-1][0])*(l.w||1)});let s={};for(let l of[1,2,3,4,5,6]){let o=n[l];st[l].max&&a[l]&&(o=o/a[l]*st[l].max);let u=0;st[l].t.forEach(([p,v])=>{o>=p-1e-9&&(u=v)}),s[l]=u}let r=Math.max(s[2],s[3]),i=s[1]+r+s[4]+s[5]+s[6];return{summe:i,grad:lt(i),gew:s,m23:r}}function it(){t.RECHNER={i:0,a:[]},c(),E()}function Ht(){let e=t.RECHNER,n=rt.length;if(e.i>=n){let s=ma(e.a),r=typeof t.USER<"u"&&t.USER||typeof t.GUEST<"u"&&t.GUEST,i=b(),l=s.grad<5?Ne[s.grad]:null,o=[[1,"Mobilit\xE4t",10,s.gew[1]],[23,"Verstehen / Verhalten",15,s.m23],[4,"Selbstversorgung",40,s.gew[4]],[5,"Krankheitsbedingte Hilfe",20,s.gew[5]],[6,"Alltag und Kontakte",15,s.gew[6]]];return`<section class="panel wiz">
+      <div class="wiztop"><button type="button" class="btn small ghost" data-act="r-close">\u2190 Schlie\xDFen</button><span class="small muted">Pflegegrad-Rechner</span></div>
+      <h2 class="wq">${s.grad?`Voraussichtlich Pflegegrad ${s.grad}`:"Voraussichtlich noch kein Pflegegrad"}</h2>
+      <p class="whelp">${g("info")}<span>Gesch\xE4tzt ${String(s.summe.toFixed(1)).replace(".",",")} von 100 Punkten.${l?` Ab ${String(l).replace(".",",")} Punkten g\xE4be es Pflegegrad ${s.grad+1}.`:""} Das ist eine Sch\xE4tzung. Die Entscheidung trifft der Medizinische Dienst bei einem Hausbesuch.</span></p>
+      <div class="rbars">${o.map(([u,p,v,y])=>`<div><span>${p}</span><div class="track"><i style="width:${Math.round(y/v*100)}%"></i></div><b>${String(y).replace(".",",")}</b></div>`).join("")}</div>
+      ${s.grad>=1&&(!i||s.grad>i)?`<p class="notice good">${g("check")}<span>${i?`Das w\xE4re h\xF6her als der jetzige Pflegegrad ${i}. Ein Antrag auf H\xF6herstufung kann sich lohnen.`:`Ein Antrag auf einen Pflegegrad kann sich lohnen. Ab Pflegegrad 1 gibt es schon ${U} \u20AC im Monat Entlastungsbetrag und mehr.`}</span></p>`:""}
+      <div class="btnrow big">${r?s.grad>=1&&(!i||s.grad>i)?`<button class="btn" type="button" data-act="r-antrag">${i?"H\xF6herstufung beantragen":"Pflegegrad beantragen"}</button>`:"":'<button class="btn" type="button" data-act="r-konto">Antrag vorbereiten (kostenlos)</button>'}
         <button class="btn ghost" type="button" data-act="r-neu">Noch einmal</button></div>
       <button class="linkbtn" type="button" data-act="teilen" style="align-self:flex-start">Rechner an Familie oder Freunde weiterempfehlen</button>
-    </section>`;
-  }
-  const q=RQ[R.i];
-  return `<section class="panel wiz">
-    <div class="wiztop"><button type="button" class="btn small ghost" data-act="r-close">← Schließen</button><span class="small muted">Pflegegrad-Rechner · ${MOD[q.m].n}</span></div>
-    ${bar(R.i+1,n,`Frage ${R.i+1} von ${n}`)}
-    ${R.i===0?`<p class="small muted">Beantworte die Fragen so, wie es an einem normalen Tag ist, nicht an einem besonders guten.</p>`:""}
-    <h2 class="wq">${esc(q.q)}</h2>
-    <div class="choices big">${q.o.map(([v,t,s])=>`<label class="choice" for="rq-${v}"><input type="radio" id="rq-${v}" name="rq" data-rq="${v}" ${R.a[R.i]===v?"checked":""}><span>${esc(t)}${s?`<small>${esc(s)}</small>`:""}</span></label>`).join("")}</div>
-    <div class="nav big go">${R.i>0?`<button class="btn ghost" type="button" data-act="r-back">Zurück</button>`:"<span></span>"}${R.a[R.i]!=null?`<button class="btn" type="button" data-act="r-next">Weiter</button>`:""}</div>
-  </section>`;
-}
-
-
-/* ---------- Anbieter vor Ort finden ---------- */
-const LOTSE="https://www.pflegelotse.de/";
-const FINDER={
- tagespflege:[["Tagespflege in der Nähe","Tagespflege"],["Pflegelotse der Ersatzkassen (mit Preisen)",LOTSE]],
- entlastung:[["Anerkannte Alltagshilfen (AOK-Pflegenavigator, für alle nutzbar)","https://www.aok.de/pk/cl/uni/pflege/pflegenavigator/unterstuetzungsangebote/"],["Nachbarschaftshilfe in der Nähe","Nachbarschaftshilfe"],["Alltagsbegleitung in der Nähe","Alltagsbegleitung Senioren"]],
- sachleistung:[["Pflegedienste in der Nähe","ambulanter Pflegedienst"],["Pflegelotse der Ersatzkassen (mit Preisen)",LOTSE]],
- jahresbetrag:[["Kurzzeitpflege in der Nähe","Kurzzeitpflege"],["Pflegelotse der Ersatzkassen",LOTSE]],
- verbrauch:[["Sanitätshaus in der Nähe","Sanitätshaus"],["Apotheke in der Nähe","Apotheke"]],
- technisch:[["Sanitätshaus in der Nähe","Sanitätshaus"],["Hausnotruf-Anbieter in der Nähe","Hausnotruf"]],
- wohnumfeld:[["Wohnberatung in der Nähe","Wohnberatung barrierefrei"]],
- beratung:[["Pflegestützpunkt in der Nähe","Pflegestützpunkt"],["Beratungsstellen-Suche des ZQP","https://www.zqp.de/beratung-pflege/"]],
- stationaer:[["Pflegeheime vergleichen (Pflegelotse)",LOTSE]],
- pflegekurs:[["Pflegekurse in der Nähe","Pflegekurs Angehörige"]],
-};
-function plz(){ const m=String(S.person.ort||"").match(/\b\d{5}\b/); return m?m[0]:(S.plz||"") }
-function finderHTML(k){
-  const L=FINDER[k]; if(!L) return "";
-  const p=plz();
-  return `<div><h4>In der Nähe finden</h4>
-    ${p?"":`<div class="field" style="max-width:220px;margin-bottom:8px"><label for="plz-${k}">Deine Postleitzahl</label><input type="text" inputmode="numeric" id="plz-${k}" data-plz="1" maxlength="5" placeholder="z. B. 70173"></div>`}
-    <div class="btnrow">${L.map(([t,q])=>{const url=/^https?:/.test(q)?q:`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q+" "+(p||""))}`;return `<a class="btn small soft" href="${url}" target="_blank" rel="noopener">${esc(t)}</a>`}).join("")}</div>
-    <p class="small muted">Neutral: Wir bekommen für diese Links kein Geld. Bei Anrufen „im Auftrag der Pflegekasse“ bitte vorsichtig sein.</p></div>`;
-}
-
-
-/* ---------- Sprachen: Oberfläche, Fragebogen und Rechner übersetzt; Anträge bleiben Deutsch ---------- */
-const LANGS=[["de","Deutsch"],["tr","Türkçe"],["ru","Русский"],["ar","العربية"],["ti","ትግርኛ"]];
-// Reihenfolge je Eintrag: Türkisch, Russisch, Arabisch, Tigrinya
-const T={
-"Willkommen":["Hoş geldiniz","Добро пожаловать","مرحبًا","እንቋዕ ብደሓን መጻእኩም"],
-"Melde dich an, um deine Angaben und Belege zu sehen.":["Bilgilerinizi ve belgelerinizi görmek için giriş yapın.","Войдите, чтобы увидеть свои данные и документы.","سجّل الدخول لرؤية بياناتك ومستنداتك.","ሓበሬታኹምን ሰነዳትኩምን ንምርኣይ እተዉ።"],
-"Mit Google anmelden":["Google ile giriş yap","Войти через Google","تسجيل الدخول عبر Google","ብGoogle እተዉ"],
-"oder mit E-Mail":["veya e-posta ile","или по эл. почте","أو بالبريد الإلكتروني","ወይ ብኢመይል"],
-"E-Mail-Adresse":["E-posta adresi","Адрес эл. почты","البريد الإلكتروني","ኣድራሻ ኢመይል"],
-"Passwort":["Şifre","Пароль","كلمة المرور","መሕለፊ ቃል"],
-"Anmelden":["Giriş yap","Войти","تسجيل الدخول","እቶ"],
-"Konto anlegen":["Hesap oluştur","Создать аккаунт","إنشاء حساب","ሕሳብ ክፈት"],
-"Neu hier? Konto anlegen":["Yeni misiniz? Hesap oluşturun","Впервые здесь? Создайте аккаунт","جديد هنا؟ أنشئ حسابًا","ሓዱሽ ዲኹም? ሕሳብ ክፈቱ"],
-"Passwort vergessen?":["Şifrenizi mi unuttunuz?","Забыли пароль?","نسيت كلمة المرور؟","መሕለፊ ቃል ረሲዕኩም?"],
-"Ich habe schon ein Konto":["Zaten hesabım var","У меня уже есть аккаунт","لدي حساب بالفعل","ሕሳብ ኣሎኒ"],
-"Ohne Konto ausprobieren":["Hesapsız deneyin","Попробовать без аккаунта","جرّب بدون حساب","ብዘይ ሕሳብ ፈትኑ"],
-"Zeigen":["Göster","Показать","إظهار","ኣርኢ"],
-"Abmelden":["Çıkış","Выйти","تسجيل الخروج","ውጻእ"],
-"Ansprüche":["Haklar","Права","الاستحقاقات","መሰላት"],
-"Belege":["Belgeler","Документы","الإيصالات","ሰነዳት"],
-"Termine":["Tarihler","Сроки","المواعيد","ቆጸራታት"],
-"Noch offen an Geld und Budgets pro Jahr":["Yıllık henüz kullanılmayan para ve bütçe","Ещё не использовано денег и бюджетов в год","مبالغ وميزانيات غير مستخدمة سنويًا","ኣብ ዓመት ዘይተጠቐምኩምሉ ገንዘብን በጀትን"],
-"offene Punkte":["açık konu","открытых пунктов","بنود مفتوحة","ክፉት ነጥብታት"],
-"Angaben ändern":["Bilgileri değiştir","Изменить данные","تعديل البيانات","ሓበሬታ ቀይር"],
-"Welche Hilfen stehen dir noch zu?":["Hangi yardımlara hâlâ hakkınız var?","На какую помощь вы ещё имеете право?","ما المساعدات التي لا تزال تستحقها؟","ኣየኖት ሓገዛት ገና ይግብኡኹም?"],
-"Viele Familien nutzen nur das Pflegegeld. Dabei sind oft mehrere tausend Euro im Jahr zusätzlich drin, etwa für Haushaltshilfe, Ersatzpflege oder Hilfsmittel.":["Birçok aile yalnızca bakım parasını kullanıyor. Oysa ev yardımı, yedek bakım veya yardımcı araçlar için yılda birkaç bin euro daha mümkün.","Многие семьи получают только пособие по уходу. А ведь часто можно получить ещё несколько тысяч евро в год — на помощь по дому, замену ухаживающего или вспомогательные средства.","كثير من العائلات تستخدم بدل الرعاية فقط، مع أنه يمكن غالبًا الحصول على عدة آلاف يورو إضافية سنويًا للمساعدة المنزلية أو الرعاية البديلة أو الوسائل المساعدة.","ብዙሓት ስድራቤታት ገንዘብ ክንክን ጥራይ ይወስዱ። ግን ንሓገዝ ገዛ፡ ተክኢ ክንክን ወይ መሳርሒታት ብዙሕ ኣሽሓት ዩሮ ተወሳኺ ይርከብ።"],
-"Ein paar Fragen, etwa 3 Minuten. Danach siehst du deine offenen Ansprüche mit fertigen Anträgen.":["Birkaç soru, yaklaşık 3 dakika. Ardından hazır başvurularla açık haklarınızı görürsünüz.","Несколько вопросов, около 3 минут. Затем вы увидите свои права и готовые заявления.","بضعة أسئلة، حوالي 3 دقائق. بعدها ترى استحقاقاتك مع طلبات جاهزة.","ቁሩብ ሕቶታት፡ ኣስታት 3 ደቒቕ። ድሕሪኡ መሰላትኩምን ድሉዋት መመልከቲታትን ትርእዩ።"],
-"Für wen nutzt du die App?":["Uygulamayı kimin için kullanıyorsunuz?","Для кого вы используете приложение?","لمن تستخدم التطبيق؟","ነመን ኢኹም እዚ ኣፕ ትጥቀሙ?"],
-"Für mich selbst":["Kendim için","Для себя","لنفسي","ንርእሰይ"],
-"ich bin pflegebedürftig oder schwerbehindert":["bakıma muhtacım veya ağır engelliyim","мне нужен уход или у меня инвалидность","أحتاج رعاية أو لدي إعاقة شديدة","ክንክን የድልየኒ ወይ ከቢድ ስንክልና ኣለኒ"],
-"Für eine angehörige Person":["Bir yakınım için","Для родственника","لأحد أقاربي","ንሓደ ቤተሰብ"],
-"ich pflege oder kümmere mich":["bakıyorum veya ilgileniyorum","я ухаживаю или забочусь","أقوم بالرعاية أو الاهتمام","ኣነ እየ ዝከናኸን"],
-"Worum geht es?":["Konu nedir?","О чём идёт речь?","ما الموضوع؟","ብዛዕባ እንታይ እዩ?"],
-"Beides ist möglich.":["İkisi de mümkün.","Можно выбрать оба.","يمكن اختيار الاثنين.","ክልቲኡ ይከኣል።"],
-"Pflegegrad / Pflegebedürftigkeit":["Bakım derecesi / bakım ihtiyacı","Степень ухода / потребность в уходе","درجة الرعاية / الحاجة للرعاية","ደረጃ ክንክን"],
-"Schwerbehinderung / GdB":["Ağır engellilik / engel derecesi","Инвалидность / степень инвалидности","إعاقة شديدة / درجة الإعاقة","ከቢድ ስንክልና"],
-"Los geht's":["Başlayalım","Начать","ابدأ","ንጀምር"],
-"Weiter":["İleri","Далее","التالي","ቀጽል"],
-"Zurück":["Geri","Назад","رجوع","ተመለስ"],
-"Weiß ich nicht":["Bilmiyorum","Не знаю","لا أعرف","ኣይፈልጥን"],
-"Speichern":["Kaydet","Сохранить","حفظ","ኣቐምጥ"],
-"Abbrechen":["İptal","Отмена","إلغاء","ሰርዝ"],
-"Schließen":["Kapat","Закрыть","إغلاق","ዕጸው"],
-"← Schließen":["← Kapat","← Закрыть","← إغلاق","← ዕጸው"],
-"← Zur Übersicht":["← Genel bakış","← К обзору","← إلى النظرة العامة","← ናብ ሓፈሻዊ"],
-"Ergebnis anzeigen":["Sonucu göster","Показать результат","عرض النتيجة","ውጽኢት ኣርኢ"],
-"Pflegegrad und Wohnsituation":["Bakım derecesi ve yaşam durumu","Степень ухода и условия проживания","درجة الرعاية وظروف السكن","ደረጃ ክንክንን ኩነታት መንበሪን"],
-"Welcher Pflegegrad ist festgestellt?":["Hangi bakım derecesi belirlendi?","Какая степень ухода установлена?","ما درجة الرعاية المحددة؟","ኣየናይ ደረጃ ክንክን ተወሲኑ?"],
-"Noch keiner":["Henüz yok","Ещё нет","لا يوجد بعد","ገና የለን"],
-"oder Antrag läuft":["veya başvuru sürüyor","или заявление на рассмотрении","أو الطلب قيد المعالجة","ወይ መመልከቲ ኣብ መስርሕ"],
-"Wo und wie wird gepflegt?":["Bakım nerede ve nasıl yapılıyor?","Где и как осуществляется уход?","أين وكيف تتم الرعاية؟","ክንክን ኣበይን ከመይን ይግበር?"],
-"Bei welcher Krankenkasse bist du versichert?":["Hangi sağlık sigortasındasınız?","В какой больничной кассе вы застрахованы?","ما هو صندوق التأمين الصحي الخاص بك؟","ኣብ ኣየናይ ናይ ሕክምና መድሕን ኢኹም?"],
-"Bei welcher Krankenkasse ist die Person versichert?":["Kişi hangi sağlık sigortasında?","В какой больничной кассе застрахован человек?","ما هو صندوق التأمين الصحي للشخص؟","እቲ ሰብ ኣብ ኣየናይ መድሕን እዩ?"],
-"Die Pflegekasse gehört immer zur Krankenkasse. Dorthin gehen die Anträge.":["Bakım sigortası her zaman sağlık sigortasına bağlıdır. Başvurular oraya gider.","Касса по уходу всегда относится к больничной кассе. Туда направляются заявления.","صندوق الرعاية تابع دائمًا لصندوق التأمين الصحي. إليه تُرسل الطلبات.","መድሕን ክንክን ኩሉ ግዜ ምስ መድሕን ሕክምና እዩ። መመልከቲታት ናብኡ ይኸዱ።"],
-"Wer pflegt im Alltag?":["Günlük bakımı kim yapıyor?","Кто ухаживает в повседневной жизни?","من يقدّم الرعاية يوميًا؟","መዓልታዊ መን ይከናኸን?"],
-"Ja":["Evet","Да","نعم","እወ"],
-"Nein":["Hayır","Нет","لا","ኣይፋል"],
-"Weiß nicht":["Bilmiyorum","Не знаю","لا أعرف","ኣይፈልጥን"],
-"Schwerbehinderung":["Ağır engellilik","Инвалидность","الإعاقة الشديدة","ከቢድ ስንክልና"],
-"Was bekommt ihr schon?":["Şu an neler alıyorsunuz?","Что вы уже получаете?","ماذا تحصلون عليه بالفعل؟","ሕጂ እንታይ ትረኽቡ?"],
-"Was bekommst du schon?":["Şu an neler alıyorsunuz?","Что вы уже получаете?","ماذا تحصل عليه بالفعل؟","ሕጂ እንታይ ትረኽብ?"],
-"Angaben für die Anträge":["Başvurular için bilgiler","Данные для заявлений","بيانات للطلبات","ሓበሬታ ንመመልከቲታት"],
-"Vor- und Nachname":["Ad ve soyad","Имя и фамилия","الاسم الكامل","ሽምን ስም ኣቦን"],
-"Geburtsdatum":["Doğum tarihi","Дата рождения","تاريخ الميلاد","ዕለተ ልደት"],
-"Versichertennummer":["Sigorta numarası","Номер страховки","رقم التأمين","ቁጽሪ መድሕን"],
-"Deine offenen Ansprüche":["Açık haklarınız","Ваши открытые права","استحقاقاتك المفتوحة","ክፉታት መሰላትኩም"],
-"Antippen für Antrag und Checkliste":["Başvuru ve kontrol listesi için dokunun","Нажмите для заявления и списка","اضغط للطلب وقائمة التحقق","ንመመልከቲ ጠውቑ"],
-"Antrag ausfüllen":["Başvuruyu doldur","Заполнить заявление","املأ الطلب","መመልከቲ ምላእ"],
-"So läuft es ab":["Nasıl işliyor","Как это происходит","كيف تسير الأمور","ከመይ ይኸይድ"],
-"Diese Unterlagen brauchst du":["Gerekli belgeler","Нужные документы","المستندات المطلوبة","ዘድልዩ ሰነዳት"],
-"In der Nähe finden":["Yakında bul","Найти поблизости","ابحث بالقرب منك","ኣብ ቀረባ ድለ"],
-"Dein Antrag ist fertig":["Başvurunuz hazır","Ваше заявление готово","طلبك جاهز","መመልከቲኹም ድሉው እዩ"],
-"Stimmt alles?":["Her şey doğru mu?","Всё верно?","هل كل شيء صحيح؟","ኩሉ ቅኑዕ ድዩ?"],
-"Antrag erstellen":["Başvuru oluştur","Создать заявление","إنشاء الطلب","መመልከቲ ፍጠር"],
-"Ändern":["Değiştir","Изменить","تعديل","ቀይር"],
-"Als PDF speichern":["PDF olarak kaydet","Сохранить как PDF","حفظ كملف PDF","ከም PDF ኣቐምጥ"],
-"Text kopieren":["Metni kopyala","Скопировать текст","نسخ النص","ጽሑፍ ቅዳሕ"],
-"So schickst du ihn ab":["Nasıl gönderilir","Как отправить","كيفية الإرسال","ከመይ ትሰዶ"],
-"Ich habe den Antrag abgeschickt":["Başvuruyu gönderdim","Я отправил(а) заявление","لقد أرسلت الطلب","መመልከቲ ሰዲደ"],
-"Bescheid oder Gutachten bekommen?":["Karar veya bilirkişi raporu mu aldınız?","Получили решение или заключение?","هل وصلك قرار أو تقرير؟","ውሳነ ወይ ጸብጻብ መጺኡኩም?"],
-"Foto machen":["Fotoğraf çek","Сфотографировать","التقط صورة","ስእሊ ኣልዕል"],
-"Abtippen":["Elle gir","Ввести вручную","إدخال يدوي","ብኢድ ጽሓፍ"],
-"Pflegegrad selbst einschätzen":["Bakım derecesini kendiniz tahmin edin","Оценить степень ухода самостоятельно","قدّر درجة الرعاية بنفسك","ደረጃ ክንክን ባዕልኹም ገምግሙ"],
-"Entlastungsbetrag":["Rahatlatma tutarı","Сумма разгрузки","مبلغ التخفيف","ናይ ምፍኳስ ገንዘብ"],
-"jetzt frei":["şu an kullanılabilir","доступно сейчас","متاح الآن","ሕጂ ዘሎ"],
-"Rechnung erfassen":["Fatura ekle","Добавить счёт","أضف فاتورة","ፋክቱራ ኣእቱ"],
-"Erstattung beantragen":["İade talep et","Запросить возмещение","اطلب الاسترداد","ምምላስ ሕተት"],
-"Foto aufnehmen":["Fotoğraf çek","Сделать фото","التقط صورة","ስእሊ ኣልዕል"],
-"Datei wählen":["Dosya seç","Выбрать файл","اختر ملفًا","ፋይል ምረጽ"],
-"Ohne Foto erfassen":["Fotoğrafsız ekle","Добавить без фото","أضف بدون صورة","ብዘይ ስእሊ ኣእቱ"],
-"Bearbeiten":["Düzenle","Изменить","تعديل","ኣመሓይሽ"],
-"Löschen":["Sil","Удалить","حذف","ሰርዝ"],
-"Beleg speichern":["Belgeyi kaydet","Сохранить документ","حفظ الإيصال","ሰነድ ኣቐምጥ"],
-"Fristen und Erinnerungen":["Süreler ve hatırlatmalar","Сроки и напоминания","المواعيد والتذكيرات","ግዜ ገደባትን መዘኻኸሪታትን"],
-"Erinnerungen per E-Mail":["E-posta ile hatırlatmalar","Напоминания по эл. почте","تذكيرات بالبريد الإلكتروني","መዘኻኸሪ ብኢመይል"],
-"Einschalten":["Aç","Включить","تشغيل","ኣወልዕ"],
-"Ausschalten":["Kapat","Выключить","إيقاف","ኣጥፍእ"],
-"Beratungsbesuch":["Danışma ziyareti","Консультационный визит","زيارة استشارية","ናይ ምኽሪ በጻሕ"],
-"Eigene Erinnerung":["Kendi hatırlatman","Своё напоминание","تذكير خاص","ናይ ገዛእ ርእስኻ መዘኻኸሪ"],
-"Hinzufügen":["Ekle","Добавить","إضافة","ወስኽ"],
-"Für wen?":["Kimin için?","Для кого?","لمن؟","ንመን?"],
-"Weitere Person anlegen":["Başka kişi ekle","Добавить человека","أضف شخصًا آخر","ካልእ ሰብ ወስኽ"],
-"Gemeinsam pflegen":["Birlikte bakım","Ухаживать вместе","الرعاية معًا","ብሓባር ምክንካን"],
-"Jemanden einladen":["Birini davet et","Пригласить","ادعُ شخصًا","ሓደ ሰብ ዕደም"],
-"Link kopieren":["Bağlantıyı kopyala","Скопировать ссылку","نسخ الرابط","ሊንክ ቅዳሕ"],
-"Pflegegrad-Rechner":["Bakım derecesi hesaplayıcı","Калькулятор степени ухода","حاسبة درجة الرعاية","መቑጸሪ ደረጃ ክንክን"],
-"Selbstständig":["Bağımsız","Самостоятельно","مستقل","ብርእሱ"],
-"schafft es allein":["tek başına yapabiliyor","справляется сам(а)","يستطيع وحده","በይኑ ይኽእል"],
-"Überwiegend selbstständig":["Çoğunlukla bağımsız","В основном самостоятельно","مستقل في الغالب","ብዙሕ ግዜ ብርእሱ"],
-"braucht ab und zu etwas Hilfe":["ara sıra biraz yardım gerekiyor","иногда нужна небольшая помощь","يحتاج أحيانًا لبعض المساعدة","ሓደሓደ ግዜ ሓገዝ የድልዮ"],
-"Überwiegend unselbstständig":["Çoğunlukla bağımlı","В основном несамостоятельно","معتمد في الغالب","ብዙሕ ግዜ ሓገዝ የድልዮ"],
-"schafft nur einen kleinen Teil allein":["sadece küçük bir kısmını yapabiliyor","справляется лишь с малой частью","يستطيع جزءًا صغيرًا فقط","ንእሽቶ ክፋል ጥራይ ይኽእል"],
-"Unselbstständig":["Bağımlı","Несамостоятельно","غير مستقل","ብርእሱ ኣይኽእልን"],
-"schafft es nicht allein":["tek başına yapamıyor","не справляется сам(а)","لا يستطيع وحده","በይኑ ኣይኽእልን"],
-"Ja, ohne Probleme":["Evet, sorunsuz","Да, без проблем","نعم، بدون مشاكل","እወ፡ ብዘይ ጸገም"],
-"Meistens":["Çoğunlukla","Обычно","غالبًا","መብዛሕትኡ ግዜ"],
-"Nur selten":["Nadiren","Редко","نادرًا","ሳሕቲ"],
-"Nein, gar nicht":["Hayır, hiç","Нет, совсем нет","لا، إطلاقًا","ኣይፋል፡ ፈጺሙ"],
-"Nie":["Hiç","Никогда","أبدًا","ፈጺሙ"],
-"Selten":["Nadiren","Редко","نادرًا","ሳሕቲ"],
-"Oft":["Sık","Часто","كثيرًا","ብዙሕ ግዜ"],
-"Täglich":["Her gün","Ежедневно","يوميًا","መዓልታዊ"],
-"Im Bett die Lage wechseln (umdrehen, aufsetzen)":["Yatakta pozisyon değiştirmek (dönmek, oturmak)","Менять положение в кровати (повернуться, сесть)","تغيير الوضعية في السرير (التقلب، الجلوس)","ኣብ ዓራት ኣቀማምጣ ምቕያር"],
-"Sicher sitzen, ohne zur Seite zu kippen":["Yana devrilmeden güvenle oturmak","Устойчиво сидеть, не заваливаясь","الجلوس بثبات دون الميل","ብዘይ ምውዳቕ ብድሕነት ምቕማጥ"],
-"Aufstehen vom Stuhl oder Bett und sich umsetzen":["Sandalyeden veya yataktan kalkmak","Вставать со стула или кровати и пересаживаться","النهوض من الكرسي أو السرير والانتقال","ካብ መንበር ወይ ዓራት ምትሳእ"],
-"In der Wohnung von Raum zu Raum gehen":["Evde odadan odaya yürümek","Передвигаться по квартире из комнаты в комнату","التنقل في البيت من غرفة لأخرى","ኣብ ገዛ ካብ ክፍሊ ናብ ክፍሊ ምኻድ"],
-"Treppen steigen":["Merdiven çıkmak","Подниматься по лестнице","صعود الدرج","ደረጃ ምድያብ"],
-"Erkennt vertraute Personen aus dem Umfeld":["Tanıdık kişileri tanıyor","Узнаёт знакомых людей","يتعرّف على الأشخاص المألوفين","ፍሉጣት ሰባት ይፈልጥ"],
-"Weiß, welcher Tag und welche Tageszeit ist":["Hangi gün ve saat olduğunu biliyor","Знает, какой день и время суток","يعرف اليوم ووقت النهار","መዓልትን ሰዓትን ይፈልጥ"],
-"Trifft Entscheidungen im Alltag (z. B. was anziehen)":["Günlük kararlar veriyor (ör. ne giyeceği)","Принимает повседневные решения (напр., что надеть)","يتخذ قرارات يومية (مثل ماذا يلبس)","መዓልታዊ ውሳነታት ይገብር"],
-"Kann einem Gespräch folgen und es verstehen":["Bir konuşmayı takip edip anlayabiliyor","Может следить за разговором и понимать его","يستطيع متابعة الحديث وفهمه","ዘረባ ክከታተልን ክርድእን ይኽእል"],
-"Ist nachts unruhig, läuft umher oder ruft":["Geceleri huzursuz, dolaşıyor veya bağırıyor","Ночью беспокоен, бродит или зовёт","مضطرب ليلًا، يتجول أو ينادي","ለይቲ ዘይህዱእ፡ ይዘውር ወይ ይጸዊዕ"],
-"Wehrt sich gegen Pflege oder Hilfe":["Bakıma veya yardıma karşı çıkıyor","Сопротивляется уходу или помощи","يرفض الرعاية أو المساعدة","ክንክን ወይ ሓገዝ ይነጽግ"],
-"Hat starke Ängste oder ist sehr niedergeschlagen":["Güçlü korkuları var veya çok üzgün","Сильные страхи или подавленность","لديه مخاوف شديدة أو حزن شديد","ብርቱዕ ፍርሒ ወይ ጓሂ ኣለዎ"],
-"Oberkörper waschen":["Üst bedeni yıkamak","Мыть верхнюю часть тела","غسل الجزء العلوي من الجسم","ላዕለዋይ ኣካል ምሕጻብ"],
-"Duschen oder baden (inkl. Haare waschen)":["Duş veya banyo (saç yıkama dahil)","Принимать душ или ванну (вкл. мытьё головы)","الاستحمام (مع غسل الشعر)","ሻወር ወይ ምሕጻብ (ጸጉሪ ምሕጻብ ሓዊሱ)"],
-"Oberkörper an- und auskleiden":["Üst bedeni giydirmek/soymak","Одевать и раздевать верх тела","لبس وخلع ملابس الجزء العلوي","ላዕለዋይ ክዳን ምኽዳንን ምውጻእን"],
-"Unterkörper an- und auskleiden (Hose, Socken, Schuhe)":["Alt bedeni giydirmek (pantolon, çorap, ayakkabı)","Одевать низ (брюки, носки, обувь)","لبس الجزء السفلي (بنطال، جوارب، أحذية)","ታሕተዋይ ክዳን (ስረ፡ ካልሲ፡ ጫማ)"],
-"Essen (mundgerecht zubereitetes Essen zum Mund führen)":["Yemek yemek (hazırlanmış yemeği ağza götürmek)","Есть (подносить подготовленную еду ко рту)","الأكل (إيصال الطعام المحضّر إلى الفم)","ምብላዕ"],
-"Trinken (genug und selbstständig)":["İçmek (yeterli ve bağımsız)","Пить (достаточно и самостоятельно)","الشرب (بكمية كافية وبشكل مستقل)","ምስታይ (እኹል ብርእሱ)"],
-"Toilette benutzen":["Tuvaleti kullanmak","Пользоваться туалетом","استخدام المرحاض","ሽቓቕ ምጥቃም"],
-"Wie oft wird Hilfe bei Medikamenten, Spritzen, Verbänden oder Messungen gebraucht?":["İlaç, iğne, pansuman veya ölçümlerde ne sıklıkla yardım gerekiyor?","Как часто нужна помощь с лекарствами, уколами, перевязками или измерениями?","كم مرة يحتاج المساعدة في الأدوية أو الحقن أو الضمادات أو القياسات؟","ኣብ መድሃኒት፡ መርፍእ ወይ መለክዒ ክንደይ ግዜ ሓገዝ የድሊ?"],
-"Wie oft muss jemand zu Arzt- oder Therapieterminen begleiten?":["Doktor veya terapi randevularına ne sıklıkla eşlik etmek gerekiyor?","Как часто нужно сопровождать к врачу или на терапию?","كم مرة يحتاج مرافقة إلى الطبيب أو العلاج؟","ናብ ሓኪም ክንደይ ግዜ ምስ ሰብ ክኸይድ የድልዮ?"],
-"Nie oder selten":["Hiç veya nadiren","Никогда или редко","أبدًا أو نادرًا","ፈጺሙ ወይ ሳሕቲ"],
-"Wöchentlich":["Haftalık","Еженедельно","أسبوعيًا","ሰሙናዊ"],
-"Mehrmals täglich":["Günde birkaç kez","Несколько раз в день","عدة مرات يوميًا","ኣብ መዓልቲ ብዙሕ ግዜ"],
-"Etwa einmal im Monat":["Ayda yaklaşık bir kez","Примерно раз в месяц","مرة في الشهر تقريبًا","ኣብ ወርሒ ሓደ ግዜ"],
-"Jede Woche":["Her hafta","Каждую неделю","كل أسبوع","ኩሉ ሰሙን"],
-"Den Tag einteilen und sich an Abläufe halten":["Günü planlamak ve düzene uymak","Планировать день и соблюдать распорядок","تنظيم اليوم والالتزام بالروتين","መዓልቲ ምውዳብ"],
-"Sich sinnvoll beschäftigen":["Anlamlı şekilde meşgul olmak","Занимать себя полезными делами","الانشغال بشكل مفيد","ብጠቓሚ ነገር ምትሓዝ"],
-"Kontakt zu Familie, Nachbarn, Freunden halten":["Aile, komşu ve arkadaşlarla iletişim","Поддерживать контакт с семьёй, соседями, друзьями","التواصل مع العائلة والجيران والأصدقاء","ምስ ስድራ፡ ጎረባብቲ፡ ኣዕሩኽ ርክብ"],
-"Noch einmal":["Tekrar","Ещё раз","مرة أخرى","ደጊምካ"],
-"Pflegegrad beantragen":["Bakım derecesi başvurusu","Подать заявление на степень ухода","التقدم بطلب درجة رعاية","ደረጃ ክንክን ሕተት"],
-"Höherstufung beantragen":["Daha yüksek derece başvurusu","Подать на повышение степени","طلب رفع الدرجة","ልዕል ዝበለ ደረጃ ሕተት"],
-"Antrag vorbereiten (kostenlos)":["Başvuruyu hazırla (ücretsiz)","Подготовить заявление (бесплатно)","تحضير الطلب (مجانًا)","መመልከቲ ኣዳሉ (ብነጻ)"],
-"Ein Widerspruch kann sich lohnen.":["İtiraz etmek faydalı olabilir.","Возражение может иметь смысл.","قد يكون الاعتراض مجديًا.","ተቓውሞ ጠቓሚ ክኸውን ይኽእል።"],
-"Widerspruch schreiben":["İtiraz yaz","Написать возражение","اكتب اعتراضًا","ተቓውሞ ጽሓፍ"],
-"Meine Daten endgültig löschen":["Verilerimi kalıcı olarak sil","Окончательно удалить мои данные","حذف بياناتي نهائيًا","ሓበሬታይ ብቐጻሊ ሰርዝ"],
-};
-let LANG="de"; try{ LANG=JSON.parse(localStorage.getItem("da-lang")||'"de"')||"de" }catch(e){}
-const LIDX={tr:0,ru:1,ar:2,ti:3};
-const RX=[
- [/^Frage (\d+) von (\d+)$/,["Soru $1 / $2","Вопрос $1 из $2","السؤال $1 من $2","ሕቶ $1 ካብ $2"]],
- [/^Schritt (\d+) von (\d+)$/,["Adım $1 / $2","Шаг $1 из $2","الخطوة $1 من $2","ስጉምቲ $1 ካብ $2"]],
- [/^Voraussichtlich Pflegegrad (\d)$/,["Tahmini bakım derecesi $1","Предположительно степень ухода $1","على الأرجح درجة الرعاية $1","ተኽእሎ ደረጃ ክንክን $1"]],
- [/^Pflegegrad (\d)$/,["Bakım derecesi $1","Степень ухода $1","درجة الرعاية $1","ደረጃ ክንክን $1"]],
-];
-function tr(s){
-  if(LANG==="de"||!s) return s;
-  const i=LIDX[LANG]; const k=s.trim(); if(!k) return s;
-  let out=T[k]&&T[k][i];
-  if(!out){ for(const [re,arr] of RX){ if(re.test(k)){ out=k.replace(re,arr[i]); break } } }
-  return out? s.replace(k,out) : s;
-}
-function applyI18n(root){
-  document.documentElement.lang=LANG; document.documentElement.dir=LANG==="ar"?"rtl":"ltr";
-  if(LANG==="de"||!root) return;
-  const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT,{acceptNode:n=>n.parentNode&&/^(SCRIPT|STYLE|TEXTAREA|CODE)$/.test(n.parentNode.nodeName)||n.parentNode.closest&&n.parentNode.closest(".paper")?NodeFilter.FILTER_REJECT:NodeFilter.FILTER_ACCEPT});
-  const nodes=[]; while(w.nextNode()) nodes.push(w.currentNode);
-  for(const n of nodes){ const v=n.nodeValue; const t=tr(v); if(t!==v) n.nodeValue=t }
-}
-function langSelect(){
-  return `<select class="langsel" id="langsel" aria-label="Sprache">${LANGS.map(([k,n])=>`<option value="${k}" ${LANG===k?"selected":""}>${n}</option>`).join("")}</select>`;
-}
-function langNotice(){
-  if(LANG==="de") return "";
-  const m={tr:"Açıklamaların bir kısmı henüz Almanca. Başvurular her zaman Almanca kalır, çünkü kurumlar bunları Almanca istiyor.",ru:"Часть пояснений пока на немецком. Заявления всегда остаются на немецком, так как ведомствам они нужны на немецком.",ar:"بعض الشروحات لا تزال باللغة الألمانية. الطلبات تبقى دائمًا بالألمانية لأن الجهات الرسمية تطلبها كذلك.",ti:"ገለ መግለጺታት ገና ብጀርመንኛ እዮም። መመልከቲታት ኩሉ ግዜ ብጀርመንኛ እዮም፡ ምኽንያቱ ቤት ጽሕፈታት ብጀርመንኛ ይደልይዎም።"};
-  return `<p class="notice info small">${ic("info")}<span>${m[LANG]}</span></p>`;
-}
-
-/* ---------- Schritte ---------- */
-const STEPS = [
- {id:"start", label:"Start", show:()=>true},
- {id:"kasse", label:"Kasse", show:()=>S.bereiche.pflege},
- {id:"pflege", label:"Pflegegrad", show:()=>S.bereiche.pflege},
- {id:"pp", label:"Pflegeperson", show:()=>S.bereiche.pflege && pg()>=1 && isHome()},
- {id:"sb", label:"Schwerbehinderung", show:()=>S.bereiche.sb},
- {id:"genutzt", label:"Schon genutzt", show:()=>true},
- {id:"daten", label:"Deine Angaben", show:()=>true},
-];
-const visSteps = ()=>STEPS.filter(s=>s.show());
-
-/* ---------- Belege-Daten ---------- */
-const KATS={
- apo:{t:"Zuzahlung Apotheke / Rezept", zz:true},
- fahrt:{t:"Zuzahlung Fahrten", zz:true},
- heil:{t:"Zuzahlung Therapie, Hilfsmittel, Klinik", zz:true},
- entl:{t:"Entlastungsbetrag (Rechnungen)"},
- vhp:{t:"Verhinderungs- & Kurzzeitpflege"},
- pflhm:{t:"Pflegehilfsmittel"},
- beratung:{t:"Nachweis Beratungsbesuch"},
- bescheid:{t:"Bescheide & Schreiben"},
- sonst:{t:"Sonstiges"},
-};
-let BEL=[];            // Belege aus der Datenbank
-let pending=null;      // Beleg, der gerade erfasst wird
-let delAsk=null;       // Beleg-ID, deren Löschen bestätigt werden soll
-let busy=false;
-let areaFilter="Alle";
-let fileTarget=null;
-let befJahr=String(new Date().getFullYear());
-function selYears(){ let j=(S.belegFilter.jahre||[]).map(String).filter(Boolean); if(!j.length) j=[String(new Date().getFullYear())]; return [...new Set(j)].sort().reverse() }
-function bruttoOf(j){ j=String(j); const bj=S.bruttoJahr||{}; if(bj[j]!=null&&bj[j]!=="") return bj[j]; return j===String(new Date().getFullYear())?(S.brutto||""):"" }
-function chronisch(){ if(S.chronisch) return S.chronisch==="ja"; return pg()>=3||gdb()>=60 }
-function zuz(jahr){
-  const sum=BEL.filter(b=>KATS[b.kat]&&KATS[b.kat].zz&&String(b.jahr)===String(jahr)).reduce((s,b)=>s+(Number(b.betrag)||0),0);
-  const pct=chronisch()?BETRAEGE.belastungsgrenzeChronischProzent:BETRAEGE.belastungsgrenzeProzent; const brutto=numDE(bruttoOf(jahr));
-  return {sum,pct,brutto,grenze:brutto?brutto*pct/100:0};
-}
-
-/* ---------- Termine ---------- */
-function beratungRelevant(){ return pg()>=2 && ["angehoerige","gemischt","wg"].includes(S.wohnen) }
-function besuche(){
-  const a=(S.termine.besuche||[]).map(x=>x.d);
-  const b=BEL.filter(x=>x.kat==="beratung"&&x.datum).map(x=>x.datum);
-  return [...new Set([...a,...b])].filter(parseIso).sort();
-}
-function beratungStatus(){
-  const H=halfOf(TODAY()); const v=besuche().map(parseIso);
-  const inH=h=>v.some(d=>d>=h.start&&d<=h.end);
-  return {H, done:inH(H), prev:shiftHalf(H,-1), prevDone:inH(shiftHalf(H,-1)), next:shiftHalf(H,1), inH};
-}
-function deadlines(){
-  const L=[]; const t=TODAY(); const y=t.getFullYear();
-  if(beratungRelevant()){
-    const st=beratungStatus();
-    if(!st.done){ const d=st.H.end; L.push({k:"beratung",t:`Beratungsbesuch für das ${st.H.label}`,d,remind:addDays(d,-45),s:`Pflicht für Pflegegeld (§ 37 Abs. 3 SGB XI). Termin mit ${S.termine.dienst||"dem Pflegedienst"} vereinbaren und den Nachweis an die Pflegekasse schicken lassen.`,main:true}) }
-    else { const d=st.next.end; L.push({k:"beratung",t:`Beratungsbesuch für das ${st.next.label}`,d,remind:addDays(st.next.start,30),s:`Für das ${st.H.label} erledigt. Der nächste Besuch muss zwischen ${deD(st.next.start)} und ${deD(st.next.end)} stattfinden.`,main:true,ok:true}) }
-  }
-  { const bi=bescheidInfo(); if(bi && bi.offen) L.push({k:"wid",t:"Widerspruchsfrist Pflegegrad-Bescheid",d:bi.frist,remind:addDays(bi.frist,-7),s:(bi.knapp||bi.abgelehnt)?"Ein Widerspruch kann sich lohnen. Fristwahrend reicht ein kurzes Schreiben, die App hilft dabei.":"Bis zu diesem Tag kann Widerspruch gegen den Bescheid eingelegt werden."}) }
-  if(pg()>=1 && isHome()){
-    const thisJune=new Date(y,5,30);
-    const d = t<=thisJune?thisJune:new Date(y+1,5,30);
-    L.push({k:"entl",t:"Entlastungsbetrag: Restguthaben verfällt",d,remind:addDays(d,-60),s:`Nicht genutzte Beträge aus ${d.getFullYear()-1} verfallen an diesem Tag. Jetzt Haushaltshilfe oder Betreuung organisieren und Rechnungen einreichen.`});
-  }
-  if(pg()>=2 && isHome()){
-    const d=new Date(y,11,31);
-    L.push({k:"vhp",t:`Verhinderungspflege aus ${y-1} einreichen`,d,remind:addDays(d,-45),s:`Ausschlussfrist: Kosten der Ersatzpflege aus ${y-1} müssen bis heute mit Nachweisen bei der Pflegekasse sein.`});
-  }
-  if(BEL.some(b=>KATS[b.kat]&&KATS[b.kat].zz) || pg()>=3 || gdb()>=60){
-    const d=new Date(y+1,0,15);
-    L.push({k:"zz",t:`Zuzahlungsbefreiung für ${y+1} beantragen`,d,remind:d,s:"Die Befreiung gilt immer nur für ein Kalenderjahr. Chronisch Kranke können den Betrag auch vorab zahlen und sind dann das ganze Jahr befreit."});
-  }
-  const wm=parseIso(S.termine.wertmarke);
-  if(wm) L.push({k:"wm",t:"Wertmarke läuft ab",d:wm,remind:addDays(wm,-30),s:"Neue Wertmarke rechtzeitig beim Versorgungsamt beantragen."});
-  for(const e of (S.termine.eigene||[])){ const d=parseIso(e.d); if(d) L.push({k:"own-"+e.id,t:e.t,d,remind:d,s:e.n||"Eigene Erinnerung",own:e.id}) }
-  return L.sort((a,b)=>a.d-b.d);
-}
-function urg(d){const n=daysUntil(d); return n<0?"late":n<=60?"soon":"ok"}
-function urgTxt(d){const n=daysUntil(d); return n<0?`${-n} Tage überfällig`:n===0?"heute":n===1?"morgen":`in ${n} Tagen`}
-function gcal(item){
-  const r=item.remind<TODAY()?TODAY():item.remind; const a=isoD(r).replace(/-/g,""), b=isoD(addDays(r,1)).replace(/-/g,"");
-  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(item.t)}&dates=${a}/${b}&details=${encodeURIComponent(item.s+" Frist: "+deD(item.d)+". (Dein Anspruch)")}`;
-}
-function ocal(item){
-  const r=item.remind<TODAY()?TODAY():item.remind;
-  return `https://outlook.live.com/calendar/0/deeplink/compose?path=/calendar/action/compose&rru=addevent&allday=true&subject=${encodeURIComponent(item.t)}&startdt=${isoD(r)}&enddt=${isoD(addDays(r,1))}&body=${encodeURIComponent(item.s+" Frist: "+deD(item.d)+".")}`;
-}
-
-/* ---------- Rendering ---------- */
-const $ = id => document.getElementById(id);
-function choice(name,val,label,small,type="radio",checked=false){
-  const id=`${name}-${val}`.replace(/[^a-zA-Z0-9-_]/g,"_");
-  return `<label class="choice" for="${id}"><input type="${type}" id="${id}" name="${name}" value="${esc(val)}" ${checked?"checked":""}><span>${esc(label)}${small?`<small>${esc(small)}</small>`:""}</span></label>`;
-}
-/* ---------- Sanftes Neuzeichnen: nur geänderte Teile austauschen, Bildschirmwechsel animieren ---------- */
-const RM=(()=>{ try{ return matchMedia("(prefers-reduced-motion: reduce)").matches }catch(e){ return false } })();
-const IH=Object.getOwnPropertyDescriptor(Element.prototype,"innerHTML");
-function sameNode(a,b){
-  if(a.nodeType!==b.nodeType||a.nodeName!==b.nodeName) return false;
-  if(a.nodeType!==1) return true;
-  if(a.id||b.id) return a.id===b.id;
-  if(a.nodeName==="INPUT" && a.type!==b.getAttribute("type")) return false;
-  return true;
-}
-function morphKids(par,np){
-  let o=par.firstChild, n=np.firstChild;
-  while(n){
-    const next=n.nextSibling;
-    if(o && sameNode(o,n)){ morphNode(o,n); o=o.nextSibling }
-    else {
-      let m=null;
-      if(n.nodeType===1 && n.id){ for(let c=o;c;c=c.nextSibling){ if(c.nodeType===1&&c.id===n.id){ m=c; break } } }
-      if(m){ par.insertBefore(m,o); morphNode(m,n) } else par.insertBefore(n,o);
-    }
-    n=next;
-  }
-  while(o){ const nx=o.nextSibling; par.removeChild(o); o=nx }
-}
-function morphNode(a,b){
-  if(a.nodeType!==1){ if(a.nodeValue!==b.nodeValue) a.nodeValue=b.nodeValue; return }
-  for(const at of [...a.attributes]) if(!b.hasAttribute(at.name)) a.removeAttribute(at.name);
-  for(const at of b.attributes) if(a.getAttribute(at.name)!==at.value) a.setAttribute(at.name,at.value);
-  const tag=a.nodeName;
-  if(tag==="INPUT"){
-    if(a.type==="checkbox"||a.type==="radio") a.checked=b.hasAttribute("checked");
-    else if(a.type!=="file" && document.activeElement!==a){ const v=b.getAttribute("value")||""; if(a.value!==v) a.value=v }
-    return;
-  }
-  if(tag==="TEXTAREA"){ if(document.activeElement!==a){ const v=b.textContent; if(a.value!==v) a.value=v } return }
-  morphKids(a,b);
-  if(tag==="SELECT"){ const s=a.querySelector("option[selected]"); if(s) a.value=s.value; else if(a.options.length && !b.querySelector("option[selected]")) a.selectedIndex=0 }
-}
-function smoothEl(el){
-  if(!el||el._smooth) return; el._smooth=true;
-  Object.defineProperty(el,"innerHTML",{configurable:true,get(){ return IH.get.call(this) },set(html){
-    const t=document.createElement("template"); IH.set.call(t,html); morphKids(this,t.content);
-  }});
-}
-["hero","tabs","main"].forEach(id=>smoothEl(document.getElementById(id)));
-const TAB_ORDER=["ansprueche","belege","termine"];
-function famKey(){
-  if(RECHNER) return "r";
-  if(typeof USER!=="undefined" && !USER && !GUEST) return "login";
-  if(typeof showPersons!=="undefined" && showPersons) return "persons";
-  if(S.wiz) return "w:"+S.wiz.k;
-  if(!S.done) return "q";
-  return "tab:"+(typeof FALL_ID!=="undefined"?FALL_ID:"");
-}
-function screenIdx(){ return RECHNER?RECHNER.i : S.wiz?S.wiz.i : !S.done?S.step : TAB_ORDER.indexOf(S.tab) }
-let lastFam=null, lastIdx=0, lastCash=null, figAnim=0;
-function animateScreen(dir){
-  if(RM) return; const m=$("main"); m.classList.remove("go-f","go-b","go-fade"); void m.offsetWidth; m.classList.add(dir);
-}
-function countFigure(){
-  const f=document.querySelector("#hero .figure"); if(!f){ lastCash=null; return }
-  const v=sums().cash; const from=lastCash; lastCash=v;
-  if(from==null||from===v||RM) return;
-  f.classList.remove("flash"); void f.offsetWidth; f.classList.add("flash");
-  const t0=performance.now(), d=700;
-  const step=now=>{ const p=Math.min(1,(now-t0)/d), e=1-Math.pow(1-p,3); f.textContent=eur(Math.round(from+(v-from)*e)); if(p<1) figAnim=requestAnimationFrame(step) };
-  figAnim=requestAnimationFrame(step);
-}
-function reveal(el){
-  if(!el) return; const r=el.getBoundingClientRect();
-  if(r.top<70 || r.top>innerHeight*0.45) el.scrollIntoView({block:"start",behavior:RM?"auto":"smooth"});
-}
-function render(){
-  const fam=famKey(), idx=screenIdx(), changed=lastFam!==null && (fam!==lastFam||idx!==lastIdx);
-  if(changed){ const a=document.activeElement; if(a && a!==document.body && a.blur && !(a.closest&&a.closest("#hero"))) try{ a.blur() }catch(e){} }
-  cancelAnimationFrame(figAnim);
-  renderHero(); renderTabs(); renderMain(); try{ applyI18n(document.querySelector(".wrap")) }catch(e){}
-  if(changed) animateScreen(fam===lastFam ? (idx>=lastIdx?"go-f":"go-b") : "go-fade");
-  lastFam=fam; lastIdx=idx;
-  countFigure();
-}
-function scrollTop(){ window.scrollTo({top:0,behavior:"instant"}) }
-
-function sums(){
-  const all=applicable(); const offen=all.filter(b=>!S.genutzt[b.k]);
-  const cash=offen.filter(b=>b.cash && (S.status[b.k]||"offen")==="offen").reduce((s,b)=>s+(b.val()||0),0);
-  const frei=offen.filter(b=>b.frei).reduce((s,b)=>s+b.frei(),0);
-  return {all,offen,cash,frei};
-}
-function renderHero(){
-  const save=`<div class="savestate"><span class="dot ${saveState.c}" id="savedot"></span><span id="savetxt">${esc(saveState.t)}</span></div>`;
-  const brand=`<div class="brand"><span class="mark" aria-hidden="true">§</span><b>Dein Anspruch</b></div>`;
-  const curF = USER && FAELLE.find(f=>f.id===FALL_ID);
-  const personBtn = curF ? `<button type="button" class="acct person" data-act="persons" aria-expanded="${showPersons}">${ic("user")}${esc(fallName(curF))} ▾</button>` : "";
-  const acct = USER?`<button type="button" class="acct" data-act="logout" title="${esc(USER.email||"")}">Abmelden</button>`:GUEST?`<button type="button" class="acct" data-act="guest-register">Konto anlegen</button>`:"";
-  const fontsw=`<div class="fontsw" role="group" aria-label="Schriftgröße">${[["1","A"],["1.15","A+"],["1.3","A++"]].map(([v,t])=>`<button type="button" data-font="${v}" aria-pressed="${(S.font||"1")===v}" aria-label="Schrift ${t}">${t}</button>`).join("")}</div>`;
-  if(S.wiz||RECHNER||(S.done&&S.tab!=="ansprueche")){ $("hero").innerHTML=`<div class="row">${brand}<div class="row" style="gap:12px">${langSelect()}${personBtn}${fontsw}${save}${acct}</div></div>`; return }
-  if(!S.done){
-    $("hero").innerHTML=`<div class="row">${brand}<div class="row" style="gap:12px">${langSelect()}${personBtn}${fontsw}${save}${acct}</div></div>
-     <p class="lead">Pflegegrad oder Schwerbehinderung: Wir prüfen, welche Leistungen 2026 noch offen sind, schreiben die Anträge vor, sortieren deine Belege und erinnern an Fristen.</p>`;
-    return;
-  }
-  const s=sums(); const dl=deadlines(); const crit=dl.find(x=>x.main&&!x.ok&&urg(x.d)!=="ok") || dl.find(x=>urg(x.d)==="late");
-  const next=dl[0];
-  $("hero").innerHTML=`<div class="row">${brand}<div class="row" style="gap:12px">${langSelect()}${personBtn}${fontsw}${save}${acct}</div></div>
-   <div style="position:relative;z-index:1;display:flex;flex-direction:column;gap:4px">
-     <span class="small" style="color:var(--hero-muted)">Noch offen an Geld und Budgets pro Jahr</span>
-     <span class="figure">${eur(s.cash)}</span>
-     ${s.frei?`<span class="small" style="color:var(--hero-muted)">plus ${eur(s.frei)} Steuerfreibeträge</span>`:""}
-   </div>
-   <div class="stats">
-     <span class="stat">${ic("list")}<strong>${s.offen.length}</strong> offene Punkte</span>
-     <span class="stat">${ic("receipt")}<strong>${BEL.length}</strong> Belege</span>
-     ${crit?`<button type="button" class="stat alert" data-tab="termine" style="border:0;font:inherit;cursor:pointer">${ic("bell")}${esc(crit.t)}: ${urgTxt(crit.d)}</button>`: next?`<span class="stat">${ic("cal")}Nächste Frist ${urgTxt(next.d)}</span>`:""}
-     <button type="button" class="stat" data-act="edit" style="border:0;font:inherit;color:inherit;cursor:pointer">${ic("user")}Angaben ändern</button>
-   </div>`;
-}
-function renderTabs(){
-  const t=$("tabs"); t.hidden=!S.done||!!S.wiz||!!RECHNER||(!USER&&!GUEST)||consentNeeded(); if(t.hidden) return;
-  const dl=deadlines(); const att=dl.filter(x=>!x.ok && urg(x.d)!=="ok").length;
-  const T=[["ansprueche","Ansprüche","list",0],["belege","Belege","receipt",0],["termine","Termine","cal",att]];
-  t.innerHTML=T.map(([k,l,i,b])=>`<button type="button" role="tab" data-tab="${k}" aria-selected="${S.tab===k}">${ic(i)}<span class="lbl">${l}</span>${b?`<span class="badge">${b}</span>`:""}</button>`).join("");
-}
-function renderMain(){
-  document.documentElement.style.setProperty("--fs", S.font||"1");
-  if(!loaded){ $("main").innerHTML=`<section class="panel"><p class="muted">Einen Moment, deine Daten werden geladen …</p></section>`; return }
-  if(RECHNER){ $("main").innerHTML=viewRechner(); return }
-  if(!USER && !GUEST){ $("main").innerHTML=viewLogin(); return }
-  if(USER && showPersons){ $("main").innerHTML=viewPersons(); return }
-  if(consentNeeded()){ $("main").innerHTML=viewConsent(); return }
-  if(S.wiz && B.find(x=>x.k===S.wiz.k)){ $("main").innerHTML=viewWizard(); return }
-  S.wiz=null;
-  if(!S.done){
-    const vs=visSteps(); if(S.step>=vs.length) S.step=vs.length-1;
-    $("main").innerHTML=VIEWS[vs[S.step].id]();
-  } else {
-    $("main").innerHTML = S.tab==="belege"?viewBelege(): S.tab==="termine"?viewTermine(): viewAnsprueche();
-  }
-}
-function stepper(){
-  const vs=visSteps(); const n=S.step+1;
-  return `<div class="stepper"><div class="meta"><span>Schritt ${n} von ${vs.length}</span><span>${vs[S.step].label}</span></div><div class="bar"><i style="width:${Math.round(n/vs.length*100)}%"></i></div></div>`;
-}
-function nav(canNext=true,nextLabel="Weiter",why="Bitte beantworte zuerst die Frage oben."){
-  return `<p class="notice navwarn" id="navwarn" hidden>${ic("alert")}<span>${esc(why)}</span></p><div class="nav go">${S.step>0?`<button class="btn ghost" type="button" data-act="back">Zurück</button>`:"<span></span>"}<button class="btn big" type="button" data-act="next" data-ok="${canNext?1:0}">${nextLabel}</button></div>`;
-}
-const VIEWS = {
- start:()=>`<section class="panel">${stepper()}
-   <div class="intro">
-     <h2>Welche Hilfen stehen dir noch zu?</h2>
-     <p>Viele Familien nutzen nur das Pflegegeld. Dabei sind oft mehrere tausend Euro im Jahr zusätzlich drin, etwa für Haushaltshilfe, Ersatzpflege oder Hilfsmittel.</p>
-     <p class="muted">Ein paar Fragen, etwa 3 Minuten. Danach siehst du deine offenen Ansprüche mit fertigen Anträgen.</p>
-   </div>
-   <fieldset class="q"><legend>Für wen nutzt du die App?</legend><div class="choices">
-     ${choice("rolle","selbst","Für mich selbst","ich bin pflegebedürftig oder schwerbehindert","radio",S.rolle==="selbst")}
-     ${choice("rolle","angehoerig","Für eine angehörige Person","ich pflege oder kümmere mich","radio",S.rolle==="angehoerig")}
-   </div></fieldset>
-   <fieldset class="q"><legend>Worum geht es?</legend><p class="hint">Beides ist möglich.</p><div class="choices">
-     ${choice("bereich","pflege","Pflegegrad / Pflegebedürftigkeit","","checkbox",S.bereiche.pflege)}
-     ${choice("bereich","sb","Schwerbehinderung / GdB","","checkbox",S.bereiche.sb)}
-   </div></fieldset>
-   ${nav(S.rolle && (S.bereiche.pflege||S.bereiche.sb),"Los geht's", !S.rolle?"Bitte wähle zuerst oben aus, für wen du die App nutzt.":"Bitte wähle mindestens ein Thema aus: Pflegegrad oder Schwerbehinderung.")}
- </section>`,
- kasse:()=>`<section class="panel">${stepper()}
-   <h2>Bei welcher Krankenkasse ${S.rolle==="angehoerig"?"ist die Person":"bist du"} versichert?</h2>
-   <p class="muted">Die Pflegekasse gehört immer zur Krankenkasse. Dorthin gehen die Anträge.</p>
-   <fieldset class="q"><legend class="sr">Krankenkasse</legend><div class="choices">
-     ${Object.entries(KASSEN).map(([k,v])=>choice("kasse",k,v.name,"","radio",S.kasse===k)).join("")}
-   </div></fieldset>
-   ${S.kasse==="aok"?`<div class="field"><label for="aokRegion">Welche AOK?</label><select id="aokRegion"><option value="">Bitte wählen</option>${AOK_REGIONEN.map(r=>`<option ${S.aokRegion===r?"selected":""}>${r}</option>`).join("")}</select></div>`:""}
-   ${S.kasse==="andere"?`<div class="field"><label for="kasseAndere">Name der Kasse</label><input type="text" id="kasseAndere" value="${esc(S.kasseAndere)}" placeholder="z. B. KNAPPSCHAFT, SBK"></div>`:""}
-   <p class="notice info">${ic("info")}<span>Privat versichert? Die Leistungen der Pflegepflichtversicherung sind gleich hoch, Anträge gehen dann an die private Pflegeversicherung. Wähle „Andere“.</span></p>
-   ${nav(!!S.kasse && (S.kasse!=="aok"||S.aokRegion))}
- </section>`,
- pflege:()=>`<section class="panel">${stepper()}
-   <h2>Pflegegrad und Wohnsituation</h2>
-   <fieldset class="q"><legend>Welcher Pflegegrad ist festgestellt?</legend><div class="choices">
-     ${choice("pg","0","Noch keiner","oder Antrag läuft","radio",S.pg==="0")}
-     ${[1,2,3,4,5].map(n=>choice("pg",String(n),"Pflegegrad "+n,["","geringe","erhebliche","schwere","schwerste","schwerste, besondere Anforderungen"][n]+" Beeinträchtigung","radio",S.pg===String(n))).join("")}
-   </div></fieldset>
-   <fieldset class="q"><legend>Wo und wie wird gepflegt?</legend><div class="choices">
-     ${Object.entries(WOHNEN).map(([k,v])=>choice("wohnen",k,v.t,v.s,"radio",S.wohnen===k)).join("")}
-   </div></fieldset>
-   ${nav(S.pg!=="" && (S.wohnen || S.pg==="0"))}
- </section>`,
- pp:()=>`<section class="panel">${stepper()}
-   <h2>Wer pflegt im Alltag?</h2>
-   <p class="muted">Pflegende Angehörige haben eigene Ansprüche, etwa Rentenpunkte und Freistellung vom Job.</p>
-   <fieldset class="q"><legend>Pflegt eine Angehörige oder ein Angehöriger mindestens 10 Stunden pro Woche, verteilt auf mindestens 2 Tage?</legend><div class="choices">
-     ${choice("stunden10","ja","Ja","","radio",S.pp.stunden10==="ja")}${choice("stunden10","nein","Nein","","radio",S.pp.stunden10==="nein")}${choice("stunden10","unklar","Weiß nicht","","radio",S.pp.stunden10==="unklar")}
-   </div></fieldset>
-   <fieldset class="q"><legend>Ist die pflegende Person berufstätig?</legend><div class="choices">
-     ${choice("arbeit","nein","Nein / Rente","","radio",S.pp.arbeit==="nein")}${choice("arbeit","bis30","Ja, bis 30 Std./Woche","","radio",S.pp.arbeit==="bis30")}${choice("arbeit","ueber30","Ja, mehr als 30 Std./Woche","","radio",S.pp.arbeit==="ueber30")}
-   </div></fieldset>
-   ${nav(S.pp.stunden10 && S.pp.arbeit)}
- </section>`,
- sb:()=>`<section class="panel">${stepper()}
-   <h2>Schwerbehinderung</h2>
-   <fieldset class="q"><legend>Gibt es einen festgestellten Grad der Behinderung (GdB)?</legend><div class="choices">
-     ${choice("sbstatus","ja","Ja, Bescheid oder Ausweis","","radio",S.sb.status==="ja")}${choice("sbstatus","beantragt","Beantragt, noch kein Bescheid","","radio",S.sb.status==="beantragt")}${choice("sbstatus","nein","Nein","","radio",S.sb.status==="nein")}
-   </div></fieldset>
-   ${S.sb.status==="ja"?`
-   <div class="field"><label for="gdb">GdB laut Bescheid</label><select id="gdb"><option value="">Bitte wählen</option>${[20,30,40,50,60,70,80,90,100].map(g=>`<option ${String(S.sb.gdb)===String(g)?"selected":""}>${g}</option>`).join("")}</select></div>
-   <fieldset class="q"><legend>Merkzeichen im Ausweis</legend><p class="hint">Stehen auf der Rückseite des Ausweises.</p><div class="choices">
-     ${Object.entries(MZ).map(([k,v])=>choice("mz",k,v,"","checkbox",!!S.sb.mz[k])).join("")}
-   </div></fieldset>`:""}
-   <fieldset class="q"><legend>Weitere Angaben</legend><div class="choices">
-     ${choice("sbx","arbeit","Berufstätig","","checkbox",S.sb.arbeit)}
-     ${choice("sbx","auto","Eigenes Auto (auf die Person zugelassen)","","checkbox",S.sb.auto)}
-     ${choice("sbx","grundsicherung","Bezieht Grundsicherung oder Bürgergeld","","checkbox",S.sb.grundsicherung)}
-   </div></fieldset>
-   ${nav(S.sb.status && (S.sb.status!=="ja"||S.sb.gdb))}
- </section>`,
- genutzt:()=>{
-   const list = applicable().filter(b=>!["beratung","pg_antrag","pg_hoch","sb_antrag","sb_neu","hzp","pug"].includes(b.k));
-   return `<section class="panel">${stepper()}
-   <h2>Was ${S.rolle==="angehoerig"?"bekommt ihr":"bekommst du"} schon?</h2>
-   <p class="muted">Kreuze an, was bereits genutzt wird. Alles andere zeigen wir als offenen Anspruch.</p>
-   ${list.length?`<div class="choices">${list.map(b=>choice("genutzt",b.k,b.t,b.p,"checkbox",!!S.genutzt[b.k])).join("")}</div>`:`<p class="notice info">${ic("info")}<span>Für diese Situation gibt es noch keine laufenden Leistungen.</span></p>`}
-   ${nav(true)}
- </section>`},
- daten:()=>{const p=S.person, a=S.rolle==="angehoerig";
-   return `<section class="panel">${stepper()}
-   <h2>Angaben für die Anträge</h2>
-   <p class="muted">Damit füllen wir die Schreiben vor. Felder dürfen leer bleiben. Die Daten liegen nur in deinem privaten Bereich.</p>
-   <h3>${a?"Pflegebedürftige bzw. schwerbehinderte Person":"Deine Daten"}</h3>
-   <div class="grid2">
-     ${fld("name","Vor- und Nachname",p.name)}${fld("geb","Geburtsdatum",p.geb,"text","TT.MM.JJJJ")}
-     ${fld("vnr","Versichertennummer",p.vnr,"text","steht auf der Gesundheitskarte")}${fld("strasse","Straße, Hausnr.",p.strasse)}
-     ${fld("ort","PLZ, Ort",p.ort)}${!a?fld("tel","Telefon",p.tel,"tel")+fld("mail","E-Mail",p.mail,"email"):""}
-   </div>
-   ${a?`<h3>Absender (du als Angehörige/r)</h3><div class="grid2">
-     ${fld("absender","Dein Name",p.absender)}${fld("beziehung","Beziehung",p.beziehung,"text","z. B. Tochter, Ehemann")}
-     ${fld("absStrasse","Straße, Hausnr.",p.absStrasse)}${fld("absOrt","PLZ, Ort",p.absOrt)}
-     ${fld("tel","Telefon",p.tel,"tel")}${fld("mail","E-Mail",p.mail,"email")}</div>
-     <p class="notice">${ic("info")}<span>Wenn du für eine andere Person Anträge stellst, braucht die Kasse eine Vollmacht oder Betreuungsurkunde. Wir setzen sie automatisch auf die Checkliste.</span></p>`:""}
-   ${nav(true,"Ergebnis anzeigen")}
- </section>`},
-};
-function fld(k,label,v,type="text",ph=""){return `<div class="field"><label for="p-${k}">${label}</label><input type="${type}" id="p-${k}" data-p="${k}" value="${esc(v)}" placeholder="${esc(ph)}"></div>`}
-
-/* ---------- Reiter: Ansprüche ---------- */
-function viewAnsprueche(){
-  const {all,offen}=sums();
-  const genutzt = all.filter(b=>S.genutzt[b.k]);
-  const areas=["Alle",...new Set(offen.map(b=>b.area))];
-  if(!areas.includes(areaFilter)) areaFilter="Alle";
-  const sorted = offen.filter(b=>areaFilter==="Alle"||b.area===areaFilter)
-    .sort((a,b)=>(!!a.opt-!!b.opt) || ((b.val()||0)-(a.val()||0)) || ((b.mon?b.mon():0)-(a.mon?a.mon():0)));
-  const dl=deadlines().filter(x=>!x.ok && urg(x.d)!=="ok").slice(0,2);
-  return `
-   ${dl.map(x=>`<p class="notice ${urg(x.d)==="late"?"bad":""}">${ic("bell")}<span><strong>${esc(x.t)}</strong> – Frist ${deD(x.d)} (${urgTxt(x.d)}). <button type="button" class="linkbtn" data-tab="termine">Zu den Terminen</button></span></p>`).join("")}
-   ${!S.welcomeSeen?`<section class="panel" style="gap:12px">
-     <div class="section-title"><h2>Fertig! So geht's weiter</h2><button type="button" class="linkbtn" data-act="welcome-ok">Ausblenden</button></div>
-     <div class="howto">
-       <button type="button" class="howbtn" data-act="welcome-ok"><b>${ic("list")}Ansprüche prüfen</b><span>Unten antippen: Anleitung, Checkliste, fertiger Antrag als Text oder PDF.</span></button>
-       <button type="button" class="howbtn" data-tab="belege"><b>${ic("receipt")}Belege sammeln</b><span>Rezepte und Rechnungen fotografieren, nach Jahr sortieren, einreichen.</span></button>
-       <button type="button" class="howbtn" data-tab="termine"><b>${ic("bell")}Fristen im Blick</b><span>Erinnerung an Beratungsbesuch und Abgabefristen im Kalender.</span></button>
-     </div></section>`:""}
-   ${(bescheidCard()||entlCard())?`<div class="minis">${bescheidCard()}${entlCard()}</div>`:""}
-   ${langNotice()}
-   <div class="section-title"><h2>Deine offenen Ansprüche</h2><span class="small muted">Antippen für Antrag und Checkliste</span></div>
-   ${areas.length>2?`<div class="filters">${areas.map(a=>`<button type="button" class="chip" data-area="${esc(a)}" aria-pressed="${areaFilter===a}">${esc(a)}</button>`).join("")}</div>`:""}
-   <div class="list">${sorted.map(itemHTML).join("") || '<p class="muted">Ihr nutzt bereits alles, was wir prüfen konnten.</p>'}</div>
-   ${genutzt.length?`<details class="used"><summary>Bereits genutzt (${genutzt.length})</summary><div class="list" style="margin-top:10px">${genutzt.map(itemHTML).join("")}</div></details>`:""}
-   <div class="nav"><button class="btn ghost" type="button" data-act="edit">Angaben ändern</button><button class="btn ghost" type="button" data-act="reset">Antworten zurücksetzen</button></div>
-   <div id="resetconfirm" hidden class="notice bad">${ic("alert")}<span>Alle Antworten aus dem Fragebogen zurücksetzen und neu anfangen? Belege und Fristen bleiben erhalten. <span class="btnrow" style="margin-top:8px"><button class="btn small danger" type="button" data-act="reset-yes">Ja, löschen</button><button class="btn small ghost" type="button" data-act="reset-no">Abbrechen</button></span></span></div>
-   ${datenBox()}`;
-}
-function valueLabel(b){
-  if(b.val && b.val()) return `<span class="val">${eur(b.val())}/Jahr</span>`;
-  if(b.mon && b.mon()) return `<span class="val">bis ${eur(b.mon(), b.mon()%1?2:0)}/Mon.</span>`;
-  if(b.once) return `<span class="val">bis ${eur(b.once)}</span>`;
-  if(b.frei) return `<span class="val">${eur(b.frei())} Freibetrag</span>`;
-  return `<span class="val neutral">${b.opt?"prüfen":"kostenlos"}</span>`;
-}
-let openKey=null;
-function itemHTML(b){
-  const st = S.status[b.k]||"offen";
-  const open = openKey===b.k;
-  return `<article class="item" id="it-${b.k}">
-    <button class="head" type="button" data-open="${b.k}" aria-expanded="${open}">
-      <span class="ico a-${esc(b.area)}">${ic(AREA_ICON[b.area]||"heart")}</span>
-      <span class="ttl">${esc(b.t)}<span class="para">${esc(b.p)} · ${esc(b.area)}</span></span>${valueLabel(b)}
-      <span class="short">${esc(txt(b.short))}</span>
-      ${(b.opt||st!=="offen")?`<span class="tags">${b.opt?'<span class="tag">je nach Lage</span>':''}${st!=="offen"?`<span class="tag st-${st}">${st}</span>`:''}</span>`:""}
-    </button>
-    ${open?detailHTML(b):""}
-  </article>`;
-}
-function docsFor(b){
-  const d=[...(txt(b.docs)||[])].filter(Boolean);
-  if(S.rolle==="angehoerig" && b.to!==FA && b.to!=="arbeitgeber" && !d.some(x=>/Vollmacht/.test(x))) d.push("Vollmacht oder Betreuungsurkunde");
-  return d;
-}
-function detailHTML(b){
-  const checks = docsFor(b), st=S.status[b.k]||"offen";
-  const nQ=(b.q||[]).filter(q=>!q.show||q.show()).length;
-  return `<div class="detail">
-    ${b.ask?`<div class="startbox">
-        <button class="btn big" type="button" data-wopen="${b.k}">${ic("file")}${st==="offen"?"Antrag ausfüllen":"Antrag ansehen"}</button>
-        ${["pg_antrag","pg_hoch"].includes(b.k)?`<button class="btn ghost" type="button" data-act="r-start">Erst selbst einschätzen: Pflegegrad-Rechner</button>`:""}
-        <p class="small muted">${nQ?`${nQ} einfache Fragen, Schritt für Schritt. Du kannst jederzeit zurück, nichts wird ohne dich abgeschickt.`:"Der Antrag ist schon fertig vorbereitet. Du musst nur noch prüfen."}</p>
-      </div>`:`<p class="notice info">${ic("info")}<span>Dafür ist kein Antrag nötig. Trage den Betrag einfach in der Steuererklärung ein (oder gib diese Info an deine Steuerberatung weiter).</span></p>`}
-    <div><h4>So läuft es ab</h4><ol>${b.steps.map(s=>`<li>${esc(s)}</li>`).join("")}</ol></div>
-    ${finderHTML(b.k)}
-    ${checks.length?`<div><h4>Diese Unterlagen brauchst du</h4><ul class="checks">${checks.map((c,i)=>`<li><label><input type="checkbox" data-check="${b.k}:${i}" ${S.checks[b.k+":"+i]?"checked":""}><span>${esc(c)}</span></label></li>`).join("")}</ul></div>`:""}
-    <div class="status"><label for="st-${b.k}"><strong>Stand:</strong></label><select id="st-${b.k}" data-status="${b.k}">${[["offen","noch nicht beantragt"],["beantragt","beantragt, warte auf Antwort"],["bewilligt","bewilligt"]].map(([v,t])=>`<option value="${v}" ${st===v?"selected":""}>${t}</option>`).join("")}</select>
-    <label class="choice" for="gn-${b.k}" style="padding:6px 10px"><input type="checkbox" id="gn-${b.k}" data-gen="${b.k}" ${S.genutzt[b.k]?"checked":""}><span>bekommen wir schon</span></label></div>
-  </div>`;
-}
-function today(){return new Date().toLocaleDateString("de-DE")}
-function letter(b){
-  const p=S.person, a=S.rolle==="angehoerig";
-  const who = p.name||"[Name]";
-  const ref = [p.vnr && (b.to===PK||b.to===KK) ? `Versichertennummer: ${p.vnr}`:"", p.geb?`geboren am ${p.geb}`:""].filter(Boolean).join(", ");
-  const subject = `${b.t}${b.to===PK||b.to===KK?" – "+(p.vnr?"Versichertennr. "+p.vnr:who):" – "+who}`;
-  const intro = a
-    ? `ich wende mich als ${p.beziehung||"[Beziehung]"} im Namen von ${who}${ref?" ("+ref+")":""} an Sie. Eine Vollmacht liegt bei.\n\nFür ${who}`
-    : `${ref?"("+ref+")\n\n":""}hiermit`;
-  const pgline = pg()>=1 && (b.to===PK||b.to===KK) ? `\n\nEs ist Pflegegrad ${pg()} festgestellt.` : "";
-  let ask = txt(b.ask);
-  if(!a) ask = ask.replace(/^(\S+) ich hiermit /,"$1 ich ");
-  const body = `Sehr geehrte Damen und Herren,\n\n${intro} ${ask}${pgline}\n\nBitte bestätigen Sie mir den Eingang dieses Antrags. Falls Sie ein bestimmtes Formular oder weitere Unterlagen benötigen, senden Sie mir diese bitte zu. Dieses Schreiben gilt als fristwahrende Antragstellung (§ 16 SGB I).\n\nMit freundlichen Grüßen\n\n${a?(p.absender||"[Dein Name]"):who}${p.tel?"\nTel. "+p.tel:""}${p.mail?"\n"+p.mail:""}`;
-  return {subject, body};
-}
-function curLetter(b){const L=letter(b);return {subject:S.texte[b.k+"_sub"]??L.subject, body:S.texte[b.k]??L.body}}
-function mailto(b,addr){const L=curLetter(b);return `mailto:${addr}?subject=${encodeURIComponent(L.subject)}&body=${encodeURIComponent(L.body)}`}
-
-/* ---------- Reiter: Belege ---------- */
-function belegYears(){ const y=new Date().getFullYear(); const ys=new Set([y,y-1,y-2,y-3].map(String)); BEL.forEach(b=>b.jahr&&ys.add(String(b.jahr))); return [...ys].sort().reverse() }
-function viewBelege(){
-  const years=selYears(); const kf=S.belegFilter.kat||"";
-  const inYears=BEL.filter(b=>years.includes(String(b.jahr)));
-  const shown=inYears.filter(b=>!kf||b.kat===kf).sort((a,b)=>(b.datum||"").localeCompare(a.datum||""));
-  const canFiles=!!ASSETS;
-  const label = years.length===1?years[0]:years.slice().reverse().join(", ");
-  const byYear={}; for(const b of shown){ const y=String(b.jahr); (byYear[y]=byYear[y]||{}); (byYear[y][b.kat]=byYear[y][b.kat]||[]).push(b) }
-  return `
-  <section class="panel">
-    <h2>Belege</h2>
-    <div class="yearchips"><span class="small muted">Jahre anzeigen:</span>${belegYears().map(y=>`<button type="button" class="chip" data-year="${y}" aria-pressed="${years.includes(y)}">${y}</button>`).join("")}</div>
-    ${bulk?bulkView():pending?pendingForm():`
-    <div class="drop" id="drop">
-      ${ic("camera")}
-      <p><strong>Rezept, Quittung oder Rechnung erfassen</strong><br><span class="small muted">Fotografieren oder Datei (Bild/PDF) wählen. Auch ältere Belege, z. B. aus ${new Date().getFullYear()-2}: einfach das Datum vom Beleg eintragen.</span>${canFiles?`<br><span class="small"><strong>Neu:</strong> Eine PDF mit vielen Rechnungen? Die App erkennt jede Rechnung und sortiert sie nach Jahr.</span>`:""}</p>
-      <div class="btnrow" style="justify-content:center">
-        ${canFiles?`<button class="btn" type="button" data-act="cam">${ic("camera")}Foto aufnehmen</button><button class="btn soft" type="button" data-act="pick">${ic("file")}Datei wählen</button>`:""}
-        <button class="btn ${canFiles?"ghost":""}" type="button" data-act="manual">${ic("plus")}Ohne Foto erfassen</button>
-      </div>
-      ${canFiles?"":`<p class="small muted">Fotos speichern geht nur mit Konto. Beträge kannst du trotzdem erfassen, sie bleiben aber nur bis zum Schließen der Seite.</p>`}
-    </div>`}
-  </section>
-
-  <section class="panel">
-    <div class="section-title"><h3>Zuzahlungen und Belastungsgrenze</h3><span class="small muted">§ 62 SGB V</span></div>
-    <p class="small muted">Pro Jahr zahlt man höchstens 2 % der Bruttoeinnahmen des Haushalts zu, chronisch Kranke 1 %. Für Ehepartner und Kinder zieht die Kasse Freibeträge ab. Zuviel Gezahltes kann meist bis zu 4 Jahre rückwirkend erstattet werden, für jedes Jahr mit eigenem Antrag.</p>
-    <div class="field" style="max-width:320px"><label for="chron">Schwerwiegend chronisch krank?</label><select id="chron"><option value="" ${!S.chronisch?"selected":""}>Automatisch (${chronisch()?"ja":"nein"})</option><option value="ja" ${S.chronisch==="ja"?"selected":""}>Ja, 1 %</option><option value="nein" ${S.chronisch==="nein"?"selected":""}>Nein, 2 %</option></select></div>
-    ${years.map(j=>{const z=zuz(j); const p=z.grenze?Math.min(100,z.sum/z.grenze*100):0; const reached=z.grenze&&z.sum>=z.grenze;
-      return `<div class="meter" style="border-top:1px solid var(--line);padding-top:12px">
-        <div class="section-title"><strong>${j}</strong><div class="field" style="flex-direction:row;align-items:center;gap:8px"><label for="brutto-${j}" class="small">Brutto ${j} (€)</label><input type="text" inputmode="decimal" id="brutto-${j}" data-brutto="${j}" value="${esc(bruttoOf(j))}" placeholder="z. B. 24000" style="width:130px"></div></div>
-        <div class="nums"><span>Gezahlt: <strong>${eur(z.sum,2)}</strong></span><span>Grenze (${z.pct} %): <strong>${z.grenze?eur(z.grenze,2):"Brutto eintragen"}</strong></span></div>
-        <div class="track" role="progressbar" aria-label="Zuzahlungen ${j}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(p)}"><i class="${reached?"over":""}" style="width:${p}%"></i></div>
-        ${z.grenze?(reached?`<p class="notice good">${ic("check")}<span><strong>Grenze erreicht.</strong> ${eur(z.sum-z.grenze,2)} zurückholen${j===String(new Date().getFullYear())?", und für den Rest des Jahres entfallen Zuzahlungen":""}.</span></p>`:`<p class="small muted">Noch ${eur(z.grenze-z.sum,2)} bis zur Grenze.</p>`):""}
-        <div class="btnrow"><button class="btn small ${reached?"":"soft"}" type="button" data-befpdf="${j}">${ic("down")}Antrag ${j} + Belege (PDF)</button><button class="btn small ghost" type="button" data-befcopy="${j}">Antragstext kopieren</button></div>
-      </div>`}).join("")}
-  </section>
-
-  <section style="display:flex;flex-direction:column;gap:12px">
-    <div class="section-title"><h3>Abgelegt: ${esc(label)}</h3><span class="small muted">${shown.length} Belege · ${eur(shown.reduce((s,b)=>s+(Number(b.betrag)||0),0),2)}</span></div>
-    <div class="filters"><button type="button" class="chip" data-kat="" aria-pressed="${!kf}">Alle Arten</button>${Object.entries(KATS).filter(([k])=>inYears.some(b=>b.kat===k)).map(([k,v])=>`<button type="button" class="chip" data-kat="${k}" aria-pressed="${kf===k}">${esc(v.t)}</button>`).join("")}</div>
-    ${shown.length?Object.keys(byYear).sort().reverse().map(y=>`${years.length>1?`<h3 style="margin-top:4px">${y}</h3>`:""}${Object.entries(byYear[y]).map(([k,arr])=>`<div class="group"><header><span>${esc((KATS[k]||KATS.sonst).t)}</span><span>${eur(arr.reduce((s,b)=>s+(Number(b.betrag)||0),0),2)}</span></header>${arr.map(belegRow).join("")}</div>`).join("")}`).join("")
-      :`<p class="notice info">${ic("receipt")}<span>Noch keine Belege für ${esc(label)}. Fotografiere jede Apotheken-Quittung mit Zuzahlung direkt nach dem Kauf, dann ist am Jahresende alles beisammen.</span></p>`}
-    ${shown.length?`<div class="btnrow"><button class="btn small" type="button" data-act="mappe">${ic("down")}Belegmappe ${esc(label)} (PDF)</button><button class="btn small ghost" type="button" data-act="csv">Liste als Tabelle (CSV)</button></div>`:""}
-  </section>`;
-}
-function belegRow(b){
-  const isImg=b.asset && /^image\//.test(b.ctype||"");
-  const thumb = b.asset ? (isImg?`<button type="button" class="thumb" data-view="${b.asset}" style="padding:0;cursor:zoom-in" aria-label="Beleg ansehen"><img src="${esc(blobUrl(b.asset))}" alt="" loading="lazy"></button>`:`<a class="thumb" href="${esc(blobUrl(b.asset))}" target="_blank" rel="noopener" aria-label="PDF öffnen">${ic("file")}</a>`) : `<span class="thumb">${ic("receipt")}</span>`;
-  const d=parseIso(b.datum);
-  return `<div class="beleg">${thumb}
-    <div style="min-width:0"><div class="b-t">${esc(b.titel||(KATS[b.kat]||KATS.sonst).t)}</div><div class="b-m">${d?deD(d):"ohne Datum"}${b.eingereicht?' · <span style="color:var(--money);font-weight:700">eingereicht</span>':''}</div></div>
-    <div class="b-v">${b.betrag!==""&&b.betrag!=null?eur(Number(b.betrag),2):"–"}</div>
-    <div class="b-a">${delAsk===b.id?`<span class="small">Wirklich löschen?</span><button type="button" class="linkbtn danger" data-delyes="${b.id}">Ja, löschen</button><button type="button" class="linkbtn" data-delno="1">Abbrechen</button>`:
-      `<button type="button" class="linkbtn" data-edit="${b.id}">Bearbeiten</button><button type="button" class="linkbtn" data-sub-toggle="${b.id}">${b.eingereicht?"Als offen markieren":"Als eingereicht markieren"}</button><button type="button" class="linkbtn danger" data-del="${b.id}">Löschen</button>`}</div>
-  </div>`;
-}
-function pendingForm(){
-  const p=pending; const canFiles=!!ASSETS;
-  return `<div class="pending">
-    <h3>${p.editId?"Beleg bearbeiten":"Neuer Beleg"}</h3>
-    <div class="preview">
-      ${p.preview?`<span class="thumb big"><img src="${esc(p.preview)}" alt="Vorschau"></span>`:(p.file||p.keepAsset)?`<span class="thumb big">${ic("file")}</span>`:`<span class="thumb big">${ic("receipt")}</span>`}
-      ${canFiles?`<div class="btnrow" style="flex-direction:column;align-items:flex-start"><button class="btn small soft" type="button" data-act="cam">${ic("camera")}${p.preview||p.file||p.keepAsset?"Neues Foto":"Foto aufnehmen"}</button><button class="btn small ghost" type="button" data-act="pick">${ic("file")}Datei wählen</button>${(p.file||p.keepAsset)?`<button class="linkbtn danger" type="button" data-act="dropphoto">Foto entfernen</button>`:""}</div>`:""}
-    </div>
-    <fieldset class="q"><legend>Was ist das für ein Beleg?</legend><div class="choices">${Object.entries(KATS).map(([k,v])=>`<label class="choice" for="pk-${k}"><input type="radio" id="pk-${k}" name="pk" data-pend="kat" value="${k}" ${p.kat===k?"checked":""}><span>${esc(v.t)}</span></label>`).join("")}</div></fieldset>
+    </section>`}let a=rt[e.i];return`<section class="panel wiz">
+    <div class="wiztop"><button type="button" class="btn small ghost" data-act="r-close">\u2190 Schlie\xDFen</button><span class="small muted">Pflegegrad-Rechner \xB7 ${st[a.m].n}</span></div>
+    ${de(e.i+1,n,`Frage ${e.i+1} von ${n}`)}
+    ${e.i===0?'<p class="small muted">Beantworte die Fragen so, wie es an einem normalen Tag ist, nicht an einem besonders guten.</p>':""}
+    <h2 class="wq">${d(a.q)}</h2>
+    <div class="choices big">${a.o.map(([s,r,i])=>`<label class="choice" for="rq-${s}"><input type="radio" id="rq-${s}" name="rq" data-rq="${s}" ${e.a[e.i]===s?"checked":""}><span>${d(r)}${i?`<small>${d(i)}</small>`:""}</span></label>`).join("")}</div>
+    <div class="nav big go">${e.i>0?'<button class="btn ghost" type="button" data-act="r-back">Zur\xFCck</button>':"<span></span>"}${e.a[e.i]!=null?'<button class="btn" type="button" data-act="r-next">Weiter</button>':""}</div>
+  </section>`}var Ut={};M(Ut,{applyI18n:()=>Te,langNotice:()=>Wt,langSelect:()=>Ge,start09:()=>jt,tr:()=>ot});var Wa=[["de","Deutsch"],["tr","T\xFCrk\xE7e"],["ru","\u0420\u0443\u0441\u0441\u043A\u0438\u0439"],["ar","\u0627\u0644\u0639\u0631\u0628\u064A\u0629"],["ti","\u1275\u130D\u122D\u129B"]],fa={Willkommen:["Ho\u015F geldiniz","\u0414\u043E\u0431\u0440\u043E \u043F\u043E\u0436\u0430\u043B\u043E\u0432\u0430\u0442\u044C","\u0645\u0631\u062D\u0628\u064B\u0627","\u12A5\u1295\u124B\u12D5 \u1265\u12F0\u1213\u1295 \u1218\u133B\u12A5\u12A9\u121D"],"Melde dich an, um deine Angaben und Belege zu sehen.":["Bilgilerinizi ve belgelerinizi g\xF6rmek i\xE7in giri\u015F yap\u0131n.","\u0412\u043E\u0439\u0434\u0438\u0442\u0435, \u0447\u0442\u043E\u0431\u044B \u0443\u0432\u0438\u0434\u0435\u0442\u044C \u0441\u0432\u043E\u0438 \u0434\u0430\u043D\u043D\u044B\u0435 \u0438 \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u044B.","\u0633\u062C\u0651\u0644 \u0627\u0644\u062F\u062E\u0648\u0644 \u0644\u0631\u0624\u064A\u0629 \u0628\u064A\u0627\u0646\u0627\u062A\u0643 \u0648\u0645\u0633\u062A\u0646\u062F\u0627\u062A\u0643.","\u1213\u1260\u122C\u1273\u12B9\u121D\u1295 \u1230\u1290\u12F3\u1275\u12A9\u121D\u1295 \u1295\u121D\u122D\u12A3\u12ED \u12A5\u1270\u12C9\u1362"],"Mit Google anmelden":["Google ile giri\u015F yap","\u0412\u043E\u0439\u0442\u0438 \u0447\u0435\u0440\u0435\u0437 Google","\u062A\u0633\u062C\u064A\u0644 \u0627\u0644\u062F\u062E\u0648\u0644 \u0639\u0628\u0631 Google","\u1265Google \u12A5\u1270\u12C9"],"oder mit E-Mail":["veya e-posta ile","\u0438\u043B\u0438 \u043F\u043E \u044D\u043B. \u043F\u043E\u0447\u0442\u0435","\u0623\u0648 \u0628\u0627\u0644\u0628\u0631\u064A\u062F \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A","\u12C8\u12ED \u1265\u12A2\u1218\u12ED\u120D"],"E-Mail-Adresse":["E-posta adresi","\u0410\u0434\u0440\u0435\u0441 \u044D\u043B. \u043F\u043E\u0447\u0442\u044B","\u0627\u0644\u0628\u0631\u064A\u062F \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A","\u12A3\u12F5\u122B\u123B \u12A2\u1218\u12ED\u120D"],Passwort:["\u015Eifre","\u041F\u0430\u0440\u043E\u043B\u044C","\u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631","\u1218\u1215\u1208\u134A \u1243\u120D"],Anmelden:["Giri\u015F yap","\u0412\u043E\u0439\u0442\u0438","\u062A\u0633\u062C\u064A\u0644 \u0627\u0644\u062F\u062E\u0648\u0644","\u12A5\u1276"],"Konto anlegen":["Hesap olu\u015Ftur","\u0421\u043E\u0437\u0434\u0430\u0442\u044C \u0430\u043A\u043A\u0430\u0443\u043D\u0442","\u0625\u0646\u0634\u0627\u0621 \u062D\u0633\u0627\u0628","\u1215\u1233\u1265 \u12AD\u1348\u1275"],"Neu hier? Konto anlegen":["Yeni misiniz? Hesap olu\u015Fturun","\u0412\u043F\u0435\u0440\u0432\u044B\u0435 \u0437\u0434\u0435\u0441\u044C? \u0421\u043E\u0437\u0434\u0430\u0439\u0442\u0435 \u0430\u043A\u043A\u0430\u0443\u043D\u0442","\u062C\u062F\u064A\u062F \u0647\u0646\u0627\u061F \u0623\u0646\u0634\u0626 \u062D\u0633\u0627\u0628\u064B\u0627","\u1213\u12F1\u123D \u12F2\u12B9\u121D? \u1215\u1233\u1265 \u12AD\u1348\u1271"],"Passwort vergessen?":["\u015Eifrenizi mi unuttunuz?","\u0417\u0430\u0431\u044B\u043B\u0438 \u043F\u0430\u0440\u043E\u043B\u044C?","\u0646\u0633\u064A\u062A \u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631\u061F","\u1218\u1215\u1208\u134A \u1243\u120D \u1228\u1232\u12D5\u12A9\u121D?"],"Ich habe schon ein Konto":["Zaten hesab\u0131m var","\u0423 \u043C\u0435\u043D\u044F \u0443\u0436\u0435 \u0435\u0441\u0442\u044C \u0430\u043A\u043A\u0430\u0443\u043D\u0442","\u0644\u062F\u064A \u062D\u0633\u0627\u0628 \u0628\u0627\u0644\u0641\u0639\u0644","\u1215\u1233\u1265 \u12A3\u120E\u1292"],"Ohne Konto ausprobieren":["Hesaps\u0131z deneyin","\u041F\u043E\u043F\u0440\u043E\u0431\u043E\u0432\u0430\u0442\u044C \u0431\u0435\u0437 \u0430\u043A\u043A\u0430\u0443\u043D\u0442\u0430","\u062C\u0631\u0651\u0628 \u0628\u062F\u0648\u0646 \u062D\u0633\u0627\u0628","\u1265\u12D8\u12ED \u1215\u1233\u1265 \u1348\u1275\u1291"],Zeigen:["G\xF6ster","\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C","\u0625\u0638\u0647\u0627\u0631","\u12A3\u122D\u12A2"],Abmelden:["\xC7\u0131k\u0131\u015F","\u0412\u044B\u0439\u0442\u0438","\u062A\u0633\u062C\u064A\u0644 \u0627\u0644\u062E\u0631\u0648\u062C","\u12CD\u133B\u12A5"],Anspr\u00FCche:["Haklar","\u041F\u0440\u0430\u0432\u0430","\u0627\u0644\u0627\u0633\u062A\u062D\u0642\u0627\u0642\u0627\u062A","\u1218\u1230\u120B\u1275"],Belege:["Belgeler","\u0414\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u044B","\u0627\u0644\u0625\u064A\u0635\u0627\u0644\u0627\u062A","\u1230\u1290\u12F3\u1275"],Termine:["Tarihler","\u0421\u0440\u043E\u043A\u0438","\u0627\u0644\u0645\u0648\u0627\u0639\u064A\u062F","\u1246\u1338\u122B\u1273\u1275"],"Noch offen an Geld und Budgets pro Jahr":["Y\u0131ll\u0131k hen\xFCz kullan\u0131lmayan para ve b\xFCt\xE7e","\u0415\u0449\u0451 \u043D\u0435 \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u043D\u043E \u0434\u0435\u043D\u0435\u0433 \u0438 \u0431\u044E\u0434\u0436\u0435\u0442\u043E\u0432 \u0432 \u0433\u043E\u0434","\u0645\u0628\u0627\u0644\u063A \u0648\u0645\u064A\u0632\u0627\u0646\u064A\u0627\u062A \u063A\u064A\u0631 \u0645\u0633\u062A\u062E\u062F\u0645\u0629 \u0633\u0646\u0648\u064A\u064B\u0627","\u12A3\u1265 \u12D3\u1218\u1275 \u12D8\u12ED\u1270\u1320\u1250\u121D\u12A9\u121D\u1209 \u1308\u1295\u12D8\u1265\u1295 \u1260\u1300\u1275\u1295"],"offene Punkte":["a\xE7\u0131k konu","\u043E\u0442\u043A\u0440\u044B\u0442\u044B\u0445 \u043F\u0443\u043D\u043A\u0442\u043E\u0432","\u0628\u0646\u0648\u062F \u0645\u0641\u062A\u0648\u062D\u0629","\u12AD\u1349\u1275 \u1290\u1325\u1265\u1273\u1275"],"Angaben \xE4ndern":["Bilgileri de\u011Fi\u015Ftir","\u0418\u0437\u043C\u0435\u043D\u0438\u0442\u044C \u0434\u0430\u043D\u043D\u044B\u0435","\u062A\u0639\u062F\u064A\u0644 \u0627\u0644\u0628\u064A\u0627\u0646\u0627\u062A","\u1213\u1260\u122C\u1273 \u1240\u12ED\u122D"],"Welche Hilfen stehen dir noch zu?":["Hangi yard\u0131mlara h\xE2l\xE2 hakk\u0131n\u0131z var?","\u041D\u0430 \u043A\u0430\u043A\u0443\u044E \u043F\u043E\u043C\u043E\u0449\u044C \u0432\u044B \u0435\u0449\u0451 \u0438\u043C\u0435\u0435\u0442\u0435 \u043F\u0440\u0430\u0432\u043E?","\u0645\u0627 \u0627\u0644\u0645\u0633\u0627\u0639\u062F\u0627\u062A \u0627\u0644\u062A\u064A \u0644\u0627 \u062A\u0632\u0627\u0644 \u062A\u0633\u062A\u062D\u0642\u0647\u0627\u061F","\u12A3\u12E8\u1296\u1275 \u1213\u1308\u12DB\u1275 \u1308\u1293 \u12ED\u130D\u1265\u12A1\u12B9\u121D?"],"Viele Familien nutzen nur das Pflegegeld. Dabei sind oft mehrere tausend Euro im Jahr zus\xE4tzlich drin, etwa f\xFCr Haushaltshilfe, Ersatzpflege oder Hilfsmittel.":["Bir\xE7ok aile yaln\u0131zca bak\u0131m paras\u0131n\u0131 kullan\u0131yor. Oysa ev yard\u0131m\u0131, yedek bak\u0131m veya yard\u0131mc\u0131 ara\xE7lar i\xE7in y\u0131lda birka\xE7 bin euro daha m\xFCmk\xFCn.","\u041C\u043D\u043E\u0433\u0438\u0435 \u0441\u0435\u043C\u044C\u0438 \u043F\u043E\u043B\u0443\u0447\u0430\u044E\u0442 \u0442\u043E\u043B\u044C\u043A\u043E \u043F\u043E\u0441\u043E\u0431\u0438\u0435 \u043F\u043E \u0443\u0445\u043E\u0434\u0443. \u0410 \u0432\u0435\u0434\u044C \u0447\u0430\u0441\u0442\u043E \u043C\u043E\u0436\u043D\u043E \u043F\u043E\u043B\u0443\u0447\u0438\u0442\u044C \u0435\u0449\u0451 \u043D\u0435\u0441\u043A\u043E\u043B\u044C\u043A\u043E \u0442\u044B\u0441\u044F\u0447 \u0435\u0432\u0440\u043E \u0432 \u0433\u043E\u0434 \u2014 \u043D\u0430 \u043F\u043E\u043C\u043E\u0449\u044C \u043F\u043E \u0434\u043E\u043C\u0443, \u0437\u0430\u043C\u0435\u043D\u0443 \u0443\u0445\u0430\u0436\u0438\u0432\u0430\u044E\u0449\u0435\u0433\u043E \u0438\u043B\u0438 \u0432\u0441\u043F\u043E\u043C\u043E\u0433\u0430\u0442\u0435\u043B\u044C\u043D\u044B\u0435 \u0441\u0440\u0435\u0434\u0441\u0442\u0432\u0430.","\u0643\u062B\u064A\u0631 \u0645\u0646 \u0627\u0644\u0639\u0627\u0626\u0644\u0627\u062A \u062A\u0633\u062A\u062E\u062F\u0645 \u0628\u062F\u0644 \u0627\u0644\u0631\u0639\u0627\u064A\u0629 \u0641\u0642\u0637\u060C \u0645\u0639 \u0623\u0646\u0647 \u064A\u0645\u0643\u0646 \u063A\u0627\u0644\u0628\u064B\u0627 \u0627\u0644\u062D\u0635\u0648\u0644 \u0639\u0644\u0649 \u0639\u062F\u0629 \u0622\u0644\u0627\u0641 \u064A\u0648\u0631\u0648 \u0625\u0636\u0627\u0641\u064A\u0629 \u0633\u0646\u0648\u064A\u064B\u0627 \u0644\u0644\u0645\u0633\u0627\u0639\u062F\u0629 \u0627\u0644\u0645\u0646\u0632\u0644\u064A\u0629 \u0623\u0648 \u0627\u0644\u0631\u0639\u0627\u064A\u0629 \u0627\u0644\u0628\u062F\u064A\u0644\u0629 \u0623\u0648 \u0627\u0644\u0648\u0633\u0627\u0626\u0644 \u0627\u0644\u0645\u0633\u0627\u0639\u062F\u0629.","\u1265\u12D9\u1213\u1275 \u1235\u12F5\u122B\u1264\u1273\u1275 \u1308\u1295\u12D8\u1265 \u12AD\u1295\u12AD\u1295 \u1325\u122B\u12ED \u12ED\u12C8\u1235\u12F1\u1362 \u130D\u1295 \u1295\u1213\u1308\u12DD \u1308\u12DB\u1361 \u1270\u12AD\u12A2 \u12AD\u1295\u12AD\u1295 \u12C8\u12ED \u1218\u1233\u122D\u1212\u1273\u1275 \u1265\u12D9\u1215 \u12A3\u123D\u1213\u1275 \u12E9\u122E \u1270\u12C8\u1233\u12BA \u12ED\u122D\u12A8\u1265\u1362"],"Ein paar Fragen, etwa 3 Minuten. Danach siehst du deine offenen Anspr\xFCche mit fertigen Antr\xE4gen.":["Birka\xE7 soru, yakla\u015F\u0131k 3 dakika. Ard\u0131ndan haz\u0131r ba\u015Fvurularla a\xE7\u0131k haklar\u0131n\u0131z\u0131 g\xF6r\xFCrs\xFCn\xFCz.","\u041D\u0435\u0441\u043A\u043E\u043B\u044C\u043A\u043E \u0432\u043E\u043F\u0440\u043E\u0441\u043E\u0432, \u043E\u043A\u043E\u043B\u043E 3 \u043C\u0438\u043D\u0443\u0442. \u0417\u0430\u0442\u0435\u043C \u0432\u044B \u0443\u0432\u0438\u0434\u0438\u0442\u0435 \u0441\u0432\u043E\u0438 \u043F\u0440\u0430\u0432\u0430 \u0438 \u0433\u043E\u0442\u043E\u0432\u044B\u0435 \u0437\u0430\u044F\u0432\u043B\u0435\u043D\u0438\u044F.","\u0628\u0636\u0639\u0629 \u0623\u0633\u0626\u0644\u0629\u060C \u062D\u0648\u0627\u0644\u064A 3 \u062F\u0642\u0627\u0626\u0642. \u0628\u0639\u062F\u0647\u0627 \u062A\u0631\u0649 \u0627\u0633\u062A\u062D\u0642\u0627\u0642\u0627\u062A\u0643 \u0645\u0639 \u0637\u0644\u0628\u0627\u062A \u062C\u0627\u0647\u0632\u0629.","\u1241\u1229\u1265 \u1215\u1276\u1273\u1275\u1361 \u12A3\u1235\u1273\u1275 3 \u12F0\u1252\u1255\u1362 \u12F5\u1215\u122A\u12A1 \u1218\u1230\u120B\u1275\u12A9\u121D\u1295 \u12F5\u1209\u12CB\u1275 \u1218\u1218\u120D\u12A8\u1272\u1273\u1275\u1295 \u1275\u122D\u12A5\u12E9\u1362"],"F\xFCr wen nutzt du die App?":["Uygulamay\u0131 kimin i\xE7in kullan\u0131yorsunuz?","\u0414\u043B\u044F \u043A\u043E\u0433\u043E \u0432\u044B \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0435\u0442\u0435 \u043F\u0440\u0438\u043B\u043E\u0436\u0435\u043D\u0438\u0435?","\u0644\u0645\u0646 \u062A\u0633\u062A\u062E\u062F\u0645 \u0627\u0644\u062A\u0637\u0628\u064A\u0642\u061F","\u1290\u1218\u1295 \u12A2\u12B9\u121D \u12A5\u12DA \u12A3\u1355 \u1275\u1325\u1240\u1219?"],"F\xFCr mich selbst":["Kendim i\xE7in","\u0414\u043B\u044F \u0441\u0435\u0431\u044F","\u0644\u0646\u0641\u0633\u064A","\u1295\u122D\u12A5\u1230\u12ED"],"ich bin pflegebed\xFCrftig oder schwerbehindert":["bak\u0131ma muhtac\u0131m veya a\u011F\u0131r engelliyim","\u043C\u043D\u0435 \u043D\u0443\u0436\u0435\u043D \u0443\u0445\u043E\u0434 \u0438\u043B\u0438 \u0443 \u043C\u0435\u043D\u044F \u0438\u043D\u0432\u0430\u043B\u0438\u0434\u043D\u043E\u0441\u0442\u044C","\u0623\u062D\u062A\u0627\u062C \u0631\u0639\u0627\u064A\u0629 \u0623\u0648 \u0644\u062F\u064A \u0625\u0639\u0627\u0642\u0629 \u0634\u062F\u064A\u062F\u0629","\u12AD\u1295\u12AD\u1295 \u12E8\u12F5\u120D\u12E8\u1292 \u12C8\u12ED \u12A8\u1262\u12F5 \u1235\u1295\u12AD\u120D\u1293 \u12A3\u1208\u1292"],"F\xFCr eine angeh\xF6rige Person":["Bir yak\u0131n\u0131m i\xE7in","\u0414\u043B\u044F \u0440\u043E\u0434\u0441\u0442\u0432\u0435\u043D\u043D\u0438\u043A\u0430","\u0644\u0623\u062D\u062F \u0623\u0642\u0627\u0631\u0628\u064A","\u1295\u1213\u12F0 \u1264\u1270\u1230\u1265"],"ich pflege oder k\xFCmmere mich":["bak\u0131yorum veya ilgileniyorum","\u044F \u0443\u0445\u0430\u0436\u0438\u0432\u0430\u044E \u0438\u043B\u0438 \u0437\u0430\u0431\u043E\u0447\u0443\u0441\u044C","\u0623\u0642\u0648\u0645 \u0628\u0627\u0644\u0631\u0639\u0627\u064A\u0629 \u0623\u0648 \u0627\u0644\u0627\u0647\u062A\u0645\u0627\u0645","\u12A3\u1290 \u12A5\u12E8 \u12DD\u12A8\u1293\u12B8\u1295"],"Worum geht es?":["Konu nedir?","\u041E \u0447\u0451\u043C \u0438\u0434\u0451\u0442 \u0440\u0435\u0447\u044C?","\u0645\u0627 \u0627\u0644\u0645\u0648\u0636\u0648\u0639\u061F","\u1265\u12DB\u12D5\u1263 \u12A5\u1295\u1273\u12ED \u12A5\u12E9?"],"Beides ist m\xF6glich.":["\u0130kisi de m\xFCmk\xFCn.","\u041C\u043E\u0436\u043D\u043E \u0432\u044B\u0431\u0440\u0430\u0442\u044C \u043E\u0431\u0430.","\u064A\u0645\u0643\u0646 \u0627\u062E\u062A\u064A\u0627\u0631 \u0627\u0644\u0627\u062B\u0646\u064A\u0646.","\u12AD\u120D\u1272\u12A1 \u12ED\u12A8\u12A3\u120D\u1362"],"Pflegegrad / Pflegebed\xFCrftigkeit":["Bak\u0131m derecesi / bak\u0131m ihtiyac\u0131","\u0421\u0442\u0435\u043F\u0435\u043D\u044C \u0443\u0445\u043E\u0434\u0430 / \u043F\u043E\u0442\u0440\u0435\u0431\u043D\u043E\u0441\u0442\u044C \u0432 \u0443\u0445\u043E\u0434\u0435","\u062F\u0631\u062C\u0629 \u0627\u0644\u0631\u0639\u0627\u064A\u0629 / \u0627\u0644\u062D\u0627\u062C\u0629 \u0644\u0644\u0631\u0639\u0627\u064A\u0629","\u12F0\u1228\u1303 \u12AD\u1295\u12AD\u1295"],"Schwerbehinderung / GdB":["A\u011F\u0131r engellilik / engel derecesi","\u0418\u043D\u0432\u0430\u043B\u0438\u0434\u043D\u043E\u0441\u0442\u044C / \u0441\u0442\u0435\u043F\u0435\u043D\u044C \u0438\u043D\u0432\u0430\u043B\u0438\u0434\u043D\u043E\u0441\u0442\u0438","\u0625\u0639\u0627\u0642\u0629 \u0634\u062F\u064A\u062F\u0629 / \u062F\u0631\u062C\u0629 \u0627\u0644\u0625\u0639\u0627\u0642\u0629","\u12A8\u1262\u12F5 \u1235\u1295\u12AD\u120D\u1293"],"Los geht's":["Ba\u015Flayal\u0131m","\u041D\u0430\u0447\u0430\u0442\u044C","\u0627\u0628\u062F\u0623","\u1295\u1300\u121D\u122D"],Weiter:["\u0130leri","\u0414\u0430\u043B\u0435\u0435","\u0627\u0644\u062A\u0627\u0644\u064A","\u1240\u133D\u120D"],Zur\u00FCck:["Geri","\u041D\u0430\u0437\u0430\u0434","\u0631\u062C\u0648\u0639","\u1270\u1218\u1208\u1235"],"Wei\xDF ich nicht":["Bilmiyorum","\u041D\u0435 \u0437\u043D\u0430\u044E","\u0644\u0627 \u0623\u0639\u0631\u0641","\u12A3\u12ED\u1348\u120D\u1325\u1295"],Speichern:["Kaydet","\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C","\u062D\u0641\u0638","\u12A3\u1250\u121D\u1325"],Abbrechen:["\u0130ptal","\u041E\u0442\u043C\u0435\u043D\u0430","\u0625\u0644\u063A\u0627\u0621","\u1230\u122D\u12DD"],Schlie\u00DFen:["Kapat","\u0417\u0430\u043A\u0440\u044B\u0442\u044C","\u0625\u063A\u0644\u0627\u0642","\u12D5\u1338\u12CD"],"\u2190 Schlie\xDFen":["\u2190 Kapat","\u2190 \u0417\u0430\u043A\u0440\u044B\u0442\u044C","\u2190 \u0625\u063A\u0644\u0627\u0642","\u2190 \u12D5\u1338\u12CD"],"\u2190 Zur \xDCbersicht":["\u2190 Genel bak\u0131\u015F","\u2190 \u041A \u043E\u0431\u0437\u043E\u0440\u0443","\u2190 \u0625\u0644\u0649 \u0627\u0644\u0646\u0638\u0631\u0629 \u0627\u0644\u0639\u0627\u0645\u0629","\u2190 \u1293\u1265 \u1213\u1348\u123B\u12CA"],"Ergebnis anzeigen":["Sonucu g\xF6ster","\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C \u0440\u0435\u0437\u0443\u043B\u044C\u0442\u0430\u0442","\u0639\u0631\u0636 \u0627\u0644\u0646\u062A\u064A\u062C\u0629","\u12CD\u133D\u12A2\u1275 \u12A3\u122D\u12A2"],"Pflegegrad und Wohnsituation":["Bak\u0131m derecesi ve ya\u015Fam durumu","\u0421\u0442\u0435\u043F\u0435\u043D\u044C \u0443\u0445\u043E\u0434\u0430 \u0438 \u0443\u0441\u043B\u043E\u0432\u0438\u044F \u043F\u0440\u043E\u0436\u0438\u0432\u0430\u043D\u0438\u044F","\u062F\u0631\u062C\u0629 \u0627\u0644\u0631\u0639\u0627\u064A\u0629 \u0648\u0638\u0631\u0648\u0641 \u0627\u0644\u0633\u0643\u0646","\u12F0\u1228\u1303 \u12AD\u1295\u12AD\u1295\u1295 \u12A9\u1290\u1273\u1275 \u1218\u1295\u1260\u122A\u1295"],"Welcher Pflegegrad ist festgestellt?":["Hangi bak\u0131m derecesi belirlendi?","\u041A\u0430\u043A\u0430\u044F \u0441\u0442\u0435\u043F\u0435\u043D\u044C \u0443\u0445\u043E\u0434\u0430 \u0443\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430?","\u0645\u0627 \u062F\u0631\u062C\u0629 \u0627\u0644\u0631\u0639\u0627\u064A\u0629 \u0627\u0644\u0645\u062D\u062F\u062F\u0629\u061F","\u12A3\u12E8\u1293\u12ED \u12F0\u1228\u1303 \u12AD\u1295\u12AD\u1295 \u1270\u12C8\u1232\u1291?"],"Noch keiner":["Hen\xFCz yok","\u0415\u0449\u0451 \u043D\u0435\u0442","\u0644\u0627 \u064A\u0648\u062C\u062F \u0628\u0639\u062F","\u1308\u1293 \u12E8\u1208\u1295"],"oder Antrag l\xE4uft":["veya ba\u015Fvuru s\xFCr\xFCyor","\u0438\u043B\u0438 \u0437\u0430\u044F\u0432\u043B\u0435\u043D\u0438\u0435 \u043D\u0430 \u0440\u0430\u0441\u0441\u043C\u043E\u0442\u0440\u0435\u043D\u0438\u0438","\u0623\u0648 \u0627\u0644\u0637\u0644\u0628 \u0642\u064A\u062F \u0627\u0644\u0645\u0639\u0627\u0644\u062C\u0629","\u12C8\u12ED \u1218\u1218\u120D\u12A8\u1272 \u12A3\u1265 \u1218\u1235\u122D\u1215"],"Wo und wie wird gepflegt?":["Bak\u0131m nerede ve nas\u0131l yap\u0131l\u0131yor?","\u0413\u0434\u0435 \u0438 \u043A\u0430\u043A \u043E\u0441\u0443\u0449\u0435\u0441\u0442\u0432\u043B\u044F\u0435\u0442\u0441\u044F \u0443\u0445\u043E\u0434?","\u0623\u064A\u0646 \u0648\u0643\u064A\u0641 \u062A\u062A\u0645 \u0627\u0644\u0631\u0639\u0627\u064A\u0629\u061F","\u12AD\u1295\u12AD\u1295 \u12A3\u1260\u12ED\u1295 \u12A8\u1218\u12ED\u1295 \u12ED\u130D\u1260\u122D?"],"Bei welcher Krankenkasse bist du versichert?":["Hangi sa\u011Fl\u0131k sigortas\u0131ndas\u0131n\u0131z?","\u0412 \u043A\u0430\u043A\u043E\u0439 \u0431\u043E\u043B\u044C\u043D\u0438\u0447\u043D\u043E\u0439 \u043A\u0430\u0441\u0441\u0435 \u0432\u044B \u0437\u0430\u0441\u0442\u0440\u0430\u0445\u043E\u0432\u0430\u043D\u044B?","\u0645\u0627 \u0647\u0648 \u0635\u0646\u062F\u0648\u0642 \u0627\u0644\u062A\u0623\u0645\u064A\u0646 \u0627\u0644\u0635\u062D\u064A \u0627\u0644\u062E\u0627\u0635 \u0628\u0643\u061F","\u12A3\u1265 \u12A3\u12E8\u1293\u12ED \u1293\u12ED \u1215\u12AD\u121D\u1293 \u1218\u12F5\u1215\u1295 \u12A2\u12B9\u121D?"],"Bei welcher Krankenkasse ist die Person versichert?":["Ki\u015Fi hangi sa\u011Fl\u0131k sigortas\u0131nda?","\u0412 \u043A\u0430\u043A\u043E\u0439 \u0431\u043E\u043B\u044C\u043D\u0438\u0447\u043D\u043E\u0439 \u043A\u0430\u0441\u0441\u0435 \u0437\u0430\u0441\u0442\u0440\u0430\u0445\u043E\u0432\u0430\u043D \u0447\u0435\u043B\u043E\u0432\u0435\u043A?","\u0645\u0627 \u0647\u0648 \u0635\u0646\u062F\u0648\u0642 \u0627\u0644\u062A\u0623\u0645\u064A\u0646 \u0627\u0644\u0635\u062D\u064A \u0644\u0644\u0634\u062E\u0635\u061F","\u12A5\u1272 \u1230\u1265 \u12A3\u1265 \u12A3\u12E8\u1293\u12ED \u1218\u12F5\u1215\u1295 \u12A5\u12E9?"],"Die Pflegekasse geh\xF6rt immer zur Krankenkasse. Dorthin gehen die Antr\xE4ge.":["Bak\u0131m sigortas\u0131 her zaman sa\u011Fl\u0131k sigortas\u0131na ba\u011Fl\u0131d\u0131r. Ba\u015Fvurular oraya gider.","\u041A\u0430\u0441\u0441\u0430 \u043F\u043E \u0443\u0445\u043E\u0434\u0443 \u0432\u0441\u0435\u0433\u0434\u0430 \u043E\u0442\u043D\u043E\u0441\u0438\u0442\u0441\u044F \u043A \u0431\u043E\u043B\u044C\u043D\u0438\u0447\u043D\u043E\u0439 \u043A\u0430\u0441\u0441\u0435. \u0422\u0443\u0434\u0430 \u043D\u0430\u043F\u0440\u0430\u0432\u043B\u044F\u044E\u0442\u0441\u044F \u0437\u0430\u044F\u0432\u043B\u0435\u043D\u0438\u044F.","\u0635\u0646\u062F\u0648\u0642 \u0627\u0644\u0631\u0639\u0627\u064A\u0629 \u062A\u0627\u0628\u0639 \u062F\u0627\u0626\u0645\u064B\u0627 \u0644\u0635\u0646\u062F\u0648\u0642 \u0627\u0644\u062A\u0623\u0645\u064A\u0646 \u0627\u0644\u0635\u062D\u064A. \u0625\u0644\u064A\u0647 \u062A\u064F\u0631\u0633\u0644 \u0627\u0644\u0637\u0644\u0628\u0627\u062A.","\u1218\u12F5\u1215\u1295 \u12AD\u1295\u12AD\u1295 \u12A9\u1209 \u130D\u12DC \u121D\u1235 \u1218\u12F5\u1215\u1295 \u1215\u12AD\u121D\u1293 \u12A5\u12E9\u1362 \u1218\u1218\u120D\u12A8\u1272\u1273\u1275 \u1293\u1265\u12A1 \u12ED\u12B8\u12F1\u1362"],"Wer pflegt im Alltag?":["G\xFCnl\xFCk bak\u0131m\u0131 kim yap\u0131yor?","\u041A\u0442\u043E \u0443\u0445\u0430\u0436\u0438\u0432\u0430\u0435\u0442 \u0432 \u043F\u043E\u0432\u0441\u0435\u0434\u043D\u0435\u0432\u043D\u043E\u0439 \u0436\u0438\u0437\u043D\u0438?","\u0645\u0646 \u064A\u0642\u062F\u0651\u0645 \u0627\u0644\u0631\u0639\u0627\u064A\u0629 \u064A\u0648\u0645\u064A\u064B\u0627\u061F","\u1218\u12D3\u120D\u1273\u12CA \u1218\u1295 \u12ED\u12A8\u1293\u12B8\u1295?"],Ja:["Evet","\u0414\u0430","\u0646\u0639\u0645","\u12A5\u12C8"],Nein:["Hay\u0131r","\u041D\u0435\u0442","\u0644\u0627","\u12A3\u12ED\u134B\u120D"],"Wei\xDF nicht":["Bilmiyorum","\u041D\u0435 \u0437\u043D\u0430\u044E","\u0644\u0627 \u0623\u0639\u0631\u0641","\u12A3\u12ED\u1348\u120D\u1325\u1295"],Schwerbehinderung:["A\u011F\u0131r engellilik","\u0418\u043D\u0432\u0430\u043B\u0438\u0434\u043D\u043E\u0441\u0442\u044C","\u0627\u0644\u0625\u0639\u0627\u0642\u0629 \u0627\u0644\u0634\u062F\u064A\u062F\u0629","\u12A8\u1262\u12F5 \u1235\u1295\u12AD\u120D\u1293"],"Was bekommt ihr schon?":["\u015Eu an neler al\u0131yorsunuz?","\u0427\u0442\u043E \u0432\u044B \u0443\u0436\u0435 \u043F\u043E\u043B\u0443\u0447\u0430\u0435\u0442\u0435?","\u0645\u0627\u0630\u0627 \u062A\u062D\u0635\u0644\u0648\u0646 \u0639\u0644\u064A\u0647 \u0628\u0627\u0644\u0641\u0639\u0644\u061F","\u1215\u1302 \u12A5\u1295\u1273\u12ED \u1275\u1228\u12BD\u1261?"],"Was bekommst du schon?":["\u015Eu an neler al\u0131yorsunuz?","\u0427\u0442\u043E \u0432\u044B \u0443\u0436\u0435 \u043F\u043E\u043B\u0443\u0447\u0430\u0435\u0442\u0435?","\u0645\u0627\u0630\u0627 \u062A\u062D\u0635\u0644 \u0639\u0644\u064A\u0647 \u0628\u0627\u0644\u0641\u0639\u0644\u061F","\u1215\u1302 \u12A5\u1295\u1273\u12ED \u1275\u1228\u12BD\u1265?"],"Angaben f\xFCr die Antr\xE4ge":["Ba\u015Fvurular i\xE7in bilgiler","\u0414\u0430\u043D\u043D\u044B\u0435 \u0434\u043B\u044F \u0437\u0430\u044F\u0432\u043B\u0435\u043D\u0438\u0439","\u0628\u064A\u0627\u0646\u0627\u062A \u0644\u0644\u0637\u0644\u0628\u0627\u062A","\u1213\u1260\u122C\u1273 \u1295\u1218\u1218\u120D\u12A8\u1272\u1273\u1275"],"Vor- und Nachname":["Ad ve soyad","\u0418\u043C\u044F \u0438 \u0444\u0430\u043C\u0438\u043B\u0438\u044F","\u0627\u0644\u0627\u0633\u0645 \u0627\u0644\u0643\u0627\u0645\u0644","\u123D\u121D\u1295 \u1235\u121D \u12A3\u1266\u1295"],Geburtsdatum:["Do\u011Fum tarihi","\u0414\u0430\u0442\u0430 \u0440\u043E\u0436\u0434\u0435\u043D\u0438\u044F","\u062A\u0627\u0631\u064A\u062E \u0627\u0644\u0645\u064A\u0644\u0627\u062F","\u12D5\u1208\u1270 \u120D\u12F0\u1275"],Versichertennummer:["Sigorta numaras\u0131","\u041D\u043E\u043C\u0435\u0440 \u0441\u0442\u0440\u0430\u0445\u043E\u0432\u043A\u0438","\u0631\u0642\u0645 \u0627\u0644\u062A\u0623\u0645\u064A\u0646","\u1241\u133D\u122A \u1218\u12F5\u1215\u1295"],"Deine offenen Anspr\xFCche":["A\xE7\u0131k haklar\u0131n\u0131z","\u0412\u0430\u0448\u0438 \u043E\u0442\u043A\u0440\u044B\u0442\u044B\u0435 \u043F\u0440\u0430\u0432\u0430","\u0627\u0633\u062A\u062D\u0642\u0627\u0642\u0627\u062A\u0643 \u0627\u0644\u0645\u0641\u062A\u0648\u062D\u0629","\u12AD\u1349\u1273\u1275 \u1218\u1230\u120B\u1275\u12A9\u121D"],"Antippen f\xFCr Antrag und Checkliste":["Ba\u015Fvuru ve kontrol listesi i\xE7in dokunun","\u041D\u0430\u0436\u043C\u0438\u0442\u0435 \u0434\u043B\u044F \u0437\u0430\u044F\u0432\u043B\u0435\u043D\u0438\u044F \u0438 \u0441\u043F\u0438\u0441\u043A\u0430","\u0627\u0636\u063A\u0637 \u0644\u0644\u0637\u0644\u0628 \u0648\u0642\u0627\u0626\u0645\u0629 \u0627\u0644\u062A\u062D\u0642\u0642","\u1295\u1218\u1218\u120D\u12A8\u1272 \u1320\u12CD\u1251"],"Antrag ausf\xFCllen":["Ba\u015Fvuruyu doldur","\u0417\u0430\u043F\u043E\u043B\u043D\u0438\u0442\u044C \u0437\u0430\u044F\u0432\u043B\u0435\u043D\u0438\u0435","\u0627\u0645\u0644\u0623 \u0627\u0644\u0637\u0644\u0628","\u1218\u1218\u120D\u12A8\u1272 \u121D\u120B\u12A5"],"So l\xE4uft es ab":["Nas\u0131l i\u015Fliyor","\u041A\u0430\u043A \u044D\u0442\u043E \u043F\u0440\u043E\u0438\u0441\u0445\u043E\u0434\u0438\u0442","\u0643\u064A\u0641 \u062A\u0633\u064A\u0631 \u0627\u0644\u0623\u0645\u0648\u0631","\u12A8\u1218\u12ED \u12ED\u12B8\u12ED\u12F5"],"Diese Unterlagen brauchst du":["Gerekli belgeler","\u041D\u0443\u0436\u043D\u044B\u0435 \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u044B","\u0627\u0644\u0645\u0633\u062A\u0646\u062F\u0627\u062A \u0627\u0644\u0645\u0637\u0644\u0648\u0628\u0629","\u12D8\u12F5\u120D\u12E9 \u1230\u1290\u12F3\u1275"],"In der N\xE4he finden":["Yak\u0131nda bul","\u041D\u0430\u0439\u0442\u0438 \u043F\u043E\u0431\u043B\u0438\u0437\u043E\u0441\u0442\u0438","\u0627\u0628\u062D\u062B \u0628\u0627\u0644\u0642\u0631\u0628 \u0645\u0646\u0643","\u12A3\u1265 \u1240\u1228\u1263 \u12F5\u1208"],"Dein Antrag ist fertig":["Ba\u015Fvurunuz haz\u0131r","\u0412\u0430\u0448\u0435 \u0437\u0430\u044F\u0432\u043B\u0435\u043D\u0438\u0435 \u0433\u043E\u0442\u043E\u0432\u043E","\u0637\u0644\u0628\u0643 \u062C\u0627\u0647\u0632","\u1218\u1218\u120D\u12A8\u1272\u12B9\u121D \u12F5\u1209\u12CD \u12A5\u12E9"],"Stimmt alles?":["Her \u015Fey do\u011Fru mu?","\u0412\u0441\u0451 \u0432\u0435\u0440\u043D\u043E?","\u0647\u0644 \u0643\u0644 \u0634\u064A\u0621 \u0635\u062D\u064A\u062D\u061F","\u12A9\u1209 \u1245\u1291\u12D5 \u12F5\u12E9?"],"Antrag erstellen":["Ba\u015Fvuru olu\u015Ftur","\u0421\u043E\u0437\u0434\u0430\u0442\u044C \u0437\u0430\u044F\u0432\u043B\u0435\u043D\u0438\u0435","\u0625\u0646\u0634\u0627\u0621 \u0627\u0644\u0637\u0644\u0628","\u1218\u1218\u120D\u12A8\u1272 \u134D\u1320\u122D"],\u00C4ndern:["De\u011Fi\u015Ftir","\u0418\u0437\u043C\u0435\u043D\u0438\u0442\u044C","\u062A\u0639\u062F\u064A\u0644","\u1240\u12ED\u122D"],"Als PDF speichern":["PDF olarak kaydet","\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u043A\u0430\u043A PDF","\u062D\u0641\u0638 \u0643\u0645\u0644\u0641 PDF","\u12A8\u121D PDF \u12A3\u1250\u121D\u1325"],"Text kopieren":["Metni kopyala","\u0421\u043A\u043E\u043F\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u0442\u0435\u043A\u0441\u0442","\u0646\u0633\u062E \u0627\u0644\u0646\u0635","\u133D\u1211\u134D \u1245\u12F3\u1215"],"So schickst du ihn ab":["Nas\u0131l g\xF6nderilir","\u041A\u0430\u043A \u043E\u0442\u043F\u0440\u0430\u0432\u0438\u0442\u044C","\u0643\u064A\u0641\u064A\u0629 \u0627\u0644\u0625\u0631\u0633\u0627\u0644","\u12A8\u1218\u12ED \u1275\u1230\u12F6"],"Ich habe den Antrag abgeschickt":["Ba\u015Fvuruyu g\xF6nderdim","\u042F \u043E\u0442\u043F\u0440\u0430\u0432\u0438\u043B(\u0430) \u0437\u0430\u044F\u0432\u043B\u0435\u043D\u0438\u0435","\u0644\u0642\u062F \u0623\u0631\u0633\u0644\u062A \u0627\u0644\u0637\u0644\u0628","\u1218\u1218\u120D\u12A8\u1272 \u1230\u12F2\u12F0"],"Bescheid oder Gutachten bekommen?":["Karar veya bilirki\u015Fi raporu mu ald\u0131n\u0131z?","\u041F\u043E\u043B\u0443\u0447\u0438\u043B\u0438 \u0440\u0435\u0448\u0435\u043D\u0438\u0435 \u0438\u043B\u0438 \u0437\u0430\u043A\u043B\u044E\u0447\u0435\u043D\u0438\u0435?","\u0647\u0644 \u0648\u0635\u0644\u0643 \u0642\u0631\u0627\u0631 \u0623\u0648 \u062A\u0642\u0631\u064A\u0631\u061F","\u12CD\u1233\u1290 \u12C8\u12ED \u1338\u1265\u133B\u1265 \u1218\u133A\u12A1\u12A9\u121D?"],"Foto machen":["Foto\u011Fraf \xE7ek","\u0421\u0444\u043E\u0442\u043E\u0433\u0440\u0430\u0444\u0438\u0440\u043E\u0432\u0430\u0442\u044C","\u0627\u0644\u062A\u0642\u0637 \u0635\u0648\u0631\u0629","\u1235\u12A5\u120A \u12A3\u120D\u12D5\u120D"],Abtippen:["Elle gir","\u0412\u0432\u0435\u0441\u0442\u0438 \u0432\u0440\u0443\u0447\u043D\u0443\u044E","\u0625\u062F\u062E\u0627\u0644 \u064A\u062F\u0648\u064A","\u1265\u12A2\u12F5 \u133D\u1213\u134D"],"Pflegegrad selbst einsch\xE4tzen":["Bak\u0131m derecesini kendiniz tahmin edin","\u041E\u0446\u0435\u043D\u0438\u0442\u044C \u0441\u0442\u0435\u043F\u0435\u043D\u044C \u0443\u0445\u043E\u0434\u0430 \u0441\u0430\u043C\u043E\u0441\u0442\u043E\u044F\u0442\u0435\u043B\u044C\u043D\u043E","\u0642\u062F\u0651\u0631 \u062F\u0631\u062C\u0629 \u0627\u0644\u0631\u0639\u0627\u064A\u0629 \u0628\u0646\u0641\u0633\u0643","\u12F0\u1228\u1303 \u12AD\u1295\u12AD\u1295 \u1263\u12D5\u120D\u12B9\u121D \u1308\u121D\u130D\u1219"],Entlastungsbetrag:["Rahatlatma tutar\u0131","\u0421\u0443\u043C\u043C\u0430 \u0440\u0430\u0437\u0433\u0440\u0443\u0437\u043A\u0438","\u0645\u0628\u0644\u063A \u0627\u0644\u062A\u062E\u0641\u064A\u0641","\u1293\u12ED \u121D\u134D\u12B3\u1235 \u1308\u1295\u12D8\u1265"],"jetzt frei":["\u015Fu an kullan\u0131labilir","\u0434\u043E\u0441\u0442\u0443\u043F\u043D\u043E \u0441\u0435\u0439\u0447\u0430\u0441","\u0645\u062A\u0627\u062D \u0627\u0644\u0622\u0646","\u1215\u1302 \u12D8\u120E"],"Rechnung erfassen":["Fatura ekle","\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u0441\u0447\u0451\u0442","\u0623\u0636\u0641 \u0641\u0627\u062A\u0648\u0631\u0629","\u134B\u12AD\u1271\u122B \u12A3\u12A5\u1271"],"Erstattung beantragen":["\u0130ade talep et","\u0417\u0430\u043F\u0440\u043E\u0441\u0438\u0442\u044C \u0432\u043E\u0437\u043C\u0435\u0449\u0435\u043D\u0438\u0435","\u0627\u0637\u0644\u0628 \u0627\u0644\u0627\u0633\u062A\u0631\u062F\u0627\u062F","\u121D\u121D\u120B\u1235 \u1215\u1270\u1275"],"Foto aufnehmen":["Foto\u011Fraf \xE7ek","\u0421\u0434\u0435\u043B\u0430\u0442\u044C \u0444\u043E\u0442\u043E","\u0627\u0644\u062A\u0642\u0637 \u0635\u0648\u0631\u0629","\u1235\u12A5\u120A \u12A3\u120D\u12D5\u120D"],"Datei w\xE4hlen":["Dosya se\xE7","\u0412\u044B\u0431\u0440\u0430\u0442\u044C \u0444\u0430\u0439\u043B","\u0627\u062E\u062A\u0631 \u0645\u0644\u0641\u064B\u0627","\u134B\u12ED\u120D \u121D\u1228\u133D"],"Ohne Foto erfassen":["Foto\u011Frafs\u0131z ekle","\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u0431\u0435\u0437 \u0444\u043E\u0442\u043E","\u0623\u0636\u0641 \u0628\u062F\u0648\u0646 \u0635\u0648\u0631\u0629","\u1265\u12D8\u12ED \u1235\u12A5\u120A \u12A3\u12A5\u1271"],Bearbeiten:["D\xFCzenle","\u0418\u0437\u043C\u0435\u043D\u0438\u0442\u044C","\u062A\u0639\u062F\u064A\u0644","\u12A3\u1218\u1213\u12ED\u123D"],L\u00F6schen:["Sil","\u0423\u0434\u0430\u043B\u0438\u0442\u044C","\u062D\u0630\u0641","\u1230\u122D\u12DD"],"Beleg speichern":["Belgeyi kaydet","\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442","\u062D\u0641\u0638 \u0627\u0644\u0625\u064A\u0635\u0627\u0644","\u1230\u1290\u12F5 \u12A3\u1250\u121D\u1325"],"Fristen und Erinnerungen":["S\xFCreler ve hat\u0131rlatmalar","\u0421\u0440\u043E\u043A\u0438 \u0438 \u043D\u0430\u043F\u043E\u043C\u0438\u043D\u0430\u043D\u0438\u044F","\u0627\u0644\u0645\u0648\u0627\u0639\u064A\u062F \u0648\u0627\u0644\u062A\u0630\u0643\u064A\u0631\u0627\u062A","\u130D\u12DC \u1308\u12F0\u1263\u1275\u1295 \u1218\u12D8\u12BB\u12B8\u122A\u1273\u1275\u1295"],"Erinnerungen per E-Mail":["E-posta ile hat\u0131rlatmalar","\u041D\u0430\u043F\u043E\u043C\u0438\u043D\u0430\u043D\u0438\u044F \u043F\u043E \u044D\u043B. \u043F\u043E\u0447\u0442\u0435","\u062A\u0630\u0643\u064A\u0631\u0627\u062A \u0628\u0627\u0644\u0628\u0631\u064A\u062F \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A","\u1218\u12D8\u12BB\u12B8\u122A \u1265\u12A2\u1218\u12ED\u120D"],Einschalten:["A\xE7","\u0412\u043A\u043B\u044E\u0447\u0438\u0442\u044C","\u062A\u0634\u063A\u064A\u0644","\u12A3\u12C8\u120D\u12D5"],Ausschalten:["Kapat","\u0412\u044B\u043A\u043B\u044E\u0447\u0438\u0442\u044C","\u0625\u064A\u0642\u0627\u0641","\u12A3\u1325\u134D\u12A5"],Beratungsbesuch:["Dan\u0131\u015Fma ziyareti","\u041A\u043E\u043D\u0441\u0443\u043B\u044C\u0442\u0430\u0446\u0438\u043E\u043D\u043D\u044B\u0439 \u0432\u0438\u0437\u0438\u0442","\u0632\u064A\u0627\u0631\u0629 \u0627\u0633\u062A\u0634\u0627\u0631\u064A\u0629","\u1293\u12ED \u121D\u12BD\u122A \u1260\u133B\u1215"],"Eigene Erinnerung":["Kendi hat\u0131rlatman","\u0421\u0432\u043E\u0451 \u043D\u0430\u043F\u043E\u043C\u0438\u043D\u0430\u043D\u0438\u0435","\u062A\u0630\u0643\u064A\u0631 \u062E\u0627\u0635","\u1293\u12ED \u1308\u12DB\u12A5 \u122D\u12A5\u1235\u12BB \u1218\u12D8\u12BB\u12B8\u122A"],Hinzuf\u00FCgen:["Ekle","\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C","\u0625\u0636\u0627\u0641\u0629","\u12C8\u1235\u12BD"],"F\xFCr wen?":["Kimin i\xE7in?","\u0414\u043B\u044F \u043A\u043E\u0433\u043E?","\u0644\u0645\u0646\u061F","\u1295\u1218\u1295?"],"Weitere Person anlegen":["Ba\u015Fka ki\u015Fi ekle","\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u0447\u0435\u043B\u043E\u0432\u0435\u043A\u0430","\u0623\u0636\u0641 \u0634\u062E\u0635\u064B\u0627 \u0622\u062E\u0631","\u12AB\u120D\u12A5 \u1230\u1265 \u12C8\u1235\u12BD"],"Gemeinsam pflegen":["Birlikte bak\u0131m","\u0423\u0445\u0430\u0436\u0438\u0432\u0430\u0442\u044C \u0432\u043C\u0435\u0441\u0442\u0435","\u0627\u0644\u0631\u0639\u0627\u064A\u0629 \u0645\u0639\u064B\u0627","\u1265\u1213\u1263\u122D \u121D\u12AD\u1295\u12AB\u1295"],"Jemanden einladen":["Birini davet et","\u041F\u0440\u0438\u0433\u043B\u0430\u0441\u0438\u0442\u044C","\u0627\u062F\u0639\u064F \u0634\u062E\u0635\u064B\u0627","\u1213\u12F0 \u1230\u1265 \u12D5\u12F0\u121D"],"Link kopieren":["Ba\u011Flant\u0131y\u0131 kopyala","\u0421\u043A\u043E\u043F\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u0441\u0441\u044B\u043B\u043A\u0443","\u0646\u0633\u062E \u0627\u0644\u0631\u0627\u0628\u0637","\u120A\u1295\u12AD \u1245\u12F3\u1215"],"Pflegegrad-Rechner":["Bak\u0131m derecesi hesaplay\u0131c\u0131","\u041A\u0430\u043B\u044C\u043A\u0443\u043B\u044F\u0442\u043E\u0440 \u0441\u0442\u0435\u043F\u0435\u043D\u0438 \u0443\u0445\u043E\u0434\u0430","\u062D\u0627\u0633\u0628\u0629 \u062F\u0631\u062C\u0629 \u0627\u0644\u0631\u0639\u0627\u064A\u0629","\u1218\u1251\u1338\u122A \u12F0\u1228\u1303 \u12AD\u1295\u12AD\u1295"],Selbstst\u00E4ndig:["Ba\u011F\u0131ms\u0131z","\u0421\u0430\u043C\u043E\u0441\u0442\u043E\u044F\u0442\u0435\u043B\u044C\u043D\u043E","\u0645\u0633\u062A\u0642\u0644","\u1265\u122D\u12A5\u1231"],"schafft es allein":["tek ba\u015F\u0131na yapabiliyor","\u0441\u043F\u0440\u0430\u0432\u043B\u044F\u0435\u0442\u0441\u044F \u0441\u0430\u043C(\u0430)","\u064A\u0633\u062A\u0637\u064A\u0639 \u0648\u062D\u062F\u0647","\u1260\u12ED\u1291 \u12ED\u12BD\u12A5\u120D"],"\xDCberwiegend selbstst\xE4ndig":["\xC7o\u011Funlukla ba\u011F\u0131ms\u0131z","\u0412 \u043E\u0441\u043D\u043E\u0432\u043D\u043E\u043C \u0441\u0430\u043C\u043E\u0441\u0442\u043E\u044F\u0442\u0435\u043B\u044C\u043D\u043E","\u0645\u0633\u062A\u0642\u0644 \u0641\u064A \u0627\u0644\u063A\u0627\u0644\u0628","\u1265\u12D9\u1215 \u130D\u12DC \u1265\u122D\u12A5\u1231"],"braucht ab und zu etwas Hilfe":["ara s\u0131ra biraz yard\u0131m gerekiyor","\u0438\u043D\u043E\u0433\u0434\u0430 \u043D\u0443\u0436\u043D\u0430 \u043D\u0435\u0431\u043E\u043B\u044C\u0448\u0430\u044F \u043F\u043E\u043C\u043E\u0449\u044C","\u064A\u062D\u062A\u0627\u062C \u0623\u062D\u064A\u0627\u0646\u064B\u0627 \u0644\u0628\u0639\u0636 \u0627\u0644\u0645\u0633\u0627\u0639\u062F\u0629","\u1213\u12F0\u1213\u12F0 \u130D\u12DC \u1213\u1308\u12DD \u12E8\u12F5\u120D\u12EE"],"\xDCberwiegend unselbstst\xE4ndig":["\xC7o\u011Funlukla ba\u011F\u0131ml\u0131","\u0412 \u043E\u0441\u043D\u043E\u0432\u043D\u043E\u043C \u043D\u0435\u0441\u0430\u043C\u043E\u0441\u0442\u043E\u044F\u0442\u0435\u043B\u044C\u043D\u043E","\u0645\u0639\u062A\u0645\u062F \u0641\u064A \u0627\u0644\u063A\u0627\u0644\u0628","\u1265\u12D9\u1215 \u130D\u12DC \u1213\u1308\u12DD \u12E8\u12F5\u120D\u12EE"],"schafft nur einen kleinen Teil allein":["sadece k\xFC\xE7\xFCk bir k\u0131sm\u0131n\u0131 yapabiliyor","\u0441\u043F\u0440\u0430\u0432\u043B\u044F\u0435\u0442\u0441\u044F \u043B\u0438\u0448\u044C \u0441 \u043C\u0430\u043B\u043E\u0439 \u0447\u0430\u0441\u0442\u044C\u044E","\u064A\u0633\u062A\u0637\u064A\u0639 \u062C\u0632\u0621\u064B\u0627 \u0635\u063A\u064A\u0631\u064B\u0627 \u0641\u0642\u0637","\u1295\u12A5\u123D\u1276 \u12AD\u134B\u120D \u1325\u122B\u12ED \u12ED\u12BD\u12A5\u120D"],Unselbstst\u00E4ndig:["Ba\u011F\u0131ml\u0131","\u041D\u0435\u0441\u0430\u043C\u043E\u0441\u0442\u043E\u044F\u0442\u0435\u043B\u044C\u043D\u043E","\u063A\u064A\u0631 \u0645\u0633\u062A\u0642\u0644","\u1265\u122D\u12A5\u1231 \u12A3\u12ED\u12BD\u12A5\u120D\u1295"],"schafft es nicht allein":["tek ba\u015F\u0131na yapam\u0131yor","\u043D\u0435 \u0441\u043F\u0440\u0430\u0432\u043B\u044F\u0435\u0442\u0441\u044F \u0441\u0430\u043C(\u0430)","\u0644\u0627 \u064A\u0633\u062A\u0637\u064A\u0639 \u0648\u062D\u062F\u0647","\u1260\u12ED\u1291 \u12A3\u12ED\u12BD\u12A5\u120D\u1295"],"Ja, ohne Probleme":["Evet, sorunsuz","\u0414\u0430, \u0431\u0435\u0437 \u043F\u0440\u043E\u0431\u043B\u0435\u043C","\u0646\u0639\u0645\u060C \u0628\u062F\u0648\u0646 \u0645\u0634\u0627\u0643\u0644","\u12A5\u12C8\u1361 \u1265\u12D8\u12ED \u1338\u1308\u121D"],Meistens:["\xC7o\u011Funlukla","\u041E\u0431\u044B\u0447\u043D\u043E","\u063A\u0627\u0644\u0628\u064B\u0627","\u1218\u1265\u12DB\u1215\u1275\u12A1 \u130D\u12DC"],"Nur selten":["Nadiren","\u0420\u0435\u0434\u043A\u043E","\u0646\u0627\u062F\u0631\u064B\u0627","\u1233\u1215\u1272"],"Nein, gar nicht":["Hay\u0131r, hi\xE7","\u041D\u0435\u0442, \u0441\u043E\u0432\u0441\u0435\u043C \u043D\u0435\u0442","\u0644\u0627\u060C \u0625\u0637\u0644\u0627\u0642\u064B\u0627","\u12A3\u12ED\u134B\u120D\u1361 \u1348\u133A\u1219"],Nie:["Hi\xE7","\u041D\u0438\u043A\u043E\u0433\u0434\u0430","\u0623\u0628\u062F\u064B\u0627","\u1348\u133A\u1219"],Selten:["Nadiren","\u0420\u0435\u0434\u043A\u043E","\u0646\u0627\u062F\u0631\u064B\u0627","\u1233\u1215\u1272"],Oft:["S\u0131k","\u0427\u0430\u0441\u0442\u043E","\u0643\u062B\u064A\u0631\u064B\u0627","\u1265\u12D9\u1215 \u130D\u12DC"],T\u00E4glich:["Her g\xFCn","\u0415\u0436\u0435\u0434\u043D\u0435\u0432\u043D\u043E","\u064A\u0648\u0645\u064A\u064B\u0627","\u1218\u12D3\u120D\u1273\u12CA"],"Im Bett die Lage wechseln (umdrehen, aufsetzen)":["Yatakta pozisyon de\u011Fi\u015Ftirmek (d\xF6nmek, oturmak)","\u041C\u0435\u043D\u044F\u0442\u044C \u043F\u043E\u043B\u043E\u0436\u0435\u043D\u0438\u0435 \u0432 \u043A\u0440\u043E\u0432\u0430\u0442\u0438 (\u043F\u043E\u0432\u0435\u0440\u043D\u0443\u0442\u044C\u0441\u044F, \u0441\u0435\u0441\u0442\u044C)","\u062A\u063A\u064A\u064A\u0631 \u0627\u0644\u0648\u0636\u0639\u064A\u0629 \u0641\u064A \u0627\u0644\u0633\u0631\u064A\u0631 (\u0627\u0644\u062A\u0642\u0644\u0628\u060C \u0627\u0644\u062C\u0644\u0648\u0633)","\u12A3\u1265 \u12D3\u122B\u1275 \u12A3\u1240\u121B\u121D\u1323 \u121D\u1255\u12EB\u122D"],"Sicher sitzen, ohne zur Seite zu kippen":["Yana devrilmeden g\xFCvenle oturmak","\u0423\u0441\u0442\u043E\u0439\u0447\u0438\u0432\u043E \u0441\u0438\u0434\u0435\u0442\u044C, \u043D\u0435 \u0437\u0430\u0432\u0430\u043B\u0438\u0432\u0430\u044F\u0441\u044C","\u0627\u0644\u062C\u0644\u0648\u0633 \u0628\u062B\u0628\u0627\u062A \u062F\u0648\u0646 \u0627\u0644\u0645\u064A\u0644","\u1265\u12D8\u12ED \u121D\u12CD\u12F3\u1255 \u1265\u12F5\u1215\u1290\u1275 \u121D\u1255\u121B\u1325"],"Aufstehen vom Stuhl oder Bett und sich umsetzen":["Sandalyeden veya yataktan kalkmak","\u0412\u0441\u0442\u0430\u0432\u0430\u0442\u044C \u0441\u043E \u0441\u0442\u0443\u043B\u0430 \u0438\u043B\u0438 \u043A\u0440\u043E\u0432\u0430\u0442\u0438 \u0438 \u043F\u0435\u0440\u0435\u0441\u0430\u0436\u0438\u0432\u0430\u0442\u044C\u0441\u044F","\u0627\u0644\u0646\u0647\u0648\u0636 \u0645\u0646 \u0627\u0644\u0643\u0631\u0633\u064A \u0623\u0648 \u0627\u0644\u0633\u0631\u064A\u0631 \u0648\u0627\u0644\u0627\u0646\u062A\u0642\u0627\u0644","\u12AB\u1265 \u1218\u1295\u1260\u122D \u12C8\u12ED \u12D3\u122B\u1275 \u121D\u1275\u1233\u12A5"],"In der Wohnung von Raum zu Raum gehen":["Evde odadan odaya y\xFCr\xFCmek","\u041F\u0435\u0440\u0435\u0434\u0432\u0438\u0433\u0430\u0442\u044C\u0441\u044F \u043F\u043E \u043A\u0432\u0430\u0440\u0442\u0438\u0440\u0435 \u0438\u0437 \u043A\u043E\u043C\u043D\u0430\u0442\u044B \u0432 \u043A\u043E\u043C\u043D\u0430\u0442\u0443","\u0627\u0644\u062A\u0646\u0642\u0644 \u0641\u064A \u0627\u0644\u0628\u064A\u062A \u0645\u0646 \u063A\u0631\u0641\u0629 \u0644\u0623\u062E\u0631\u0649","\u12A3\u1265 \u1308\u12DB \u12AB\u1265 \u12AD\u134D\u120A \u1293\u1265 \u12AD\u134D\u120A \u121D\u12BB\u12F5"],"Treppen steigen":["Merdiven \xE7\u0131kmak","\u041F\u043E\u0434\u043D\u0438\u043C\u0430\u0442\u044C\u0441\u044F \u043F\u043E \u043B\u0435\u0441\u0442\u043D\u0438\u0446\u0435","\u0635\u0639\u0648\u062F \u0627\u0644\u062F\u0631\u062C","\u12F0\u1228\u1303 \u121D\u12F5\u12EB\u1265"],"Erkennt vertraute Personen aus dem Umfeld":["Tan\u0131d\u0131k ki\u015Fileri tan\u0131yor","\u0423\u0437\u043D\u0430\u0451\u0442 \u0437\u043D\u0430\u043A\u043E\u043C\u044B\u0445 \u043B\u044E\u0434\u0435\u0439","\u064A\u062A\u0639\u0631\u0651\u0641 \u0639\u0644\u0649 \u0627\u0644\u0623\u0634\u062E\u0627\u0635 \u0627\u0644\u0645\u0623\u0644\u0648\u0641\u064A\u0646","\u134D\u1209\u1323\u1275 \u1230\u1263\u1275 \u12ED\u1348\u120D\u1325"],"Wei\xDF, welcher Tag und welche Tageszeit ist":["Hangi g\xFCn ve saat oldu\u011Funu biliyor","\u0417\u043D\u0430\u0435\u0442, \u043A\u0430\u043A\u043E\u0439 \u0434\u0435\u043D\u044C \u0438 \u0432\u0440\u0435\u043C\u044F \u0441\u0443\u0442\u043E\u043A","\u064A\u0639\u0631\u0641 \u0627\u0644\u064A\u0648\u0645 \u0648\u0648\u0642\u062A \u0627\u0644\u0646\u0647\u0627\u0631","\u1218\u12D3\u120D\u1275\u1295 \u1230\u12D3\u1275\u1295 \u12ED\u1348\u120D\u1325"],"Trifft Entscheidungen im Alltag (z. B. was anziehen)":["G\xFCnl\xFCk kararlar veriyor (\xF6r. ne giyece\u011Fi)","\u041F\u0440\u0438\u043D\u0438\u043C\u0430\u0435\u0442 \u043F\u043E\u0432\u0441\u0435\u0434\u043D\u0435\u0432\u043D\u044B\u0435 \u0440\u0435\u0448\u0435\u043D\u0438\u044F (\u043D\u0430\u043F\u0440., \u0447\u0442\u043E \u043D\u0430\u0434\u0435\u0442\u044C)","\u064A\u062A\u062E\u0630 \u0642\u0631\u0627\u0631\u0627\u062A \u064A\u0648\u0645\u064A\u0629 (\u0645\u062B\u0644 \u0645\u0627\u0630\u0627 \u064A\u0644\u0628\u0633)","\u1218\u12D3\u120D\u1273\u12CA \u12CD\u1233\u1290\u1273\u1275 \u12ED\u1308\u1265\u122D"],"Kann einem Gespr\xE4ch folgen und es verstehen":["Bir konu\u015Fmay\u0131 takip edip anlayabiliyor","\u041C\u043E\u0436\u0435\u0442 \u0441\u043B\u0435\u0434\u0438\u0442\u044C \u0437\u0430 \u0440\u0430\u0437\u0433\u043E\u0432\u043E\u0440\u043E\u043C \u0438 \u043F\u043E\u043D\u0438\u043C\u0430\u0442\u044C \u0435\u0433\u043E","\u064A\u0633\u062A\u0637\u064A\u0639 \u0645\u062A\u0627\u0628\u0639\u0629 \u0627\u0644\u062D\u062F\u064A\u062B \u0648\u0641\u0647\u0645\u0647","\u12D8\u1228\u1263 \u12AD\u12A8\u1273\u1270\u120D\u1295 \u12AD\u122D\u12F5\u12A5\u1295 \u12ED\u12BD\u12A5\u120D"],"Ist nachts unruhig, l\xE4uft umher oder ruft":["Geceleri huzursuz, dola\u015F\u0131yor veya ba\u011F\u0131r\u0131yor","\u041D\u043E\u0447\u044C\u044E \u0431\u0435\u0441\u043F\u043E\u043A\u043E\u0435\u043D, \u0431\u0440\u043E\u0434\u0438\u0442 \u0438\u043B\u0438 \u0437\u043E\u0432\u0451\u0442","\u0645\u0636\u0637\u0631\u0628 \u0644\u064A\u0644\u064B\u0627\u060C \u064A\u062A\u062C\u0648\u0644 \u0623\u0648 \u064A\u0646\u0627\u062F\u064A","\u1208\u12ED\u1272 \u12D8\u12ED\u1205\u12F1\u12A5\u1361 \u12ED\u12D8\u12CD\u122D \u12C8\u12ED \u12ED\u1338\u12CA\u12D5"],"Wehrt sich gegen Pflege oder Hilfe":["Bak\u0131ma veya yard\u0131ma kar\u015F\u0131 \xE7\u0131k\u0131yor","\u0421\u043E\u043F\u0440\u043E\u0442\u0438\u0432\u043B\u044F\u0435\u0442\u0441\u044F \u0443\u0445\u043E\u0434\u0443 \u0438\u043B\u0438 \u043F\u043E\u043C\u043E\u0449\u0438","\u064A\u0631\u0641\u0636 \u0627\u0644\u0631\u0639\u0627\u064A\u0629 \u0623\u0648 \u0627\u0644\u0645\u0633\u0627\u0639\u062F\u0629","\u12AD\u1295\u12AD\u1295 \u12C8\u12ED \u1213\u1308\u12DD \u12ED\u1290\u133D\u130D"],"Hat starke \xC4ngste oder ist sehr niedergeschlagen":["G\xFC\xE7l\xFC korkular\u0131 var veya \xE7ok \xFCzg\xFCn","\u0421\u0438\u043B\u044C\u043D\u044B\u0435 \u0441\u0442\u0440\u0430\u0445\u0438 \u0438\u043B\u0438 \u043F\u043E\u0434\u0430\u0432\u043B\u0435\u043D\u043D\u043E\u0441\u0442\u044C","\u0644\u062F\u064A\u0647 \u0645\u062E\u0627\u0648\u0641 \u0634\u062F\u064A\u062F\u0629 \u0623\u0648 \u062D\u0632\u0646 \u0634\u062F\u064A\u062F","\u1265\u122D\u1271\u12D5 \u134D\u122D\u1212 \u12C8\u12ED \u1313\u1202 \u12A3\u1208\u12CE"],"Oberk\xF6rper waschen":["\xDCst bedeni y\u0131kamak","\u041C\u044B\u0442\u044C \u0432\u0435\u0440\u0445\u043D\u044E\u044E \u0447\u0430\u0441\u0442\u044C \u0442\u0435\u043B\u0430","\u063A\u0633\u0644 \u0627\u0644\u062C\u0632\u0621 \u0627\u0644\u0639\u0644\u0648\u064A \u0645\u0646 \u0627\u0644\u062C\u0633\u0645","\u120B\u12D5\u1208\u12CB\u12ED \u12A3\u12AB\u120D \u121D\u1215\u133B\u1265"],"Duschen oder baden (inkl. Haare waschen)":["Du\u015F veya banyo (sa\xE7 y\u0131kama dahil)","\u041F\u0440\u0438\u043D\u0438\u043C\u0430\u0442\u044C \u0434\u0443\u0448 \u0438\u043B\u0438 \u0432\u0430\u043D\u043D\u0443 (\u0432\u043A\u043B. \u043C\u044B\u0442\u044C\u0451 \u0433\u043E\u043B\u043E\u0432\u044B)","\u0627\u0644\u0627\u0633\u062A\u062D\u0645\u0627\u0645 (\u0645\u0639 \u063A\u0633\u0644 \u0627\u0644\u0634\u0639\u0631)","\u123B\u12C8\u122D \u12C8\u12ED \u121D\u1215\u133B\u1265 (\u1338\u1309\u122A \u121D\u1215\u133B\u1265 \u1213\u12CA\u1231)"],"Oberk\xF6rper an- und auskleiden":["\xDCst bedeni giydirmek/soymak","\u041E\u0434\u0435\u0432\u0430\u0442\u044C \u0438 \u0440\u0430\u0437\u0434\u0435\u0432\u0430\u0442\u044C \u0432\u0435\u0440\u0445 \u0442\u0435\u043B\u0430","\u0644\u0628\u0633 \u0648\u062E\u0644\u0639 \u0645\u0644\u0627\u0628\u0633 \u0627\u0644\u062C\u0632\u0621 \u0627\u0644\u0639\u0644\u0648\u064A","\u120B\u12D5\u1208\u12CB\u12ED \u12AD\u12F3\u1295 \u121D\u12BD\u12F3\u1295\u1295 \u121D\u12CD\u133B\u12A5\u1295"],"Unterk\xF6rper an- und auskleiden (Hose, Socken, Schuhe)":["Alt bedeni giydirmek (pantolon, \xE7orap, ayakkab\u0131)","\u041E\u0434\u0435\u0432\u0430\u0442\u044C \u043D\u0438\u0437 (\u0431\u0440\u044E\u043A\u0438, \u043D\u043E\u0441\u043A\u0438, \u043E\u0431\u0443\u0432\u044C)","\u0644\u0628\u0633 \u0627\u0644\u062C\u0632\u0621 \u0627\u0644\u0633\u0641\u0644\u064A (\u0628\u0646\u0637\u0627\u0644\u060C \u062C\u0648\u0627\u0631\u0628\u060C \u0623\u062D\u0630\u064A\u0629)","\u1273\u1215\u1270\u12CB\u12ED \u12AD\u12F3\u1295 (\u1235\u1228\u1361 \u12AB\u120D\u1232\u1361 \u132B\u121B)"],"Essen (mundgerecht zubereitetes Essen zum Mund f\xFChren)":["Yemek yemek (haz\u0131rlanm\u0131\u015F yeme\u011Fi a\u011Fza g\xF6t\xFCrmek)","\u0415\u0441\u0442\u044C (\u043F\u043E\u0434\u043D\u043E\u0441\u0438\u0442\u044C \u043F\u043E\u0434\u0433\u043E\u0442\u043E\u0432\u043B\u0435\u043D\u043D\u0443\u044E \u0435\u0434\u0443 \u043A\u043E \u0440\u0442\u0443)","\u0627\u0644\u0623\u0643\u0644 (\u0625\u064A\u0635\u0627\u0644 \u0627\u0644\u0637\u0639\u0627\u0645 \u0627\u0644\u0645\u062D\u0636\u0651\u0631 \u0625\u0644\u0649 \u0627\u0644\u0641\u0645)","\u121D\u1265\u120B\u12D5"],"Trinken (genug und selbstst\xE4ndig)":["\u0130\xE7mek (yeterli ve ba\u011F\u0131ms\u0131z)","\u041F\u0438\u0442\u044C (\u0434\u043E\u0441\u0442\u0430\u0442\u043E\u0447\u043D\u043E \u0438 \u0441\u0430\u043C\u043E\u0441\u0442\u043E\u044F\u0442\u0435\u043B\u044C\u043D\u043E)","\u0627\u0644\u0634\u0631\u0628 (\u0628\u0643\u0645\u064A\u0629 \u0643\u0627\u0641\u064A\u0629 \u0648\u0628\u0634\u0643\u0644 \u0645\u0633\u062A\u0642\u0644)","\u121D\u1235\u1273\u12ED (\u12A5\u12B9\u120D \u1265\u122D\u12A5\u1231)"],"Toilette benutzen":["Tuvaleti kullanmak","\u041F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u044C\u0441\u044F \u0442\u0443\u0430\u043B\u0435\u0442\u043E\u043C","\u0627\u0633\u062A\u062E\u062F\u0627\u0645 \u0627\u0644\u0645\u0631\u062D\u0627\u0636","\u123D\u1253\u1255 \u121D\u1325\u1243\u121D"],"Wie oft wird Hilfe bei Medikamenten, Spritzen, Verb\xE4nden oder Messungen gebraucht?":["\u0130la\xE7, i\u011Fne, pansuman veya \xF6l\xE7\xFCmlerde ne s\u0131kl\u0131kla yard\u0131m gerekiyor?","\u041A\u0430\u043A \u0447\u0430\u0441\u0442\u043E \u043D\u0443\u0436\u043D\u0430 \u043F\u043E\u043C\u043E\u0449\u044C \u0441 \u043B\u0435\u043A\u0430\u0440\u0441\u0442\u0432\u0430\u043C\u0438, \u0443\u043A\u043E\u043B\u0430\u043C\u0438, \u043F\u0435\u0440\u0435\u0432\u044F\u0437\u043A\u0430\u043C\u0438 \u0438\u043B\u0438 \u0438\u0437\u043C\u0435\u0440\u0435\u043D\u0438\u044F\u043C\u0438?","\u0643\u0645 \u0645\u0631\u0629 \u064A\u062D\u062A\u0627\u062C \u0627\u0644\u0645\u0633\u0627\u0639\u062F\u0629 \u0641\u064A \u0627\u0644\u0623\u062F\u0648\u064A\u0629 \u0623\u0648 \u0627\u0644\u062D\u0642\u0646 \u0623\u0648 \u0627\u0644\u0636\u0645\u0627\u062F\u0627\u062A \u0623\u0648 \u0627\u0644\u0642\u064A\u0627\u0633\u0627\u062A\u061F","\u12A3\u1265 \u1218\u12F5\u1203\u1292\u1275\u1361 \u1218\u122D\u134D\u12A5 \u12C8\u12ED \u1218\u1208\u12AD\u12D2 \u12AD\u1295\u12F0\u12ED \u130D\u12DC \u1213\u1308\u12DD \u12E8\u12F5\u120A?"],"Wie oft muss jemand zu Arzt- oder Therapieterminen begleiten?":["Doktor veya terapi randevular\u0131na ne s\u0131kl\u0131kla e\u015Flik etmek gerekiyor?","\u041A\u0430\u043A \u0447\u0430\u0441\u0442\u043E \u043D\u0443\u0436\u043D\u043E \u0441\u043E\u043F\u0440\u043E\u0432\u043E\u0436\u0434\u0430\u0442\u044C \u043A \u0432\u0440\u0430\u0447\u0443 \u0438\u043B\u0438 \u043D\u0430 \u0442\u0435\u0440\u0430\u043F\u0438\u044E?","\u0643\u0645 \u0645\u0631\u0629 \u064A\u062D\u062A\u0627\u062C \u0645\u0631\u0627\u0641\u0642\u0629 \u0625\u0644\u0649 \u0627\u0644\u0637\u0628\u064A\u0628 \u0623\u0648 \u0627\u0644\u0639\u0644\u0627\u062C\u061F","\u1293\u1265 \u1213\u12AA\u121D \u12AD\u1295\u12F0\u12ED \u130D\u12DC \u121D\u1235 \u1230\u1265 \u12AD\u12B8\u12ED\u12F5 \u12E8\u12F5\u120D\u12EE?"],"Nie oder selten":["Hi\xE7 veya nadiren","\u041D\u0438\u043A\u043E\u0433\u0434\u0430 \u0438\u043B\u0438 \u0440\u0435\u0434\u043A\u043E","\u0623\u0628\u062F\u064B\u0627 \u0623\u0648 \u0646\u0627\u062F\u0631\u064B\u0627","\u1348\u133A\u1219 \u12C8\u12ED \u1233\u1215\u1272"],W\u00F6chentlich:["Haftal\u0131k","\u0415\u0436\u0435\u043D\u0435\u0434\u0435\u043B\u044C\u043D\u043E","\u0623\u0633\u0628\u0648\u0639\u064A\u064B\u0627","\u1230\u1219\u1293\u12CA"],"Mehrmals t\xE4glich":["G\xFCnde birka\xE7 kez","\u041D\u0435\u0441\u043A\u043E\u043B\u044C\u043A\u043E \u0440\u0430\u0437 \u0432 \u0434\u0435\u043D\u044C","\u0639\u062F\u0629 \u0645\u0631\u0627\u062A \u064A\u0648\u0645\u064A\u064B\u0627","\u12A3\u1265 \u1218\u12D3\u120D\u1272 \u1265\u12D9\u1215 \u130D\u12DC"],"Etwa einmal im Monat":["Ayda yakla\u015F\u0131k bir kez","\u041F\u0440\u0438\u043C\u0435\u0440\u043D\u043E \u0440\u0430\u0437 \u0432 \u043C\u0435\u0441\u044F\u0446","\u0645\u0631\u0629 \u0641\u064A \u0627\u0644\u0634\u0647\u0631 \u062A\u0642\u0631\u064A\u0628\u064B\u0627","\u12A3\u1265 \u12C8\u122D\u1212 \u1213\u12F0 \u130D\u12DC"],"Jede Woche":["Her hafta","\u041A\u0430\u0436\u0434\u0443\u044E \u043D\u0435\u0434\u0435\u043B\u044E","\u0643\u0644 \u0623\u0633\u0628\u0648\u0639","\u12A9\u1209 \u1230\u1219\u1295"],"Den Tag einteilen und sich an Abl\xE4ufe halten":["G\xFCn\xFC planlamak ve d\xFCzene uymak","\u041F\u043B\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u0434\u0435\u043D\u044C \u0438 \u0441\u043E\u0431\u043B\u044E\u0434\u0430\u0442\u044C \u0440\u0430\u0441\u043F\u043E\u0440\u044F\u0434\u043E\u043A","\u062A\u0646\u0638\u064A\u0645 \u0627\u0644\u064A\u0648\u0645 \u0648\u0627\u0644\u0627\u0644\u062A\u0632\u0627\u0645 \u0628\u0627\u0644\u0631\u0648\u062A\u064A\u0646","\u1218\u12D3\u120D\u1272 \u121D\u12CD\u12F3\u1265"],"Sich sinnvoll besch\xE4ftigen":["Anlaml\u0131 \u015Fekilde me\u015Fgul olmak","\u0417\u0430\u043D\u0438\u043C\u0430\u0442\u044C \u0441\u0435\u0431\u044F \u043F\u043E\u043B\u0435\u0437\u043D\u044B\u043C\u0438 \u0434\u0435\u043B\u0430\u043C\u0438","\u0627\u0644\u0627\u0646\u0634\u063A\u0627\u0644 \u0628\u0634\u0643\u0644 \u0645\u0641\u064A\u062F","\u1265\u1320\u1253\u121A \u1290\u1308\u122D \u121D\u1275\u1213\u12DD"],"Kontakt zu Familie, Nachbarn, Freunden halten":["Aile, kom\u015Fu ve arkada\u015Flarla ileti\u015Fim","\u041F\u043E\u0434\u0434\u0435\u0440\u0436\u0438\u0432\u0430\u0442\u044C \u043A\u043E\u043D\u0442\u0430\u043A\u0442 \u0441 \u0441\u0435\u043C\u044C\u0451\u0439, \u0441\u043E\u0441\u0435\u0434\u044F\u043C\u0438, \u0434\u0440\u0443\u0437\u044C\u044F\u043C\u0438","\u0627\u0644\u062A\u0648\u0627\u0635\u0644 \u0645\u0639 \u0627\u0644\u0639\u0627\u0626\u0644\u0629 \u0648\u0627\u0644\u062C\u064A\u0631\u0627\u0646 \u0648\u0627\u0644\u0623\u0635\u062F\u0642\u0627\u0621","\u121D\u1235 \u1235\u12F5\u122B\u1361 \u130E\u1228\u1263\u1265\u1272\u1361 \u12A3\u12D5\u1229\u12BD \u122D\u12AD\u1265"],"Noch einmal":["Tekrar","\u0415\u0449\u0451 \u0440\u0430\u0437","\u0645\u0631\u0629 \u0623\u062E\u0631\u0649","\u12F0\u130A\u121D\u12AB"],"Pflegegrad beantragen":["Bak\u0131m derecesi ba\u015Fvurusu","\u041F\u043E\u0434\u0430\u0442\u044C \u0437\u0430\u044F\u0432\u043B\u0435\u043D\u0438\u0435 \u043D\u0430 \u0441\u0442\u0435\u043F\u0435\u043D\u044C \u0443\u0445\u043E\u0434\u0430","\u0627\u0644\u062A\u0642\u062F\u0645 \u0628\u0637\u0644\u0628 \u062F\u0631\u062C\u0629 \u0631\u0639\u0627\u064A\u0629","\u12F0\u1228\u1303 \u12AD\u1295\u12AD\u1295 \u1215\u1270\u1275"],"H\xF6herstufung beantragen":["Daha y\xFCksek derece ba\u015Fvurusu","\u041F\u043E\u0434\u0430\u0442\u044C \u043D\u0430 \u043F\u043E\u0432\u044B\u0448\u0435\u043D\u0438\u0435 \u0441\u0442\u0435\u043F\u0435\u043D\u0438","\u0637\u0644\u0628 \u0631\u0641\u0639 \u0627\u0644\u062F\u0631\u062C\u0629","\u120D\u12D5\u120D \u12DD\u1260\u1208 \u12F0\u1228\u1303 \u1215\u1270\u1275"],"Antrag vorbereiten (kostenlos)":["Ba\u015Fvuruyu haz\u0131rla (\xFCcretsiz)","\u041F\u043E\u0434\u0433\u043E\u0442\u043E\u0432\u0438\u0442\u044C \u0437\u0430\u044F\u0432\u043B\u0435\u043D\u0438\u0435 (\u0431\u0435\u0441\u043F\u043B\u0430\u0442\u043D\u043E)","\u062A\u062D\u0636\u064A\u0631 \u0627\u0644\u0637\u0644\u0628 (\u0645\u062C\u0627\u0646\u064B\u0627)","\u1218\u1218\u120D\u12A8\u1272 \u12A3\u12F3\u1209 (\u1265\u1290\u133B)"],"Ein Widerspruch kann sich lohnen.":["\u0130tiraz etmek faydal\u0131 olabilir.","\u0412\u043E\u0437\u0440\u0430\u0436\u0435\u043D\u0438\u0435 \u043C\u043E\u0436\u0435\u0442 \u0438\u043C\u0435\u0442\u044C \u0441\u043C\u044B\u0441\u043B.","\u0642\u062F \u064A\u0643\u0648\u0646 \u0627\u0644\u0627\u0639\u062A\u0631\u0627\u0636 \u0645\u062C\u062F\u064A\u064B\u0627.","\u1270\u1253\u12CD\u121E \u1320\u1253\u121A \u12AD\u12B8\u12CD\u1295 \u12ED\u12BD\u12A5\u120D\u1362"],"Widerspruch schreiben":["\u0130tiraz yaz","\u041D\u0430\u043F\u0438\u0441\u0430\u0442\u044C \u0432\u043E\u0437\u0440\u0430\u0436\u0435\u043D\u0438\u0435","\u0627\u0643\u062A\u0628 \u0627\u0639\u062A\u0631\u0627\u0636\u064B\u0627","\u1270\u1253\u12CD\u121E \u133D\u1213\u134D"],"Meine Daten endg\xFCltig l\xF6schen":["Verilerimi kal\u0131c\u0131 olarak sil","\u041E\u043A\u043E\u043D\u0447\u0430\u0442\u0435\u043B\u044C\u043D\u043E \u0443\u0434\u0430\u043B\u0438\u0442\u044C \u043C\u043E\u0438 \u0434\u0430\u043D\u043D\u044B\u0435","\u062D\u0630\u0641 \u0628\u064A\u0627\u0646\u0627\u062A\u064A \u0646\u0647\u0627\u0626\u064A\u064B\u0627","\u1213\u1260\u122C\u1273\u12ED \u1265\u1250\u133B\u120A \u1230\u122D\u12DD"]};t.LANG="de";var ja={tr:0,ru:1,ar:2,ti:3},Ua=[[/^Frage (\d+) von (\d+)$/,["Soru $1 / $2","\u0412\u043E\u043F\u0440\u043E\u0441 $1 \u0438\u0437 $2","\u0627\u0644\u0633\u0624\u0627\u0644 $1 \u0645\u0646 $2","\u1215\u1276 $1 \u12AB\u1265 $2"]],[/^Schritt (\d+) von (\d+)$/,["Ad\u0131m $1 / $2","\u0428\u0430\u0433 $1 \u0438\u0437 $2","\u0627\u0644\u062E\u0637\u0648\u0629 $1 \u0645\u0646 $2","\u1235\u1309\u121D\u1272 $1 \u12AB\u1265 $2"]],[/^Voraussichtlich Pflegegrad (\d)$/,["Tahmini bak\u0131m derecesi $1","\u041F\u0440\u0435\u0434\u043F\u043E\u043B\u043E\u0436\u0438\u0442\u0435\u043B\u044C\u043D\u043E \u0441\u0442\u0435\u043F\u0435\u043D\u044C \u0443\u0445\u043E\u0434\u0430 $1","\u0639\u0644\u0649 \u0627\u0644\u0623\u0631\u062C\u062D \u062F\u0631\u062C\u0629 \u0627\u0644\u0631\u0639\u0627\u064A\u0629 $1","\u1270\u12BD\u12A5\u120E \u12F0\u1228\u1303 \u12AD\u1295\u12AD\u1295 $1"]],[/^Pflegegrad (\d)$/,["Bak\u0131m derecesi $1","\u0421\u0442\u0435\u043F\u0435\u043D\u044C \u0443\u0445\u043E\u0434\u0430 $1","\u062F\u0631\u062C\u0629 \u0627\u0644\u0631\u0639\u0627\u064A\u0629 $1","\u12F0\u1228\u1303 \u12AD\u1295\u12AD\u1295 $1"]]];function ot(e){if(t.LANG==="de"||!e)return e;let n=ja[t.LANG],a=e.trim();if(!a)return e;let s=fa[a]&&fa[a][n];if(!s){for(let[r,i]of Ua)if(r.test(a)){s=a.replace(r,i[n]);break}}return s?e.replace(a,s):e}function Te(e){if(document.documentElement.lang=t.LANG,document.documentElement.dir=t.LANG==="ar"?"rtl":"ltr",t.LANG==="de"||!e)return;let n=document.createTreeWalker(e,NodeFilter.SHOW_TEXT,{acceptNode:s=>s.parentNode&&/^(SCRIPT|STYLE|TEXTAREA|CODE)$/.test(s.parentNode.nodeName)||s.parentNode.closest&&s.parentNode.closest(".paper")?NodeFilter.FILTER_REJECT:NodeFilter.FILTER_ACCEPT}),a=[];for(;n.nextNode();)a.push(n.currentNode);for(let s of a){let r=s.nodeValue,i=ot(r);i!==r&&(s.nodeValue=i)}}function Ge(){return`<select class="langsel" id="langsel" aria-label="Sprache">${Wa.map(([e,n])=>`<option value="${e}" ${t.LANG===e?"selected":""}>${n}</option>`).join("")}</select>`}function Wt(){if(t.LANG==="de")return"";let e={tr:"A\xE7\u0131klamalar\u0131n bir k\u0131sm\u0131 hen\xFCz Almanca. Ba\u015Fvurular her zaman Almanca kal\u0131r, \xE7\xFCnk\xFC kurumlar bunlar\u0131 Almanca istiyor.",ru:"\u0427\u0430\u0441\u0442\u044C \u043F\u043E\u044F\u0441\u043D\u0435\u043D\u0438\u0439 \u043F\u043E\u043A\u0430 \u043D\u0430 \u043D\u0435\u043C\u0435\u0446\u043A\u043E\u043C. \u0417\u0430\u044F\u0432\u043B\u0435\u043D\u0438\u044F \u0432\u0441\u0435\u0433\u0434\u0430 \u043E\u0441\u0442\u0430\u044E\u0442\u0441\u044F \u043D\u0430 \u043D\u0435\u043C\u0435\u0446\u043A\u043E\u043C, \u0442\u0430\u043A \u043A\u0430\u043A \u0432\u0435\u0434\u043E\u043C\u0441\u0442\u0432\u0430\u043C \u043E\u043D\u0438 \u043D\u0443\u0436\u043D\u044B \u043D\u0430 \u043D\u0435\u043C\u0435\u0446\u043A\u043E\u043C.",ar:"\u0628\u0639\u0636 \u0627\u0644\u0634\u0631\u0648\u062D\u0627\u062A \u0644\u0627 \u062A\u0632\u0627\u0644 \u0628\u0627\u0644\u0644\u063A\u0629 \u0627\u0644\u0623\u0644\u0645\u0627\u0646\u064A\u0629. \u0627\u0644\u0637\u0644\u0628\u0627\u062A \u062A\u0628\u0642\u0649 \u062F\u0627\u0626\u0645\u064B\u0627 \u0628\u0627\u0644\u0623\u0644\u0645\u0627\u0646\u064A\u0629 \u0644\u0623\u0646 \u0627\u0644\u062C\u0647\u0627\u062A \u0627\u0644\u0631\u0633\u0645\u064A\u0629 \u062A\u0637\u0644\u0628\u0647\u0627 \u0643\u0630\u0644\u0643.",ti:"\u1308\u1208 \u1218\u130D\u1208\u133A\u1273\u1275 \u1308\u1293 \u1265\u1300\u122D\u1218\u1295\u129B \u12A5\u12EE\u121D\u1362 \u1218\u1218\u120D\u12A8\u1272\u1273\u1275 \u12A9\u1209 \u130D\u12DC \u1265\u1300\u122D\u1218\u1295\u129B \u12A5\u12EE\u121D\u1361 \u121D\u12BD\u1295\u12EB\u1271 \u1264\u1275 \u133D\u1215\u1348\u1273\u1275 \u1265\u1300\u122D\u1218\u1295\u129B \u12ED\u12F0\u120D\u12ED\u12CE\u121D\u1362"};return`<p class="notice info small">${g("info")}<span>${e[t.LANG]}</span></p>`}function jt(){try{t.LANG=JSON.parse(localStorage.getItem("da-lang")||'"de"')||"de"}catch{}}var Xn={};M(Xn,{curLetter:()=>ie,docsFor:()=>Be,mailto:()=>Jn,today:()=>mn,viewAnsprueche:()=>qn});var Ot={};M(Ot,{finderHTML:()=>_t});var ut="https://www.pflegelotse.de/",_a={tagespflege:[["Tagespflege in der N\xE4he","Tagespflege"],["Pflegelotse der Ersatzkassen (mit Preisen)",ut]],entlastung:[["Anerkannte Alltagshilfen (AOK-Pflegenavigator, f\xFCr alle nutzbar)","https://www.aok.de/pk/cl/uni/pflege/pflegenavigator/unterstuetzungsangebote/"],["Nachbarschaftshilfe in der N\xE4he","Nachbarschaftshilfe"],["Alltagsbegleitung in der N\xE4he","Alltagsbegleitung Senioren"]],sachleistung:[["Pflegedienste in der N\xE4he","ambulanter Pflegedienst"],["Pflegelotse der Ersatzkassen (mit Preisen)",ut]],jahresbetrag:[["Kurzzeitpflege in der N\xE4he","Kurzzeitpflege"],["Pflegelotse der Ersatzkassen",ut]],verbrauch:[["Sanit\xE4tshaus in der N\xE4he","Sanit\xE4tshaus"],["Apotheke in der N\xE4he","Apotheke"]],technisch:[["Sanit\xE4tshaus in der N\xE4he","Sanit\xE4tshaus"],["Hausnotruf-Anbieter in der N\xE4he","Hausnotruf"]],wohnumfeld:[["Wohnberatung in der N\xE4he","Wohnberatung barrierefrei"]],beratung:[["Pflegest\xFCtzpunkt in der N\xE4he","Pflegest\xFCtzpunkt"],["Beratungsstellen-Suche des ZQP","https://www.zqp.de/beratung-pflege/"]],stationaer:[["Pflegeheime vergleichen (Pflegelotse)",ut]],pflegekurs:[["Pflegekurse in der N\xE4he","Pflegekurs Angeh\xF6rige"]]};function Oa(){let e=String(t.S.person.ort||"").match(/\b\d{5}\b/);return e?e[0]:t.S.plz||""}function _t(e){let n=_a[e];if(!n)return"";let a=Oa();return`<div><h4>In der N\xE4he finden</h4>
+    ${a?"":`<div class="field" style="max-width:220px;margin-bottom:8px"><label for="plz-${e}">Deine Postleitzahl</label><input type="text" inputmode="numeric" id="plz-${e}" data-plz="1" maxlength="5" placeholder="z. B. 70173"></div>`}
+    <div class="btnrow">${n.map(([s,r])=>`<a class="btn small soft" href="${/^https?:/.test(r)?r:`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(r+" "+(a||""))}`}" target="_blank" rel="noopener">${d(s)}</a>`).join("")}</div>
+    <p class="small muted">Neutral: Wir bekommen f\xFCr diese Links kein Geld. Bei Anrufen \u201Eim Auftrag der Pflegekasse\u201C bitte vorsichtig sein.</p></div>`}var Zn={};M(Zn,{backupData:()=>jn,datenBox:()=>Cn,restoreData:()=>St,wipeAll:()=>Wn});var Kn={};M(Kn,{start18:()=>Hn,toast:()=>m});var qt={};M(qt,{pdText:()=>ct,viewTermine:()=>Zt});var Ct={};M(Ct,{eriCard:()=>Vt,setEri:()=>dt});t.ERI=null;t.eriLoaded=!1;async function Va(){if(!t.USER)return;let{data:e}=await t.sb.from("erinnerung").select("aktiv,email").eq("user_id",t.USER.id).maybeSingle();t.ERI=e||null,t.eriLoaded=!0,c()}async function dt(e,n){let a=(n||t.ERI&&t.ERI.email||t.USER.email||"").trim();if(e&&!/^\S+@\S+\.\S+$/.test(a)){m("Bitte eine g\xFCltige E-Mail-Adresse eingeben.");return}let{error:s}=await t.sb.from("erinnerung").upsert({user_id:t.USER.id,aktiv:e,email:a,updated_at:new Date().toISOString()});if(s){m("Speichern hat nicht geklappt.");return}t.ERI={aktiv:e,email:a},m(e?"Erinnerungen per E-Mail sind an.":"Erinnerungen per E-Mail sind aus."),c()}function Vt(){if(!t.USER)return"";if(!t.eriLoaded)return Va(),"";let e=t.ERI&&t.ERI.aktiv;return`<section class="panel mini">
+    <div class="mini-head">${g("bell")}<div><h3>Erinnerungen per E-Mail</h3><p class="small muted">Wir schreiben dir 14, 7 und 1 Tag vor jeder Frist, f\xFCr alle Personen in deinem Konto.</p></div></div>
+    ${e?`<p class="small">An: <strong>${d(t.ERI.email)}</strong></p><div class="btnrow"><button class="btn small ghost" type="button" data-act="eri-off">Ausschalten</button></div>`:`<div class="grid2" style="align-items:end"><div class="field"><label for="eri-mail">E-Mail-Adresse</label><input type="email" id="eri-mail" value="${d(t.ERI&&t.ERI.email||t.USER.email||"")}"></div><div><button class="btn" type="button" data-act="eri-on">${g("bell")}Einschalten</button></div></div>`}
+  </section>`}function Zt(){let e=le(),n=gt(),a=Se(),s=[a.prev,a.H,a.next];return`
+  ${Vt()}
+  ${n?`<section class="panel">
+    <div class="section-title"><h2>Beratungsbesuch</h2><span class="small muted">\xA7 37 Abs. 3 SGB XI</span></div>
+    <p class="muted small">Wer Pflegegeld bekommt, muss einmal in jedem Kalenderhalbjahr (Januar\u2013Juni und Juli\u2013Dezember) einen Beratungsbesuch durch einen Pflegedienst oder eine anerkannte Beratungsstelle nachweisen. Fehlt der Nachweis, k\xFCrzt die Pflegekasse das Pflegegeld, im Wiederholungsfall wird es gestrichen. Der Besuch ist kostenlos, jeder zweite darf per Video sein.</p>
+    <div class="halves">${s.map((r,i)=>{let l=a.inH(r);return`<div class="half ${l?"done":i===0?"miss":i===1?"open":""}"><b>${r.label}</b><span>${l?"erledigt":i===0?"kein Besuch eingetragen":i===1?`offen \xB7 bis ${A(r.end)}`:`ab ${A(r.start)}`}</span></div>`}).join("")}</div>
     <div class="grid2">
-      <div class="field"><label for="pd">Datum auf dem Beleg</label><input type="date" id="pd" data-pend="datum" value="${esc(p.datum)}"></div>
-      <div class="field"><label for="pb">Betrag</label><div class="euro"><input type="text" inputmode="decimal" id="pb" data-pend="betrag" value="${esc(p.betrag)}" placeholder="z. B. 5,00"><span>€</span></div></div>
-    </div>
-    <div class="field"><label for="pt">Kurze Beschreibung (freiwillig)</label><input type="text" id="pt" data-pend="titel" value="${esc(p.titel)}" placeholder="z. B. Apotheke am Markt"></div>
-    <div class="nav big go"><button class="btn ghost" type="button" data-act="cancelbeleg" ${busy?"disabled":""}>Abbrechen</button><button class="btn" type="button" data-act="savebeleg" ${busy?"disabled":""}>${busy?"Speichert …":p.editId?"Änderungen speichern":"Beleg speichern"}</button></div>
-  </div>`;
-}
-/* ---------- Reiter: Termine ---------- */
-function viewTermine(){
-  const dl=deadlines(); const rel=beratungRelevant(); const st=beratungStatus();
-  const halves=[st.prev,st.H,st.next];
-  return `
-  ${eriCard()}
-  ${rel?`<section class="panel">
-    <div class="section-title"><h2>Beratungsbesuch</h2><span class="small muted">§ 37 Abs. 3 SGB XI</span></div>
-    <p class="muted small">Wer Pflegegeld bekommt, muss einmal in jedem Kalenderhalbjahr (Januar–Juni und Juli–Dezember) einen Beratungsbesuch durch einen Pflegedienst oder eine anerkannte Beratungsstelle nachweisen. Fehlt der Nachweis, kürzt die Pflegekasse das Pflegegeld, im Wiederholungsfall wird es gestrichen. Der Besuch ist kostenlos, jeder zweite darf per Video sein.</p>
-    <div class="halves">${halves.map((h,i)=>{const done=st.inH(h);const cls=done?"done":i===0?"miss":i===1?"open":"";return `<div class="half ${cls}"><b>${h.label}</b><span>${done?"erledigt":i===0?"kein Besuch eingetragen":i===1?`offen · bis ${deD(h.end)}`:`ab ${deD(h.start)}`}</span></div>`}).join("")}</div>
-    <div class="grid2">
-      <div class="field"><label for="tdienst">Pflegedienst / Beratungsstelle</label><input type="text" id="tdienst" value="${esc(S.termine.dienst)}" placeholder="Name"></div>
-      <div class="field"><label for="ttel">Telefon</label><input type="tel" id="ttel" value="${esc(S.termine.tel)}"></div>
+      <div class="field"><label for="tdienst">Pflegedienst / Beratungsstelle</label><input type="text" id="tdienst" value="${d(t.S.termine.dienst)}" placeholder="Name"></div>
+      <div class="field"><label for="ttel">Telefon</label><input type="tel" id="ttel" value="${d(t.S.termine.tel)}"></div>
     </div>
     <div class="grid2" style="align-items:end">
-      <div class="field"><label for="tbesuch">Besuch hat stattgefunden am</label><input type="date" id="tbesuch" max="${isoD(TODAY())}"></div>
-      <div><button class="btn" type="button" data-act="addbesuch">${ic("check")}Besuch eintragen</button></div>
+      <div class="field"><label for="tbesuch">Besuch hat stattgefunden am</label><input type="date" id="tbesuch" max="${F(x())}"></div>
+      <div><button class="btn" type="button" data-act="addbesuch">${g("check")}Besuch eintragen</button></div>
     </div>
-    ${besuche().length?`<p class="small muted">Eingetragene Besuche: ${besuche().map(s=>deD(parseIso(s))).join(", ")}. Den Nachweis kannst du unter Belege als „Nachweis Beratungsbesuch“ ablegen.</p>`:""}
-    <div class="recip"><span><strong>Text für den Pflegedienst</strong></span><span class="small" id="pdtext">${esc(pdText())}</span><span class="btnrow"><button class="btn small soft" type="button" data-act="copypd">Text kopieren</button></span></div>
+    ${Ie().length?`<p class="small muted">Eingetragene Besuche: ${Ie().map(r=>A(B(r))).join(", ")}. Den Nachweis kannst du unter Belege als \u201ENachweis Beratungsbesuch\u201C ablegen.</p>`:""}
+    <div class="recip"><span><strong>Text f\xFCr den Pflegedienst</strong></span><span class="small" id="pdtext">${d(ct())}</span><span class="btnrow"><button class="btn small soft" type="button" data-act="copypd">Text kopieren</button></span></div>
   </section>`:""}
 
   <section style="display:flex;flex-direction:column;gap:10px">
     <div class="section-title"><h2>Fristen und Erinnerungen</h2></div>
     <p class="small muted">Trage Erinnerungen mit einem Klick in deinen Kalender ein. Der Kalender meldet sich dann auch, wenn die App geschlossen ist.</p>
-    ${dl.length?dl.map(dueHTML).join(""):`<p class="muted">Keine Fristen für deine Situation.</p>`}
+    ${e.length?e.map(Ca).join(""):'<p class="muted">Keine Fristen f\xFCr deine Situation.</p>'}
   </section>
 
   <section class="panel">
@@ -1666,946 +50,410 @@ function viewTermine(){
       <div class="field"><label for="ownt">Was?</label><input type="text" id="ownt" placeholder="z. B. Widerspruch Pflegegrad abschicken"></div>
       <div class="field"><label for="ownd">Wann?</label><input type="date" id="ownd"></div>
     </div>
-    <div><button class="btn soft" type="button" data-act="addown">${ic("plus")}Hinzufügen</button></div>
-    ${S.sb.status==="ja"&&(mz("G")||mz("aG")||mz("Gl")||mz("H")||mz("Bl"))?`<div class="field" style="max-width:260px"><label for="twm">Wertmarke gültig bis</label><input type="date" id="twm" value="${esc(S.termine.wertmarke)}"></div>`:""}
-  </section>`;
-}
-function pdText(){
-  const st=beratungStatus(); const H=st.done?st.next:st.H; const p=S.person;
-  return `Guten Tag, ich möchte einen Beratungsbesuch nach § 37 Abs. 3 SGB XI für ${p.name||"[Name]"}${pg()?` (Pflegegrad ${pg()})`:""} vereinbaren. Der Besuch muss im ${H.label} stattfinden, also bis spätestens ${deD(H.end)}. Bitte schicken Sie den Nachweis anschließend direkt an die ${kassePK()} und mir eine Kopie. Vielen Dank!`;
-}
-function dueHTML(x){
-  const u=x.ok?"ok":urg(x.d);
-  return `<div class="due ${u}">
-    <div class="cal"><b>${MON[x.d.getMonth()]}</b><span>${x.d.getDate()}</span></div>
-    <div class="d-t">${esc(x.t)} <span class="pill ${u}">${x.ok?"erledigt bis "+deD(beratungStatus().H.end):urgTxt(x.d)}</span></div>
-    <div class="d-s">${esc(x.s)}</div>
+    <div><button class="btn soft" type="button" data-act="addown">${g("plus")}Hinzuf\xFCgen</button></div>
+    ${t.S.sb.status==="ja"&&(k("G")||k("aG")||k("Gl")||k("H")||k("Bl"))?`<div class="field" style="max-width:260px"><label for="twm">Wertmarke g\xFCltig bis</label><input type="date" id="twm" value="${d(t.S.termine.wertmarke)}"></div>`:""}
+  </section>`}function ct(){let e=Se(),n=e.done?e.next:e.H;return`Guten Tag, ich m\xF6chte einen Beratungsbesuch nach \xA7 37 Abs. 3 SGB XI f\xFCr ${t.S.person.name||"[Name]"}${b()?` (Pflegegrad ${b()})`:""} vereinbaren. Der Besuch muss im ${n.label} stattfinden, also bis sp\xE4testens ${A(n.end)}. Bitte schicken Sie den Nachweis anschlie\xDFend direkt an die ${ht()} und mir eine Kopie. Vielen Dank!`}function Ca(e){let n=e.ok?"ok":te(e.d);return`<div class="due ${n}">
+    <div class="cal"><b>${Yt[e.d.getMonth()]}</b><span>${e.d.getDate()}</span></div>
+    <div class="d-t">${d(e.t)} <span class="pill ${n}">${e.ok?"erledigt bis "+A(Se().H.end):Z(e.d)}</span></div>
+    <div class="d-s">${d(e.s)}</div>
     <div class="btnrow">
-      <a class="btn small soft" href="${gcal(x)}" target="_blank" rel="noopener">${ic("cal")}Google Kalender</a>
-      <a class="btn small ghost" href="${ocal(x)}" target="_blank" rel="noopener">Outlook</a>
-      ${x.own?`<button type="button" class="btn small ghost" data-delown="${x.own}">Entfernen</button>`:""}
+      <a class="btn small soft" href="${Jt(e)}" target="_blank" rel="noopener">${g("cal")}Google Kalender</a>
+      <a class="btn small ghost" href="${Xt(e)}" target="_blank" rel="noopener">Outlook</a>
+      ${e.own?`<button type="button" class="btn small ghost" data-delown="${e.own}">Entfernen</button>`:""}
     </div>
-  </div>`;
-}
-
-/* ---------- PDF ---------- */
-function newDoc(){ if(!window.jspdf){toast("PDF-Erzeugung nicht geladen. Bitte Text kopieren.");return null} return new window.jspdf.jsPDF({unit:"mm",format:"a4"}) }
-function drawLetter(doc,b){
-  const p=S.person, a=S.rolle==="angehoerig", r=RECIP[b.to](), L=curLetter(b);
-  const L0=25, W=165; let y;
-  doc.setFont("helvetica","normal"); doc.setFontSize(8);
-  const abs=[a?p.absender:p.name, a?p.absStrasse:p.strasse, a?p.absOrt:p.ort].filter(Boolean).join(" · ")||"[Absender]";
-  doc.text(abs,L0,47);
-  doc.setFontSize(11);
-  doc.text([r.name,"[Straße / Postfach]","[PLZ Ort]"],L0,55);
-  const ortName=((a?p.absOrt:p.ort)||"").replace(/^\d{5}\s*/,"");
-  doc.text(`${ortName?ortName+", ":""}${today()}`,190,95,{align:"right"});
-  doc.setFont("helvetica","bold"); y=105;
-  const subl=doc.splitTextToSize(L.subject,W); doc.text(subl,L0,y); y+=subl.length*5.5+6;
-  doc.setFont("helvetica","normal");
-  for(const ln of doc.splitTextToSize(L.body,W)){ if(y>275){doc.addPage();y=20} doc.text(ln,L0,y); y+=5.2 }
-  y+=10; if(y>270){doc.addPage();y=20}
-  doc.line(L0,y,L0+70,y); doc.setFontSize(8); doc.text("Unterschrift",L0,y+4);
-  const docs=docsFor(b); if(docs.length){ y+=14; if(y>260){doc.addPage();y=20} doc.setFontSize(10); doc.setFont("helvetica","bold"); doc.text("Anlagen",L0,y); doc.setFont("helvetica","normal"); y+=5; for(const d of docs){ if(y>282){doc.addPage();y=20} doc.text("– "+d,L0,y); y+=5 } }
-}
-async function saveFile(filename,data,okMsg){
-  const dl = DL; // Datei-Download im Browser (siehe 19-speicher.js)
-  try{ await dl.save({filename,data}); toast(okMsg||"Gespeichert") }
-  catch(e){ if(e&&e.code==="declined") return; toast(e&&e.code==="rate_limited"?"Bitte kurz warten und erneut versuchen.":"Download nicht möglich.") }
-}
-async function makePDF(b){ const doc=newDoc(); if(!doc) return; drawLetter(doc,b); await saveFile(`Antrag-${b.k}.pdf`,doc.output("blob"),"PDF gespeichert") }
-async function blobToDataURL(id){
-  const res=await fetch(blobUrl(id)); if(!res.ok) throw new Error("fetch");
-  const bl=await res.blob(); if(!/^image\//.test(bl.type)) return null;
-  const bmp=await createImageBitmap(bl); const c=document.createElement("canvas"); const s=Math.min(1,1600/Math.max(bmp.width,bmp.height));
-  c.width=Math.round(bmp.width*s); c.height=Math.round(bmp.height*s); c.getContext("2d").drawImage(bmp,0,0,c.width,c.height);
-  return {url:c.toDataURL("image/jpeg",0.8),w:c.width,h:c.height};
-}
-async function makeMappe(withLetter, onlyZZ, yearsArg){
-  const doc=newDoc(); if(!doc) return;
-  toast("PDF wird erstellt …");
-  const years=yearsArg||selYears(); const kf=S.belegFilter.kat||"";
-  const jahr=years.length===1?years[0]:years.slice().reverse().join("-");
-  let list=BEL.filter(b=>years.includes(String(b.jahr)));
-  if(onlyZZ) list=list.filter(b=>KATS[b.kat]&&KATS[b.kat].zz); else if(kf) list=list.filter(b=>b.kat===kf);
-  list.sort((a,b)=>(a.kat+a.datum).localeCompare(b.kat+b.datum));
-  if(withLetter){ befJahr=years[0]; drawLetter(doc,B.find(x=>x.k==="befreiung")); doc.addPage() }
-  const L0=20; let y=22;
-  doc.setFont("helvetica","bold"); doc.setFontSize(15); doc.text(`Belegübersicht ${jahr.replace("-"," – ")}`,L0,y); y+=7;
-  doc.setFont("helvetica","normal"); doc.setFontSize(10);
-  doc.text([S.person.name||"", S.person.vnr?`Versichertennummer ${S.person.vnr}`:"", kasseName()].filter(Boolean).join(" · "),L0,y); y+=10;
-  doc.setFont("helvetica","bold"); doc.text("Nr.",L0,y); doc.text("Datum",L0+12,y); doc.text("Art / Beschreibung",L0+36,y); doc.text("Betrag",190,y,{align:"right"}); y+=2; doc.line(L0,y,190,y); y+=5;
-  doc.setFont("helvetica","normal");
-  let sum=0;
-  list.forEach((b,i)=>{ if(y>280){doc.addPage();y=20}
-    const d=parseIso(b.datum); const t=`${(KATS[b.kat]||KATS.sonst).t}${b.titel?" – "+b.titel:""}${b.asset&&!/^image\//.test(b.ctype||"")?" (PDF separat)":""}`;
-    doc.text(String(i+1),L0,y); doc.text(d?deD(d):"–",L0+12,y); doc.text(doc.splitTextToSize(t,110)[0],L0+36,y); doc.text(b.betrag!==""&&b.betrag!=null?eur(Number(b.betrag),2):"–",190,y,{align:"right"});
-    sum+=Number(b.betrag)||0; y+=6 });
-  doc.line(L0,y-2,190,y-2); doc.setFont("helvetica","bold"); doc.text("Summe",L0+36,y+3); doc.text(eur(sum,2),190,y+3,{align:"right"});
-  let i=0;
-  for(const b of list){ i++; if(!b.asset||!/^image\//.test(b.ctype||"")) continue;
-    try{ const im=await blobToDataURL(b.asset); if(!im) continue; doc.addPage();
-      doc.setFont("helvetica","normal"); doc.setFontSize(10); const d=parseIso(b.datum);
-      doc.text(`Beleg ${i}: ${(KATS[b.kat]||KATS.sonst).t}${d?" · "+deD(d):""}${b.betrag?" · "+eur(Number(b.betrag),2):""}`,20,15);
-      const maxW=170,maxH=260; const s=Math.min(maxW/im.w,maxH/im.h); doc.addImage(im.url,"JPEG",20,22,im.w*s,im.h*s);
-    }catch(e){}
-  }
-  await saveFile(withLetter?`Befreiungsantrag-${jahr}.pdf`:`Belegmappe-${jahr}.pdf`,doc.output("blob"),"PDF gespeichert");
-}
-async function makeCSV(){
-  const years=selYears(); const jahr=years.slice().reverse().join("-");
-  const rows=[["Datum","Art","Beschreibung","Betrag","Eingereicht"]];
-  BEL.filter(b=>years.includes(String(b.jahr))&&(!S.belegFilter.kat||b.kat===S.belegFilter.kat)).sort((a,b)=>(a.datum||"").localeCompare(b.datum||"")).forEach(b=>rows.push([b.datum?deD(parseIso(b.datum)):"",(KATS[b.kat]||KATS.sonst).t,b.titel||"",b.betrag!=null&&b.betrag!==""?Number(b.betrag).toFixed(2).replace(".",","):"",b.eingereicht?"ja":"nein"]));
-  const csv="﻿"+rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(";")).join("\r\n");
-  await saveFile(`Belege-${jahr}.csv`,csv,"Tabelle gespeichert");
-}
-
-/* ---------- Belege speichern ---------- */
-function startPending(file){
-  if(pending){ // Foto in laufender Erfassung ersetzen
-    if(pending.preview&&pending.preview.startsWith("blob:")) URL.revokeObjectURL(pending.preview);
-    pending.file=file||null; pending.preview=file&&/^image\//.test(file.type)?URL.createObjectURL(file):""; pending.dropAsset=false;
-    return render();
-  }
-  pending={file:file||null, preview: file&&/^image\//.test(file.type)?URL.createObjectURL(file):"", kat:"apo", datum:isoD(TODAY()), betrag:"", titel:""};
-  render();
-}
-function editBeleg(id){
-  const b=BEL.find(x=>x.id===id); if(!b) return;
-  pending={editId:id, file:null, keepAsset:b.asset||"", keepType:b.ctype||"", preview:b.asset&&/^image\//.test(b.ctype||"")?blobUrl(b.asset):"", kat:b.kat||"sonst", datum:b.datum||isoD(TODAY()), betrag:b.betrag==null||b.betrag===""?"":String(b.betrag).replace(".",","), titel:b.titel||""};
-  render(); scrollTop();
-}
-async function prepareFile(f){
-  if(f.type==="application/pdf") return {blob:f,type:"application/pdf"};
-  try{
-    const bmp=await createImageBitmap(f); const s=Math.min(1,1800/Math.max(bmp.width,bmp.height));
-    const c=document.createElement("canvas"); c.width=Math.round(bmp.width*s); c.height=Math.round(bmp.height*s);
-    c.getContext("2d").drawImage(bmp,0,0,c.width,c.height);
-    const blob=await new Promise(r=>c.toBlob(r,"image/jpeg",0.82)); if(blob) return {blob,type:"image/jpeg"};
-  }catch(e){}
-  if(["image/jpeg","image/png","image/webp","image/gif"].includes(f.type)) return {blob:f,type:f.type};
-  throw {code:"unsupported_type"};
-}
-async function saveBeleg(){
-  if(busy||!pending) return;
-  const p=pending; const betrag=String(p.betrag).trim()===""?"":numDE(p.betrag);
-  if(String(p.betrag).trim()!=="" && !/^[\d.,\s]+$/.test(String(p.betrag).trim())){toast("Bitte den Betrag nur als Zahl eingeben, z. B. 5,00");return}
-  busy=true; render();
-  try{
-    let asset=p.keepAsset||"", ctype=p.keepType||"", oldAsset="";
-    if(p.dropAsset){ oldAsset=asset; asset=""; ctype="" }
-    if(p.file){
-      if(!ASSETS) throw {code:"no_assets"};
-      const {blob,type}=await prepareFile(p.file);
-      const up=await ASSETS.upload(blob,{type}); oldAsset=p.keepAsset||""; asset=up.id; ctype=up.contentType;
-    }
-    const d=parseIso(p.datum)||TODAY();
-    const data={kat:p.kat,datum:isoD(d),jahr:d.getFullYear(),betrag,titel:String(p.titel||"").trim(),asset,ctype};
-    if(p.editId){
-      if(BCOL && !p.editId.startsWith("local-")) await BCOL.doc(p.editId).update(data);
-      else { const x=BEL.find(x=>x.id===p.editId); if(x) Object.assign(x,data) }
-      if(oldAsset && oldAsset!==asset && ASSETS){ try{ await ASSETS.delete(oldAsset) }catch(e){} }
-    } else {
-      data.eingereicht=false; data.created=new Date().toISOString();
-      if(BCOL){ await BCOL.add(data) } else { BEL.push({id:"local-"+Date.now(),...data}) }
-    }
-    if(p.preview&&p.preview.startsWith("blob:")) URL.revokeObjectURL(p.preview);
-    pending=null; { const yy=String(d.getFullYear()); const cur=selYears(); if(!cur.includes(yy)) S.belegFilter.jahre=[...cur,yy]; } save(); toast(p.editId?"Änderungen gespeichert":"Beleg gespeichert");
-  }catch(e){
-    const c=e&&e.code;
-    toast(c==="too_large"?"Datei ist zu groß (max. 20 MB).":c==="unsupported_type"?"Dieses Dateiformat geht nicht. Bitte JPG, PNG oder PDF.":c==="quota_exceeded"?"Speicherplatz voll. Bitte alte Belege löschen.":c==="no_assets"?"Fotos können in dieser Ansicht nicht gespeichert werden.":"Speichern hat nicht geklappt. Bitte noch einmal versuchen.");
-  }
-  busy=false; render();
-}
-async function deleteBeleg(id){
-  const b=BEL.find(x=>x.id===id); delAsk=null; if(!b) return render();
-  try{
-    if(BCOL && !id.startsWith("local-")) await BCOL.doc(id).delete(); else BEL=BEL.filter(x=>x.id!==id);
-    if(b.asset && ASSETS){ try{ await ASSETS.delete(b.asset) }catch(e){} }
-    toast("Beleg gelöscht");
-  }catch(e){ toast("Löschen fehlgeschlagen.") }
-  render();
-}
-async function toggleSubmitted(id){
-  const b=BEL.find(x=>x.id===id); if(!b) return;
-  if(BCOL && !id.startsWith("local-")){ try{ await BCOL.doc(id).update({eingereicht:!b.eingereicht}) }catch(e){toast("Ändern fehlgeschlagen.")} }
-  else { b.eingereicht=!b.eingereicht; render() }
-}
-
-/* ---------- Sammel-PDF: mehrere Rechnungen erkennen und nach Jahr einsortieren ---------- */
-let bulk=null; // {phase:"lesen"|"pruefen"|"speichern", n, total, items:[], pdf, file, pages}
-let pdfjsP=null;
-function loadPdfJs(){
-  if(!pdfjsP) pdfjsP=import(new URL("vendor/pdf.min.js",location.href).href).then(m=>{ m.GlobalWorkerOptions.workerSrc=new URL("vendor/pdf.worker.min.js",location.href).href; return m }).catch(e=>{ pdfjsP=null; throw e });
-  return pdfjsP;
-}
-const pad2=n=>String(n).padStart(2,"0");
-const MONATE={januar:1,jan:1,februar:2,feb:2,"märz":3,maerz:3,mrz:3,april:4,apr:4,mai:5,juni:6,jun:6,juli:7,jul:7,august:8,aug:8,september:9,sept:9,sep:9,oktober:10,okt:10,november:11,nov:11,dezember:12,dez:12};
-function mkDatum(y,m,d){
-  y=Number(y); if(y<100) y+=2000; m=Number(m); d=Number(d);
-  const now=new Date().getFullYear();
-  if(!(m>=1&&m<=12&&d>=1&&d<=31) || y<now-6 || y>now+1) return null;
-  return `${y}-${pad2(m)}-${pad2(d)}`;
-}
-function datesIn(line){
-  const out=[]; let m;
-  const r1=/(?<!\d)(\d{1,2})\s?\.\s?(\d{1,2})\s?\.\s?(\d{4}|\d{2})(?!\d)/g; while((m=r1.exec(line))) out.push(mkDatum(m[3],m[2],m[1]));
-  const r2=/(?<!\d)(\d{1,2})\.?\s+(januar|jan|februar|feb|märz|maerz|mrz|april|apr|mai|juni|jun|juli|jul|august|aug|september|sept|sep|oktober|okt|november|nov|dezember|dez)\.?\s+(\d{4})/gi; while((m=r2.exec(line))) out.push(mkDatum(m[3],MONATE[m[2].toLowerCase()],m[1]));
-  const r3=/(?<!\d)(\d{4})-(\d{2})-(\d{2})(?!\d)/g; while((m=r3.exec(line))) out.push(mkDatum(m[1],m[2],m[3]));
-  return out.filter(Boolean);
-}
-const BETRAG=/(?<![\d,.])(\d{1,3}(?:[.\s']\d{3})+|\d+),(\d{2})(?!\d)/g;
-function amountsIn(line){ return [...line.matchAll(BETRAG)].map(m=>Number(m[1].replace(/[.\s']/g,"")+"."+m[2])).filter(v=>v>0&&v<100000) }
-const NICHT_DATUM=/geb\.|geboren|geburt|fällig|zahlbar bis|zahlungsziel|gültig bis|bis zum|überweisen bis|skonto/i;
-function pickDate(lines){
-  const key=/(rechnungs|beleg|quittungs|ausstellungs|kauf|verordnungs|abgabe)?datum|\bvom\b|\brechnung\b|\bquittung\b|\bdatum\b/i;
-  for(const l of lines){ if(key.test(l) && !NICHT_DATUM.test(l)){ const d=datesIn(l); if(d.length) return d[0] } }
-  const count={}; let first=null;
-  for(const l of lines){ if(NICHT_DATUM.test(l)) continue; for(const d of datesIn(l)){ count[d]=(count[d]||0)+1; first=first||d } }
-  const best=Object.entries(count).sort((a,b)=>b[1]-a[1])[0];
-  return best&&best[1]>1?best[0]:first;
-}
-function pickAmount(lines,kat){
-  const val=(i)=>{ const a=amountsIn(lines[i]); if(a.length) return a[a.length-1]; const n=lines[i+1]?amountsIn(lines[i+1]):[]; return n.length?n[0]:null };
-  if(KATS[kat]&&KATS[kat].zz){
-    for(let i=lines.length-1;i>=0;i--) if(/(summe|gesamt)[^0-9]{0,20}zuzahlung|zuzahlung[^0-9]{0,12}(gesamt|summe)/i.test(lines[i])){ const v=val(i); if(v!=null) return v }
-    const z=[]; lines.forEach((l,i)=>{ if(/zuzahlung|eigenanteil/i.test(l)){ const v=val(i); if(v!=null) z.push(v) } });
-    if(z.length) return Math.round(z.reduce((s,v)=>s+v,0)*100)/100;
-  }
-  const tiers=[/gesamtbetrag|rechnungsbetrag|endbetrag|zahlbetrag|zu zahlen|zu überweisen|gesamtsumme|bruttobetrag|summe brutto|rechnungssumme|gesamt brutto/i,/\bgesamt\b|\bsumme\b|\btotal\b|\bbetrag\b|\beur\b|€/i];
-  for(const re of tiers){ for(let i=lines.length-1;i>=0;i--){ if(re.test(lines[i]) && !/netto|mwst|ust|steuer|rabatt/i.test(lines[i])){ const v=val(i); if(v!=null) return v } } }
-  const all=lines.flatMap(amountsIn); return all.length?Math.max(...all):null;
-}
-const KAT_REGELN=[
-  ["vhp",/verhinderungspflege|§\s?39\b|kurzzeitpflege|§\s?42\b|ersatzpflege/i],
-  ["beratung",/beratungsbesuch|beratungseinsatz|§\s?37\s?abs\.?\s?3/i],
-  ["entl",/entlastungsbetrag|§\s?45\s?b|45b|alltagshilfe|haushaltshilfe|haushaltsnahe|betreuungsleistung|unterstützung im alltag|unterstuetzung im alltag|alltagsbegleitung|tagespflege|nachbarschaftshilfe/i],
-  ["pflhm",/pflegehilfsmittel|§\s?40\b|einmalhandschuh|bettschutzeinlage|pflegebox|desinfektion/i],
-  ["fahrt",/krankenfahrt|krankentransport|taxi|fahrdienst|beförderung/i],
-  ["heil",/physiotherap|krankengymnastik|ergotherap|logopäd|podolog|heilmittel|sanitätshaus|orthopädie|krankenhaus|klinik|stationär|hilfsmittel/i],
-  ["apo",/apotheke|pzn|rezept|arzneimittel|verordnung/i],
-  ["bescheid",/bescheid|widerspruch|sehr geehrte/i],
-];
-function guessKat(text){ for(const [k,re] of KAT_REGELN) if(re.test(text)) return k; return "sonst" }
-function guessTitel(lines){
-  const org=/apotheke|pflegedienst|sozialstation|sanitätshaus|praxis|physiotherap|ergotherap|logopäd|taxi|klinik|krankenhaus|diakonie|caritas|\bdrk\b|\bawo\b|alltagshilfe|tagespflege|gmbh|\be\.\s?v\.|\bgbr\b|\bug\b|\bohg\b/i;
-  const top=lines.slice(0,14);
-  const l=top.find(x=>org.test(x)&&x.length<70) || top.find(x=>x.length>=4&&x.length<=50&&!/\d{3,}/.test(x)&&!/rechnung|seite|datum/i.test(x));
-  return l?l.replace(/\s{2,}/g," ").slice(0,50):"";
-}
-function rechnungsNr(text){ const m=text.match(/(rechnungs?|beleg|quittungs?)[-\s]*(nr|nummer|no)\.?\s*:?\s*([A-Z0-9][A-Z0-9\-\/]{2,})/i); return m?m[3]:"" }
-async function pageLines(page){
-  const tc=await page.getTextContent(); const rows=new Map();
-  for(const it of tc.items){ if(!it.str||!it.str.trim()) continue; const y=Math.round(it.transform[5]/4); const r=rows.get(y)||[]; r.push([it.transform[4],it.str]); rows.set(y,r) }
-  return [...rows.entries()].sort((a,b)=>b[0]-a[0]).map(([,r])=>r.sort((a,b)=>a[0]-b[0]).map(x=>x[1]).join(" ").replace(/\s+/g," ").trim()).filter(Boolean);
-}
-async function pageCanvas(page,maxW){
-  const v1=page.getViewport({scale:1}); const vp=page.getViewport({scale:Math.min(3,maxW/v1.width)});
-  const c=document.createElement("canvas"); c.width=Math.ceil(vp.width); c.height=Math.ceil(vp.height);
-  const ctx=c.getContext("2d"); ctx.fillStyle="#fff"; ctx.fillRect(0,0,c.width,c.height);
-  await page.render({canvasContext:ctx,viewport:vp}).promise; return c;
-}
-async function importPdf(file){
-  pending=null; bulk={phase:"lesen",n:0,total:0,items:[],file,msg:"Die PDF wird geöffnet …"}; render(); scrollTop();
-  let ocr=null;
-  try{
-    const lib=await loadPdfJs();
-    const buf=await file.arrayBuffer();
-    const pdf=await lib.getDocument({data:new Uint8Array(buf),wasmUrl:new URL("vendor/wasm/",location.href).href,standardFontDataUrl:new URL("vendor/fonts/",location.href).href,isEvalSupported:false}).promise;
-    if(!bulk||bulk.file!==file) return;
-    bulk.pdf=pdf; bulk.total=pdf.numPages; bulk.pages=[];
-    for(let i=1;i<=pdf.numPages;i++){
-      if(!bulk||bulk.file!==file) return;
-      bulk.n=i; bulk.msg=`Seite ${i} von ${pdf.numPages} wird gelesen …`; render();
-      const page=await pdf.getPage(i);
-      let lines=await pageLines(page);
-      const thumb=(await pageCanvas(page,160)).toDataURL("image/jpeg",0.7);
-      if(lines.join("").length<40){ // eingescannt: Text erst erkennen
-        bulk.msg=`Seite ${i} von ${pdf.numPages}: eingescannt, Text wird erkannt …`; render();
-        try{
-          if(!ocr){ const T=await loadTesseract(); ocr=await T.createWorker("deu") }
-          const c=await pageCanvas(page,1700); const {data}=await ocr.recognize(c);
-          lines=String(data.text||"").split(/\n+/).map(s=>s.replace(/\s+/g," ").trim()).filter(Boolean);
-        }catch(e){}
-      }
-      bulk.pages.push({i,lines,text:lines.join("\n"),thumb});
-    }
-    if(!bulk||bulk.file!==file) return;
-    bulk.items=groupPages(bulk.pages); bulk.phase="pruefen"; bulk.msg="";
-  }catch(e){
-    bulk={phase:"fehler",file,items:[],msg:"Die PDF konnte nicht gelesen werden."};
-  }finally{ if(ocr) try{ await ocr.terminate() }catch(e){} }
-  render(); scrollTop();
-}
-function groupPages(pages){
-  const groups=[];
-  for(const p of pages){
-    const prev=groups[groups.length-1];
-    const nr=rechnungsNr(p.text), d=pickDate(p.lines), hasAmt=amountsIn(p.text).length>0;
-    const folge=/seite\s*([2-9]|[1-9]\d)\s*(von|\/|of)\s*\d+/i.test(p.text) && !/seite\s*1\s*(von|\/|of)/i.test(p.text);
-    if(prev && (folge || (nr && nr===prev.nr) || (!d && !hasAmt && p.text.length>0))){ prev.pages.push(p); continue }
-    groups.push({nr,pages:[p]});
-  }
-  return groups.map((g,idx)=>{
-    const lines=g.pages.flatMap(p=>p.lines), text=lines.join("\n");
-    const kat=guessKat(text), datum=pickDate(lines)||"", b=pickAmount(lines,kat);
-    return {id:"bi"+idx,on:true,pages:g.pages.map(p=>p.i),thumb:g.pages[0].thumb,kat,datum,betrag:b==null?"":String(b.toFixed(2)).replace(".",","),titel:guessTitel(g.pages[0].lines)};
-  });
-}
-function bulkYears(){ const c={}; for(const it of bulk.items) if(it.on){ const y=(it.datum||"").slice(0,4)||"ohne Datum"; c[y]=(c[y]||0)+1 } return Object.entries(c).sort() }
-function bulkView(){
-  const B=bulk;
-  if(B.phase==="lesen"||B.phase==="speichern") return `<div class="pending bulk">
-    <h3>${B.phase==="lesen"?"Rechnungen werden erkannt":"Belege werden gespeichert"}</h3>
-    ${B.total?bar(B.n,B.total,B.msg):`<p class="muted">${esc(B.msg)}</p>`}
-    <p class="small muted">${B.phase==="lesen"?"Alles passiert auf deinem Gerät. Bei eingescannten Seiten dauert es etwas länger.":"Bitte die Seite nicht schließen."}</p>
-    ${B.phase==="lesen"?`<button class="btn ghost" type="button" data-act="bulk-cancel">Abbrechen</button>`:""}
-  </div>`;
-  if(B.phase==="fehler"||!B.items.length) return `<div class="pending bulk">
-    <p class="notice warn">${ic("alert")}<span>${B.phase==="fehler"?esc(B.msg):"In dieser PDF haben wir keine Rechnung erkannt."} Du kannst sie trotzdem als einen Beleg speichern.</span></p>
-    <div class="nav big go"><button class="btn ghost" type="button" data-act="bulk-cancel">Abbrechen</button><button class="btn" type="button" data-act="bulk-single">Als einen Beleg speichern</button></div></div>`;
-  const on=B.items.filter(x=>x.on).length, yrs=bulkYears();
-  return `<div class="pending bulk">
-    <h3>${B.items.length===1?"1 Rechnung erkannt":`${B.items.length} Rechnungen erkannt`}</h3>
-    ${yrs.length?`<div class="yearchips">${yrs.map(([y,n])=>`<span class="chip" aria-pressed="true">${esc(y)}: ${n}</span>`).join("")}</div>`:""}
-    ${B.pages&&B.pages.some(x=>!x.text)?`<p class="notice warn">${ic("alert")}<span>Bei ${B.pages.filter(x=>!x.text).length===1?"einer Seite":B.pages.filter(x=>!x.text).length+" Seiten"} konnten wir den Text nicht lesen. Bitte dort Datum und Betrag selbst eintragen.</span></p>`:""}
-    <p class="notice info">${ic("info")}<span>Bitte kurz prüfen. Du kannst alles ändern oder eine Rechnung abwählen. Gespeichert wird erst, wenn du unten tippst.</span></p>
-    <div class="bulklist">${B.items.map((it,i)=>`<article class="bulkitem${it.on?"":" off"}" id="${it.id}">
-      <label class="bion" for="bion-${i}"><input type="checkbox" id="bion-${i}" data-bi="${i}:on" ${it.on?"checked":""}><span>übernehmen</span></label>
-      <img class="bthumb" src="${it.thumb}" alt="Seite ${it.pages[0]}">
-      <div class="bfields">
-        <span class="small muted">${it.pages.length>1?`Seiten ${it.pages[0]}–${it.pages[it.pages.length-1]}`:`Seite ${it.pages[0]}`}</span>
-        <div class="field"><label for="bik-${i}">Art</label><select id="bik-${i}" data-bi="${i}:kat">${Object.entries(KATS).map(([k,v])=>`<option value="${k}" ${it.kat===k?"selected":""}>${esc(v.t)}</option>`).join("")}</select></div>
-        <div class="grid2">
-          <div class="field"><label for="bid-${i}">Datum${it.datum?"":' <span class="miss">fehlt</span>'}</label><input type="date" id="bid-${i}" data-bi="${i}:datum" value="${esc(it.datum)}"></div>
-          <div class="field"><label for="bib-${i}">Betrag${it.betrag?"":' <span class="miss">fehlt</span>'}</label><div class="euro"><input type="text" inputmode="decimal" id="bib-${i}" data-bi="${i}:betrag" value="${esc(it.betrag)}" placeholder="z. B. 5,00"><span>€</span></div></div>
-        </div>
-        <div class="field"><label for="bit-${i}">Beschreibung</label><input type="text" id="bit-${i}" data-bi="${i}:titel" value="${esc(it.titel)}" placeholder="z. B. Apotheke am Markt"></div>
-      </div>
-    </article>`).join("")}</div>
-    ${ASSETS?"":`<p class="small muted">Ohne Konto werden nur Datum, Betrag und Art gespeichert, nicht die Seiten selbst.</p>`}
-    <div class="nav big go"><button class="btn ghost" type="button" data-act="bulk-cancel">Abbrechen</button><button class="btn" type="button" data-act="bulk-save" ${on?"":"disabled"}>${on===1?"1 Beleg speichern":`${on} Belege speichern`}</button></div>
-  </div>`;
-}
-async function bulkBlob(it){
-  const B=bulk;
-  if(B.items.length===1 && it.pages.length===B.total && B.file.size<20e6) return {blob:B.file,type:"application/pdf"};
-  const canvases=[]; for(const i of it.pages) canvases.push(await pageCanvas(await B.pdf.getPage(i),1300));
-  if(canvases.length===1 || !window.jspdf){ // ohne PDF-Bibliothek: Seiten untereinander zu einem Bild
-    let c=canvases[0];
-    if(canvases.length>1){ const w=Math.max(...canvases.map(x=>x.width)), h=canvases.reduce((s,x)=>s+x.height,0), k=Math.min(1,12000/h); c=document.createElement("canvas"); c.width=Math.round(w*k); c.height=Math.round(h*k); const g=c.getContext("2d"); g.fillStyle="#fff"; g.fillRect(0,0,c.width,c.height); let y=0; for(const x of canvases){ g.drawImage(x,0,y,x.width*k,x.height*k); y+=x.height*k } }
-    const blob=await new Promise(r=>c.toBlob(r,"image/jpeg",0.8)); return {blob,type:"image/jpeg"} }
-  const doc=new window.jspdf.jsPDF({unit:"mm",format:"a4"});
-  canvases.forEach((c,k)=>{ if(k) doc.addPage(); const w=210, h=Math.min(297,c.height/c.width*210); doc.addImage(c.toDataURL("image/jpeg",0.8),"JPEG",0,0,w,h) });
-  return {blob:doc.output("blob"),type:"application/pdf"};
-}
-async function bulkSave(){
-  if(!bulk||bulk.phase!=="pruefen") return;
-  const bad=bulk.items.find(it=>it.on && String(it.betrag).trim() && !/^[\d.,\s]+$/.test(String(it.betrag).trim()));
-  if(bad){ toast("Bitte Beträge nur als Zahl eingeben, z. B. 5,00"); return }
-  const list=bulk.items.filter(x=>x.on); bulk.phase="speichern"; bulk.total=list.length; bulk.n=0; render();
-  let ok=0; const years=new Set();
-  for(const it of list){
-    bulk.n++; bulk.msg=`Beleg ${bulk.n} von ${list.length}`; render();
-    try{
-      let asset="", ctype="";
-      if(ASSETS){ const {blob,type}=await bulkBlob(it); const up=await ASSETS.upload(blob,{type}); asset=up.id; ctype=up.contentType }
-      const d=parseIso(it.datum)||TODAY();
-      const data={kat:it.kat,datum:isoD(d),jahr:d.getFullYear(),betrag:String(it.betrag).trim()===""?"":numDE(it.betrag),titel:String(it.titel||"").trim(),asset,ctype,eingereicht:false,created:new Date().toISOString()};
-      if(BCOL) await BCOL.add(data); else BEL.push({id:"local-"+Date.now()+"-"+ok,...data});
-      ok++; years.add(String(d.getFullYear()));
-    }catch(e){}
-  }
-  const cur=selYears(); S.belegFilter.jahre=[...new Set([...cur,...years])]; S.belegFilter.kat=""; save();
-  bulk=null; render(); scrollTop();
-  toast(ok===list.length?(ok===1?"1 Beleg gespeichert":`${ok} Belege gespeichert`):`${ok} von ${list.length} Belegen gespeichert. Bitte die übrigen noch einmal versuchen.`);
-}
-
-/* ---------- Events ---------- */
-document.addEventListener("click", e=>{
-  const t=e.target.closest("[data-act],[data-open],[data-copy],[data-pdf],[data-resettx],[data-tab],[data-area],[data-kat],[data-del],[data-delyes],[data-delno],[data-sub-toggle],[data-view],[data-delown],[data-year],[data-befpdf],[data-befcopy],[data-edit],[data-wopen],[data-wnav],[data-font],[data-gotoclaim],[data-rmember]");
-  if(!t) return;
-  const a=t.dataset.act;
-  if(t.dataset.tab){if(t.classList.contains("howbtn"))S.welcomeSeen=true;S.tab=t.dataset.tab;openKey=null;save();render();scrollTop();return}
-  if(t.dataset.area){areaFilter=t.dataset.area;render();return}
-  if(t.dataset.gotoclaim){ S.tab="ansprueche"; openKey=t.dataset.gotoclaim; render(); const el=$("it-"+openKey); el&&el.scrollIntoView({block:"start"}); return }
-  if(t.dataset.rmember){ removeMember(t.dataset.rmember); return }
-  if(t.dataset.font){ S.font=t.dataset.font; save(); render(); return }
-  if(t.dataset.edit){ editBeleg(t.dataset.edit); return }
-  if(t.dataset.wopen){ startWiz(t.dataset.wopen); return }
-  if(t.dataset.wnav){ const n=t.dataset.wnav; const len=wizSteps().list.length;
-    if(n==="close"){ const k=S.wiz.k; S.wiz=null; openKey=k; save(); render(); const el=$("it-"+k); el&&el.scrollIntoView({block:"start"}); return }
-    if(n==="next") S.wiz.i=Math.min(len-1,S.wiz.i+1);
-    else if(n==="back") S.wiz.i=Math.max(0,S.wiz.i-1);
-    else if(n.startsWith("goto:")) S.wiz.i=Number(n.slice(5));
-    save(); render(); scrollTop(); const f=document.querySelector(".wiz input[type=text],.wiz input[type=date],.wiz input[type=tel],.wiz textarea"); if(f&&!f.value) try{f.focus({preventScroll:true})}catch(e){} return }
-  if(t.dataset.year){ const y=t.dataset.year; let cur=selYears(); cur=cur.includes(y)?cur.filter(x=>x!==y):[...cur,y]; if(!cur.length){toast("Mindestens ein Jahr auswählen");return} S.belegFilter.jahre=cur; save(); render(); return }
-  if(t.dataset.befpdf){ makeMappe(true,true,[t.dataset.befpdf]); return }
-  if(t.dataset.befcopy){ befJahr=t.dataset.befcopy; const L=curLetter(B.find(x=>x.k==="befreiung")); copy(`Betreff: ${L.subject}\n\n${L.body}`); return }
-  if(t.dataset.kat!==undefined && t.classList.contains("chip")){S.belegFilter.kat=t.dataset.kat;save();render();return}
-  if(t.dataset.del){delAsk=t.dataset.del;render();return}
-  if(t.dataset.delno){delAsk=null;render();return}
-  if(t.dataset.delyes){deleteBeleg(t.dataset.delyes);return}
-  if(t.dataset.subToggle){toggleSubmitted(t.dataset.subToggle);return}
-  if(t.dataset.view){$("lbimg").src=blobUrl(t.dataset.view);$("lightbox").hidden=false;return}
-  if(t.dataset.delown){S.termine.eigene=(S.termine.eigene||[]).filter(x=>x.id!==t.dataset.delown);save();render();return}
-  if(t.dataset.open){openKey = openKey===t.dataset.open?null:t.dataset.open; render(); if(openKey) reveal($("it-"+openKey));return}
-  if(t.dataset.copy){const b=B.find(x=>x.k===t.dataset.copy);const L=curLetter(b);copy(`Betreff: ${L.subject}\n\n${L.body}`);return}
-  if(t.dataset.pdf){makePDF(B.find(x=>x.k===t.dataset.pdf));return}
-  if(t.dataset.resettx){delete S.texte[t.dataset.resettx];delete S.texte[t.dataset.resettx+"_sub"];save();render();return}
-  switch(a){
-    case "next": { if(t.dataset.ok==="0"){ const w=$("navwarn"); if(w){ w.hidden=false; w.scrollIntoView({block:"center",behavior:"smooth"}) } break }
-      const vs=visSteps(); if(S.step>=vs.length-1){S.done=true;S.tab="ansprueche"} else S.step++; save();render();scrollTop();break }
-    case "back": S.step=Math.max(0,S.step-1);save();render();scrollTop();break;
-    case "edit": S.done=false;S.step=0;save();render();scrollTop();break;
-    case "reset": $("resetconfirm").hidden=false;break;
-    case "sent": { const k=t.dataset.k; S.status[k]="beantragt"; S.sent=S.sent||{}; S.sent[k]=isoD(TODAY()); const bb=B.find(x=>x.k===k);
-      S.termine.eigene=[...(S.termine.eigene||[]),{id:String(Date.now()),t:`Antwort auf Antrag „${bb?bb.t:k}“ da?`,d:isoD(addDays(TODAY(),28)),n:"Falls noch keine Antwort da ist: bei der Kasse nachfragen. Das Datum des Antrags steht in der App."}];
-      save(); render(); toast("Super! Wir erinnern dich in 4 Wochen."); break }
-    case "dropphoto": if(pending){ if(pending.preview&&pending.preview.startsWith("blob:")) URL.revokeObjectURL(pending.preview); pending.file=null; pending.preview=""; if(pending.keepAsset) pending.dropAsset=true; render() } break;
-    case "bes-cam": fileTarget="bescheid"; $("fileCam").value=""; $("fileCam").click(); break;
-    case "bes-manual": case "bes-edit": bescheidDraft={...(S.bescheid||{}), pg:(S.bescheid&&S.bescheid.pg)||String(pg()||"")}; ocrMsg=""; render(); break;
-    case "bes-cancel": bescheidDraft=null; ocrMsg=""; render(); break;
-    case "bes-save": saveBescheid(); break;
-    case "entl-add": S.tab="belege"; pending=null; startPending(null); if(pending){ pending.kat="entl"; render() } scrollTop(); break;
-    case "r-start": startRechner(); break;
-    case "r-next": RECHNER.i++; render(); scrollTop(); break;
-    case "r-back": RECHNER.i=Math.max(0,RECHNER.i-1); render(); scrollTop(); break;
-    case "r-close": RECHNER=null; render(); scrollTop(); break;
-    case "r-neu": startRechner(); break;
-    case "r-antrag": { const k=pg()?"pg_hoch":"pg_antrag"; RECHNER=null; S.bereiche.pflege=true; if(!S.done){ S.done=true } startWiz(k); break }
-    case "r-konto": RECHNER=null; if(typeof authMode!=="undefined"){ authMode="register"; authMsg="Lege ein kostenloses Konto an. Danach hilft dir die App Schritt für Schritt beim Antrag." } render(); scrollTop(); break;
-    case "au-google": googleLogin(); break;
-    case "au-login": case "au-register": case "au-forgot": case "au-newpw": authAction(a); break;
-    case "au-mode": authMode=t.dataset.mode; authMsg=""; render(); break;
-    case "au-show": { const p=$("au-pw"); if(p){ p.type=p.type==="password"?"text":"password"; t.textContent=p.type==="password"?"Zeigen":"Verbergen" } break }
-    case "au-guest": lsSet("dein-anspruch-modus","gast"); startGuest(); scrollTop(); break;
-    case "guest-register": GUEST=false; authMode="register"; authMsg=""; lsSet("dein-anspruch-modus",""); render(); scrollTop(); break;
-    case "logout": logout(); break;
-    case "cs-yes": giveConsent(); break;
-    case "fb-open": openFeedback(); break;
-    case "fb-close": closeFeedback(); break;
-    case "fb-send": sendFeedback(); break;
-    case "teilen": shareApp(); break;
-    case "eri-on": setEri(true,($("eri-mail")||{}).value); break;
-    case "eri-off": setEri(false); break;
-    case "persons": showPersons=!showPersons; delPersonAsk=false; if(showPersons) loadMembers(); render(); scrollTop(); break;
-    case "add-person": addPerson(); break;
-    case "invite": makeInvite(); break;
-    case "inv-copy": copy(inviteLink); break;
-    case "del-person": delPersonAsk=true; render(); break;
-    case "del-person-no": delPersonAsk=false; render(); break;
-    case "del-person-yes": deletePerson(); break;
-    case "wipe": wipeAsk=true; render(); { const w=$("wipe-word"); if(w) try{ w.focus({preventScroll:true}) }catch(e){} } break;
-    case "wipe-no": wipeAsk=false; render(); break;
-    case "wipe-yes": wipeAll(); break;
-    case "backup": backupData(); break;
-    case "restore": { const f=$("fileJson"); if(f){ f.value=""; f.click() } break }
-    case "welcome-ok": S.welcomeSeen=true;save();render();break;
-    case "vhp-quittung": makeQuittung();break;
-    case "reset-no": $("resetconfirm").hidden=true;break;
-    case "reset-yes": S=blank();openKey=null;save();render();scrollTop();break;
-    case "cam": $("fileCam").value="";$("fileCam").click();break;
-    case "pick": $("fileAny").value="";$("fileAny").click();break;
-    case "manual": startPending(null);break;
-    case "cancelbeleg": if(pending&&pending.preview&&pending.preview.startsWith("blob:")) URL.revokeObjectURL(pending.preview); pending=null;render();break;
-    case "savebeleg": saveBeleg();break;
-    case "bulk-save": bulkSave();break;
-    case "bulk-cancel": bulk=null;render();break;
-    case "bulk-single": { const f=bulk&&bulk.file; bulk=null; startPending(f); break }
-    case "mappe": makeMappe(false,false);break;
-    case "csv": makeCSV();break;
-    case "addbesuch": { const v=$("tbesuch").value; if(!parseIso(v)){toast("Bitte ein Datum wählen");break} S.termine.besuche=[...(S.termine.besuche||[]),{d:v}];save();render();toast("Besuch eingetragen");break }
-    case "copypd": copy(pdText());break;
-    case "addown": { const tt=$("ownt").value.trim(), d=$("ownd").value; if(!tt||!parseIso(d)){toast("Bitte Text und Datum angeben");break} S.termine.eigene=[...(S.termine.eigene||[]),{id:String(Date.now()),t:tt,d}];save();render();toast("Erinnerung hinzugefügt");break }
-  }
-});
-document.addEventListener("change", e=>{
-  const t=e.target, n=t.name;
-  if(t.id==="langsel"){ LANG=t.value; try{localStorage.setItem("da-lang",JSON.stringify(LANG))}catch(e){} render(); return }
-  if(t.dataset.plz){ if(/^\d{5}$/.test(t.value.trim())){ S.plz=t.value.trim(); save(); render() } return }
-  if(t.dataset.rq!=null && RECHNER){ RECHNER.a[RECHNER.i]=t.dataset.rq; render(); setTimeout(()=>{ if(RECHNER && RECHNER.a[RECHNER.i]!=null){ RECHNER.i++; render(); scrollTop() } },350); return }
-  if(t.id==="fileJson"){ const f=t.files&&t.files[0]; if(f && typeof restoreData==="function") restoreData(f); return }
-  if(t.id==="fileCam"||t.id==="fileAny"){ const f=t.files&&t.files[0]; if(f){ if(fileTarget==="bescheid"){ fileTarget=null; scanBescheid(f) } else if(!pending && (f.type==="application/pdf"||/\.pdf$/i.test(f.name||""))) importPdf(f); else startPending(f) } return }
-  if(t.dataset.bd && bescheidDraft){ bescheidDraft[t.dataset.bd]=t.value; return }
-  if(t.dataset.bi && bulk && bulk.items){ const [i,f]=t.dataset.bi.split(":"); const it=bulk.items[+i]; if(it){ it[f]=t.type==="checkbox"?t.checked:t.value; render() } return }
-  if(t.dataset.fall){ openFall(t.dataset.fall); scrollTop(); return }
-  if(t.id==="entl-seit"){ S.entlSeit=t.value; save(); render(); return }
-  if(t.dataset.wq && t.type==="radio"){ const q=wizSteps().list.find(x=>x.k===t.dataset.wq); if(q){ setQ(q,t.value); render(); const k=S.wiz.k, i=S.wiz.i; setTimeout(()=>{ if(S.wiz&&S.wiz.k===k&&S.wiz.i===i){ const nx=document.querySelector('.wiz .nav [data-wnav="next"]:not(.ghost)'); nx&&nx.click() } },420) } return }
-  if(t.dataset.wqm){ const q=wizSteps().list.find(x=>x.k===t.dataset.wqm); if(q){ const cur=Array.isArray(getQ(q))?getQ(q):[]; setQ(q, t.checked?[...cur,t.value]:cur.filter(x=>x!==t.value)); render() } return }
-  if(t.dataset.wq && t.type==="date"){ const q=wizSteps().list.find(x=>x.k===t.dataset.wq); if(q){ setQ(q,t.value); render() } return }
-  if(n==="rolle") S.rolle=t.value;
-  else if(n==="bereich") S.bereiche[t.value]=t.checked;
-  else if(n==="kasse") S.kasse=t.value;
-  else if(t.id==="aokRegion") S.aokRegion=t.value;
-  else if(n==="pg") S.pg=t.value;
-  else if(n==="wohnen") S.wohnen=t.value;
-  else if(n==="stunden10") S.pp.stunden10=t.value;
-  else if(n==="arbeit") S.pp.arbeit=t.value;
-  else if(n==="sbstatus") S.sb.status=t.value;
-  else if(t.id==="gdb") S.sb.gdb=t.value;
-  else if(n==="mz") S.sb.mz[t.value]=t.checked;
-  else if(n==="sbx") S.sb[t.value]=t.checked;
-  else if(n==="genutzt") S.genutzt[t.value]=t.checked;
-  else if(t.dataset.check){ S.checks[t.dataset.check]=t.checked; save(); return }
-  else if(t.dataset.status) S.status[t.dataset.status]=t.value;
-  else if(t.dataset.gen) {S.genutzt[t.dataset.gen]=t.checked; openKey=null}
-  else if(t.id==="chron") S.chronisch=t.value;
-  else if(t.dataset.brutto){ S.bruttoJahr={...(S.bruttoJahr||{}),[t.dataset.brutto]:t.value} }
-  else if(t.dataset.vhp){ S.vhp[t.dataset.vhp]=t.value; delete S.texte.jahresbetrag; delete S.texte.jahresbetrag_sub }
-  else if(t.id==="twm") S.termine.wertmarke=t.value;
-  else if(t.dataset.pend){ pending[t.dataset.pend]=t.value; if(t.type==="radio") render(); return }
-  else return;
-  save(); render();
-});
-document.addEventListener("input", e=>{
-  const t=e.target;
-  if(t.dataset.wq && t.type!=="radio" && t.type!=="date"){ const q=wizSteps().list.find(x=>x.k===t.dataset.wq); if(q){ setQ(q,t.value); const sk=document.querySelector('.wiz [data-wnav="next"].ghost'); if(sk) sk.hidden=!!t.value.trim() } return }
-  if(t.dataset.bd && bescheidDraft){ bescheidDraft[t.dataset.bd]=t.value; return }
-  if(t.dataset.bi && bulk && bulk.items && t.type!=="checkbox"){ const [i,f]=t.dataset.bi.split(":"); const it=bulk.items[+i]; if(it) it[f]=t.value; return }
-  if(t.dataset.wqp){ S.person[t.dataset.wqp]=t.value; save(); return }
-  if(t.id==="kasseAndere"){S.kasseAndere=t.value;save()}
-  else if(t.dataset.p){S.person[t.dataset.p]=t.value;save()}
-  else if(t.dataset.tx){S.texte[t.dataset.tx]=t.value;save()}
-  else if(t.dataset.sub){S.texte[t.dataset.sub+"_sub"]=t.value;save()}
-  else if(t.dataset.pend){pending[t.dataset.pend]=t.value}
-  else if(t.dataset.vhp && t.type!=="radio"){S.vhp[t.dataset.vhp]=t.value;save()}
-  else if(t.id==="tdienst"){S.termine.dienst=t.value;save()}
-  else if(t.id==="ttel"){S.termine.tel=t.value;save()}
-});
-document.addEventListener("dragover", e=>{const d=e.target.closest&&e.target.closest("#drop"); if(d&&ASSETS){e.preventDefault();d.classList.add("over")}});
-document.addEventListener("dragleave", e=>{const d=e.target.closest&&e.target.closest("#drop"); if(d) d.classList.remove("over")});
-document.addEventListener("drop", e=>{const d=e.target.closest&&e.target.closest("#drop"); if(d&&ASSETS){e.preventDefault();const f=e.dataTransfer.files[0]; if(f) startPending(f)}});
-$("lbclose").onclick=()=>{$("lightbox").hidden=true};
-$("lightbox").onclick=e=>{if(e.target.id==="lightbox") $("lightbox").hidden=true};
-document.addEventListener("keydown",e=>{if(e.key==="Escape"){ $("lightbox").hidden=true; const fb=$("fbbox"); if(fb) fb.hidden=true }
-  if(e.key==="Enter" && e.target.closest && e.target.closest(".auth") && e.target.tagName==="INPUT"){ e.preventDefault(); const b=document.querySelector('.auth .btn.big'); b&&b.click(); return }
-  if(e.key==="Enter" && S.wiz && e.target.matches && e.target.matches(".wiz input")){ e.preventDefault(); const nx=document.querySelector('.wiz .nav [data-wnav="next"]:not(.ghost)'); nx&&nx.click() }});
-
-async function copy(text){
-  try{await navigator.clipboard.writeText(text);toast("Text kopiert")}
-  catch(e){const ta=document.querySelector("textarea[data-tx]"); if(ta){ta.focus();ta.select()} toast("Bitte Text markieren und kopieren (Strg+C)")}
-}
-let tT; function toast(m){const t=$("toast");t.textContent=tr(m);t.hidden=false;clearTimeout(tT);tT=setTimeout(()=>t.hidden=true,2800)}
-
-/* ---------- Speicher: Supabase (Konto, Datenbank, Beleg-Fotos) ---------- */
-const SB_URL="https://ssamgluufgwsxvkyvaob.supabase.co";
-const SB_KEY="sb_publishable_UiXPXKzQ6uKTyQF3SqFQiw_VtjqAAbd";
-let sb=null, USER=null, GUEST=false, RECOVERY=false, authMsg="", authMode="login", authBusy=false;
-let ref=null, BCOL=null, ASSETS=null, saveTimer=null, writing=Promise.resolve(), canSave=false;
-let saveState={c:"",t:"Verbinde …"};
-let URLS={};
-const lsGet=k=>{try{return JSON.parse(localStorage.getItem(k)||"null")}catch(e){return null}};
-const lsSet=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
-function blobUrl(p){ return URLS[p]||"" }
-function setSave(c,t){saveState={c,t}; const d=$("savedot"), x=$("savetxt"); if(d){d.className="dot "+c} if(x) x.textContent=t}
-const DL={ async save({filename,data}){
-  const type=/\.csv$/.test(filename)?"text/csv;charset=utf-8":/\.pdf$/.test(filename)?"application/pdf":"application/octet-stream";
-  const blob=data instanceof Blob?data:new Blob([data],{type});
-  const u=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=u; a.download=filename; document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(()=>URL.revokeObjectURL(u),8000); return {status:"saved"} } };
-const UI_KEYS=["tab","wiz","belegFilter","welcomeSeen"];
-let FAELLE=[], FALL_ID=null, MEMBERS=[], showPersons=false, inviteLink="", inviteBusy=false;
-function uiKey(){ return "da-ui-"+(USER?USER.id:"gast")+"-"+(FALL_ID||"x") }
-function save(){
-  if(!canSave||!ref) return;
-  clearTimeout(saveTimer); setSave("","Speichert …");
-  const ui={}; UI_KEYS.forEach(k=>ui[k]=S[k]); lsSet(uiKey(),ui); lsSet("da-font",S.font);
-  saveTimer=setTimeout(()=>{
-    saveTimer=null;
-    const data=JSON.parse(JSON.stringify(S)); data.updated=new Date().toISOString();
-    if(USER) UI_KEYS.forEach(k=>delete data[k]);
-    const f=FAELLE.find(x=>x.id===FALL_ID); if(f) f.data=data;
-    writing = writing.then(()=>ref.set(data)).then(()=>setSave("ok",USER?"Gespeichert":"Nur auf diesem Gerät")).catch(()=>{ setSave("warn","Nicht gespeichert – Internet prüfen") });
-  },700);
-}
-function merge(d){
-  const b=blank();
-  const m={...b,...d,bereiche:{...b.bereiche,...(d.bereiche||{})},pp:{...b.pp,...(d.pp||{})},sb:{...b.sb,...(d.sb||{}),mz:{...(d.sb&&d.sb.mz||{})}},person:{...b.person,...(d.person||{})},termine:{...b.termine,...(d.termine||{})},belegFilter:{...b.belegFilter,...(d.belegFilter||{})},vhp:{...b.vhp,...(d.vhp||{})},bruttoJahr:{...(d.bruttoJahr||{})},ans:{...(d.ans||{})},sent:{...(d.sent||{})}};
-  if(d.done===undefined) m.done = (d.step||0)>=6 && !!d.rolle;
-  delete m.updated; return m;
-}
-function fallName(f){ const p=(f&&f.data&&f.data.person)||{}; return (p.name||"").trim()||"Neue Person" }
-const toRow=d=>{ const r={}; for(const k of ["kat","titel","ctype","eingereicht","jahr"]) if(k in d) r[k]=d[k];
-  if("datum" in d) r.datum=d.datum||null; if("betrag" in d) r.betrag=(d.betrag===""||d.betrag==null||isNaN(d.betrag))?null:Number(d.betrag);
-  if("asset" in d) r.pfad=d.asset||""; return r };
-async function refreshUrls(){
-  const paths=BEL.map(b=>b.asset).filter(p=>p&&!URLS[p]); if(!paths.length) return;
-  const {data}=await sb.storage.from("belege").createSignedUrls(paths,6*3600);
-  (data||[]).forEach(x=>{ if(x.signedUrl) URLS[x.path]=x.signedUrl });
-}
-async function reloadBelege(){
-  if(!USER||!FALL_ID) return;
-  const {data,error}=await sb.from("belege").select("*").eq("fall_id",FALL_ID).order("datum",{ascending:false});
-  if(error){ toast("Belege konnten nicht geladen werden."); return }
-  BEL=data.map(r=>({id:r.id,kat:r.kat,datum:r.datum||"",jahr:r.jahr,betrag:r.betrag==null?"":Number(r.betrag),titel:r.titel||"",asset:r.pfad||"",ctype:r.ctype||"",eingereicht:!!r.eingereicht}));
-  try{ await refreshUrls() }catch(e){}
-  render();
-}
-const BCOL_SB={
-  async add(d){ const {error}=await sb.from("belege").insert({...toRow(d),fall_id:FALL_ID}); if(error) throw error; await reloadBelege() },
-  doc(id){ return {
-    async update(d){ const {error}=await sb.from("belege").update(toRow(d)).eq("id",id); if(error) throw error; await reloadBelege() },
-    async delete(){ const {error}=await sb.from("belege").delete().eq("id",id); if(error) throw error; await reloadBelege() } } },
-};
-const ASSETS_SB={
-  async upload(blob,{type}){
-    const ext=type==="application/pdf"?"pdf":type==="image/png"?"png":type==="image/webp"?"webp":"jpg";
-    const id=(crypto.randomUUID?crypto.randomUUID():String(Date.now())+Math.random().toString(16).slice(2));
-    const path=`${FALL_ID}/${id}.${ext}`;
-    const {error}=await sb.storage.from("belege").upload(path,blob,{contentType:type,upsert:false});
-    if(error) throw {code:/size|large|exceed/i.test(error.message||"")?"too_large":"upload"};
-    const {data}=await sb.storage.from("belege").createSignedUrl(path,6*3600); if(data) URLS[path]=data.signedUrl;
-    return {id:path,contentType:type};
-  },
-  async delete(path){ await sb.storage.from("belege").remove([path]) },
-};
-const REF_SB={ async set(data){ const {error}=await sb.from("fall").update({data,updated_at:new Date().toISOString()}).eq("id",FALL_ID); if(error) throw error } };
-const REF_LOCAL={ async set(data){ lsSet("dein-anspruch-gast",data) } };
-
-async function loadFaelle(){
-  const {data,error}=await sb.from("fall").select("id,data,created_by,updated_at").order("created_at");
-  if(error) throw error;
-  const {data:m}=await sb.from("mitglied").select("fall_id,rolle").eq("user_id",USER.id);
-  const rollen=Object.fromEntries((m||[]).map(x=>[x.fall_id,x.rolle]));
-  FAELLE=data.map(f=>({...f,rolle:rollen[f.id]||"mitglied"}));
-}
-async function createFall(data){
-  const {data:row,error}=await sb.from("fall").insert({data:data||{}}).select("id,data,created_by,updated_at").single();
-  if(error) throw error; FAELLE.push({...row,rolle:"besitzer"}); return row.id;
-}
-async function openFall(id){
-  FALL_ID=id; lsSet("da-fall-"+USER.id,id); inviteLink=""; showPersons=false;
-  const f=FAELLE.find(x=>x.id===id);
-  S=merge({...(f?f.data:{}),...(lsGet(uiKey())||{}),font:lsGet("da-font")||"1"});
-  BEL=[]; URLS={}; openKey=null; pending=null; bescheidDraft=null;
-  ref=REF_SB; canSave=true; render(); reloadBelege(); loadMembers();
-}
-async function loadMembers(){
-  MEMBERS=[]; if(!FALL_ID) return;
-  const {data}=await sb.from("mitglied").select("user_id,rolle,email").eq("fall_id",FALL_ID);
-  MEMBERS=data||[]; if(showPersons) render();
-}
-const CONSENT_VERSION="2026-10";
-function consentNeeded(){ return !!USER && !((USER.user_metadata||{}).einwilligung_am) }
-let consentBusy=false;
-function viewConsent(){
-  return `<section class="panel auth consent">
+  </div>`}var bn={};M(bn,{makeCSV:()=>pn,makeMappe:()=>bt,makePDF:()=>hn,newDoc:()=>Ue,saveFile:()=>ze});var gn={};M(gn,{DL:()=>tn,addPerson:()=>sn,blobUrl:()=>ne,consentNeeded:()=>je,createFall:()=>ce,deletePerson:()=>on,fallName:()=>Y,giveConsent:()=>an,initStore:()=>dn,loadFaelle:()=>pt,loadMembers:()=>We,lsGet:()=>q,lsSet:()=>W,makeInvite:()=>rn,merge:()=>$e,openFall:()=>re,removeMember:()=>ln,save:()=>S,start19:()=>cn,startGuest:()=>Ke,viewConsent:()=>nn,viewPersons:()=>un});var Za="https://ssamgluufgwsxvkyvaob.supabase.co",qa="sb_publishable_UiXPXKzQ6uKTyQF3SqFQiw_VtjqAAbd";t.sb=null;t.USER=null;t.GUEST=!1;t.RECOVERY=!1;t.authMsg="";t.authMode="login";t.authBusy=!1;t.ref=null;t.BCOL=null;t.ASSETS=null;t.saveTimer=null;t.writing=Promise.resolve();t.canSave=!1;t.saveState={c:"",t:"Verbinde \u2026"};t.URLS={};function q(e){try{return JSON.parse(localStorage.getItem(e)||"null")}catch{return null}}function W(e,n){try{localStorage.setItem(e,JSON.stringify(n))}catch{}}function ne(e){return t.URLS[e]||""}function se(e,n){t.saveState={c:e,t:n};let a=f("savedot"),s=f("savetxt");a&&(a.className="dot "+e),s&&(s.textContent=n)}var tn={async save({filename:e,data:n}){let a=/\.csv$/.test(e)?"text/csv;charset=utf-8":/\.pdf$/.test(e)?"application/pdf":"application/octet-stream",s=n instanceof Blob?n:new Blob([n],{type:a}),r=URL.createObjectURL(s),i=document.createElement("a");return i.href=r,i.download=e,document.body.appendChild(i),i.click(),i.remove(),setTimeout(()=>URL.revokeObjectURL(r),8e3),{status:"saved"}}},Qt=["tab","wiz","belegFilter","welcomeSeen"];t.FAELLE=[];t.FALL_ID=null;t.MEMBERS=[];t.showPersons=!1;t.inviteLink="";t.inviteBusy=!1;function va(){return"da-ui-"+(t.USER?t.USER.id:"gast")+"-"+(t.FALL_ID||"x")}function S(){if(!t.canSave||!t.ref)return;clearTimeout(t.saveTimer),se("","Speichert \u2026");let e={};Qt.forEach(n=>e[n]=t.S[n]),W(va(),e),W("da-font",t.S.font),t.saveTimer=setTimeout(()=>{t.saveTimer=null;let n=JSON.parse(JSON.stringify(t.S));n.updated=new Date().toISOString(),t.USER&&Qt.forEach(s=>delete n[s]);let a=t.FAELLE.find(s=>s.id===t.FALL_ID);a&&(a.data=n),t.writing=t.writing.then(()=>t.ref.set(n)).then(()=>se("ok",t.USER?"Gespeichert":"Nur auf diesem Ger\xE4t")).catch(()=>{se("warn","Nicht gespeichert \u2013 Internet pr\xFCfen")})},700)}function $e(e){let n=C(),a={...n,...e,bereiche:{...n.bereiche,...e.bereiche||{}},pp:{...n.pp,...e.pp||{}},sb:{...n.sb,...e.sb||{},mz:{...e.sb&&e.sb.mz||{}}},person:{...n.person,...e.person||{}},termine:{...n.termine,...e.termine||{}},belegFilter:{...n.belegFilter,...e.belegFilter||{}},vhp:{...n.vhp,...e.vhp||{}},bruttoJahr:{...e.bruttoJahr||{}},ans:{...e.ans||{}},sent:{...e.sent||{}}};return e.done===void 0&&(a.done=(e.step||0)>=6&&!!e.rolle),delete a.updated,a}function Y(e){return((e&&e.data&&e.data.person||{}).name||"").trim()||"Neue Person"}function ka(e){let n={};for(let a of["kat","titel","ctype","eingereicht","jahr"])a in e&&(n[a]=e[a]);return"datum"in e&&(n.datum=e.datum||null),"betrag"in e&&(n.betrag=e.betrag===""||e.betrag==null||isNaN(e.betrag)?null:Number(e.betrag)),"asset"in e&&(n.pfad=e.asset||""),n}async function Ja(){let e=t.BEL.map(a=>a.asset).filter(a=>a&&!t.URLS[a]);if(!e.length)return;let{data:n}=await t.sb.storage.from("belege").createSignedUrls(e,6*3600);(n||[]).forEach(a=>{a.signedUrl&&(t.URLS[a.path]=a.signedUrl)})}async function He(){if(!t.USER||!t.FALL_ID)return;let{data:e,error:n}=await t.sb.from("belege").select("*").eq("fall_id",t.FALL_ID).order("datum",{ascending:!1});if(n){m("Belege konnten nicht geladen werden.");return}t.BEL=e.map(a=>({id:a.id,kat:a.kat,datum:a.datum||"",jahr:a.jahr,betrag:a.betrag==null?"":Number(a.betrag),titel:a.titel||"",asset:a.pfad||"",ctype:a.ctype||"",eingereicht:!!a.eingereicht}));try{await Ja()}catch{}c()}var Xa={async add(e){let{error:n}=await t.sb.from("belege").insert({...ka(e),fall_id:t.FALL_ID});if(n)throw n;await He()},doc(e){return{async update(n){let{error:a}=await t.sb.from("belege").update(ka(n)).eq("id",e);if(a)throw a;await He()},async delete(){let{error:n}=await t.sb.from("belege").delete().eq("id",e);if(n)throw n;await He()}}}},Ya={async upload(e,{type:n}){let a=n==="application/pdf"?"pdf":n==="image/png"?"png":n==="image/webp"?"webp":"jpg",s=crypto.randomUUID?crypto.randomUUID():String(Date.now())+Math.random().toString(16).slice(2),r=`${t.FALL_ID}/${s}.${a}`,{error:i}=await t.sb.storage.from("belege").upload(r,e,{contentType:n,upsert:!1});if(i)throw{code:/size|large|exceed/i.test(i.message||"")?"too_large":"upload"};let{data:l}=await t.sb.storage.from("belege").createSignedUrl(r,6*3600);return l&&(t.URLS[r]=l.signedUrl),{id:r,contentType:n}},async delete(e){await t.sb.storage.from("belege").remove([e])}},Qa={async set(e){let{error:n}=await t.sb.from("fall").update({data:e,updated_at:new Date().toISOString()}).eq("id",t.FALL_ID);if(n)throw n}},es={async set(e){W("dein-anspruch-gast",e)}};async function pt(){let{data:e,error:n}=await t.sb.from("fall").select("id,data,created_by,updated_at").order("created_at");if(n)throw n;let{data:a}=await t.sb.from("mitglied").select("fall_id,rolle").eq("user_id",t.USER.id),s=Object.fromEntries((a||[]).map(r=>[r.fall_id,r.rolle]));t.FAELLE=e.map(r=>({...r,rolle:s[r.id]||"mitglied"}))}async function ce(e){let{data:n,error:a}=await t.sb.from("fall").insert({data:e||{}}).select("id,data,created_by,updated_at").single();if(a)throw a;return t.FAELLE.push({...n,rolle:"besitzer"}),n.id}async function re(e){t.FALL_ID=e,W("da-fall-"+t.USER.id,e),t.inviteLink="",t.showPersons=!1;let n=t.FAELLE.find(a=>a.id===e);t.S=$e({...n?n.data:{},...q(va())||{},font:q("da-font")||"1"}),t.BEL=[],t.URLS={},t.openKey=null,t.pending=null,t.bescheidDraft=null,t.ref=Qa,t.canSave=!0,c(),He(),We()}async function We(){if(t.MEMBERS=[],!t.FALL_ID)return;let{data:e}=await t.sb.from("mitglied").select("user_id,rolle,email").eq("fall_id",t.FALL_ID);t.MEMBERS=e||[],t.showPersons&&c()}var ts="2026-10";function je(){return!!t.USER&&!(t.USER.user_metadata||{}).einwilligung_am}t.consentBusy=!1;function nn(){return`<section class="panel auth consent">
     <h2>Bevor es losgeht</h2>
-    <p>Damit die App dir helfen kann, speichert sie Angaben zur Pflege, zum Beispiel den Pflegegrad, Anträge und Belege. Das sind Gesundheitsdaten, und die sind besonders geschützt. Deshalb brauchen wir einmalig deine ausdrückliche Einwilligung.</p>
+    <p>Damit die App dir helfen kann, speichert sie Angaben zur Pflege, zum Beispiel den Pflegegrad, Antr\xE4ge und Belege. Das sind Gesundheitsdaten, und die sind besonders gesch\xFCtzt. Deshalb brauchen wir einmalig deine ausdr\xFCckliche Einwilligung.</p>
     <ul class="small">
-      <li>Die Daten liegen verschlüsselt in Frankfurt (EU).</li>
-      <li>Nur du und Personen, die du selbst einlädst, sehen sie.</li>
+      <li>Die Daten liegen verschl\xFCsselt in Frankfurt (EU).</li>
+      <li>Nur du und Personen, die du selbst einl\xE4dst, sehen sie.</li>
       <li>Keine Werbung, kein Verkauf von Daten.</li>
-      <li>Du kannst alles jederzeit selbst löschen.</li>
+      <li>Du kannst alles jederzeit selbst l\xF6schen.</li>
     </ul>
-    <label class="choice" for="cs-ok"><input type="checkbox" id="cs-ok"><span>Ich willige ein, dass Dein Anspruch meine Angaben, auch Gesundheitsdaten, speichert und verarbeitet, um mir die Funktionen der App bereitzustellen (Art. 9 Abs. 2 lit. a DSGVO). Wenn ich Angaben über eine andere Person mache, bin ich dazu berechtigt, zum Beispiel mit ihrem Einverständnis oder als Bevollmächtigte/r. Ich kann die Einwilligung jederzeit widerrufen, indem ich meine Daten in der App lösche.<small>Mehr dazu in der <a href="datenschutz.html" target="_blank" rel="noopener">Datenschutzerklärung</a>. Es gelten die <a href="nutzungsbedingungen.html" target="_blank" rel="noopener">Nutzungsbedingungen</a>.</small></span></label>
-    <button class="btn big" type="button" data-act="cs-yes" ${consentBusy?"disabled":""}>${consentBusy?"Einen Moment …":"Zustimmen und weiter"}</button>
+    <label class="choice" for="cs-ok"><input type="checkbox" id="cs-ok"><span>Ich willige ein, dass Dein Anspruch meine Angaben, auch Gesundheitsdaten, speichert und verarbeitet, um mir die Funktionen der App bereitzustellen (Art. 9 Abs. 2 lit. a DSGVO). Wenn ich Angaben \xFCber eine andere Person mache, bin ich dazu berechtigt, zum Beispiel mit ihrem Einverst\xE4ndnis oder als Bevollm\xE4chtigte/r. Ich kann die Einwilligung jederzeit widerrufen, indem ich meine Daten in der App l\xF6sche.<small>Mehr dazu in der <a href="datenschutz.html" target="_blank" rel="noopener">Datenschutzerkl\xE4rung</a>. Es gelten die <a href="nutzungsbedingungen.html" target="_blank" rel="noopener">Nutzungsbedingungen</a>.</small></span></label>
+    <button class="btn big" type="button" data-act="cs-yes" ${t.consentBusy?"disabled":""}>${t.consentBusy?"Einen Moment \u2026":"Zustimmen und weiter"}</button>
     <button class="btn ghost" type="button" data-act="logout">Nicht zustimmen und abmelden</button>
-  </section>`;
-}
-async function giveConsent(){
-  const c=$("cs-ok"); if(!c||!c.checked){ toast("Bitte zuerst das Häkchen bei der Einwilligung setzen."); return }
-  consentBusy=true; render();
-  const {data,error}=await sb.auth.updateUser({data:{einwilligung_am:new Date().toISOString(),einwilligung_version:CONSENT_VERSION}});
-  consentBusy=false;
-  if(error){ toast("Das hat nicht geklappt. Bitte noch einmal versuchen."); return render() }
-  if(data&&data.user) USER=data.user;
-  await loadUserData();
-}
-async function loadUserData(){
-  if(consentNeeded()){ loaded=true; canSave=false; setSave("","Einwilligung fehlt"); render(); return }
-  setSave("","Lade deine Daten …");
-  try{
-    const code=lsGet("da-einladung"); let joined=null;
-    if(code){ lsSet("da-einladung",null); const {data,error}=await sb.rpc("einladung_annehmen",{c:code}); if(error) toast("Die Einladung ist ungültig oder abgelaufen."); else { joined=data; toast("Willkommen! Ihr pflegt jetzt gemeinsam.") } }
-    await loadFaelle();
-    if(!FAELLE.length){ const guest=lsGet("dein-anspruch-gast"); await createFall(guest||{}); if(guest) toast("Deine Angaben von diesem Gerät wurden ins Konto übernommen.") }
-    const want=joined||lsGet("da-fall-"+USER.id);
-    ASSETS=ASSETS_SB; BCOL=BCOL_SB; GUEST=false; loaded=true;
-    setSave("ok","Gespeichert");
-    await openFall(FAELLE.some(f=>f.id===want)?want:FAELLE[0].id);
-  }catch(e){ canSave=false; loaded=true; setSave("warn","Speicher nicht erreichbar"); render() }
-}
-async function refreshFromServer(){
-  if(!USER||!FALL_ID||saveTimer) return;
-  const {data}=await sb.from("fall").select("data,updated_at").eq("id",FALL_ID).maybeSingle();
-  const f=FAELLE.find(x=>x.id===FALL_ID);
-  if(data && f && data.updated_at!==f.updated_at){ f.data=data.data; f.updated_at=data.updated_at; const ui={}; UI_KEYS.forEach(k=>ui[k]=S[k]); S=merge({...data.data,...ui,font:S.font}); render(); }
-  reloadBelege();
-}
-document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible") refreshFromServer().catch(()=>{}) });
-async function addPerson(){
-  try{ const id=await createFall({}); await openFall(id); scrollTop(); toast("Neue Person angelegt. Beantworte kurz die Fragen.") }catch(e){ toast("Anlegen hat nicht geklappt.") }
-}
-async function makeInvite(){
-  inviteBusy=true; render();
-  const {data,error}=await sb.rpc("einladung_erstellen",{f:FALL_ID});
-  inviteBusy=false;
-  if(error){ toast("Einladung konnte nicht erstellt werden."); return render() }
-  inviteLink=location.origin+location.pathname+"?einladung="+data; render();
-}
-async function removeMember(uid){
-  const {error}=await sb.from("mitglied").delete().eq("fall_id",FALL_ID).eq("user_id",uid);
-  if(error) return toast("Entfernen hat nicht geklappt.");
-  if(uid===USER.id){ FAELLE=FAELLE.filter(f=>f.id!==FALL_ID); toast("Du bist ausgetreten."); if(!FAELLE.length) await createFall({}); return openFall(FAELLE[0].id) }
-  toast("Person entfernt."); loadMembers().then(render);
-}
-let delPersonAsk=false;
-async function deletePerson(){
-  try{
-    const paths=BEL.map(b=>b.asset).filter(Boolean); if(paths.length) await sb.storage.from("belege").remove(paths);
-    const {error}=await sb.from("fall").delete().eq("id",FALL_ID); if(error) throw error;
-    FAELLE=FAELLE.filter(f=>f.id!==FALL_ID); delPersonAsk=false; toast("Person und ihre Daten wurden gelöscht.");
-    if(!FAELLE.length) await createFall({}); openFall(FAELLE[0].id);
-  }catch(e){ toast("Löschen hat nicht geklappt.") }
-}
-function viewPersons(){
-  const cur=FAELLE.find(f=>f.id===FALL_ID)||{}; const own=cur.rolle==="besitzer";
-  const others=MEMBERS.filter(m=>m.user_id!==USER.id);
-  return `<section class="panel persons">
-    <div class="section-title"><h2>Für wen?</h2><button type="button" class="linkbtn" data-act="persons">Schließen</button></div>
-    <div class="choices big">${FAELLE.map(f=>`<label class="choice" for="pf-${f.id}"><input type="radio" id="pf-${f.id}" name="pfall" data-fall="${f.id}" ${f.id===FALL_ID?"checked":""}><span>${esc(fallName(f))}<small>${f.rolle==="besitzer"?"angelegt von dir":"mit dir geteilt"}</small></span></label>`).join("")}</div>
-    <button class="btn ghost" type="button" data-act="add-person">${ic("plus")}Weitere Person anlegen</button>
+  </section>`}async function an(){let e=f("cs-ok");if(!e||!e.checked){m("Bitte zuerst das H\xE4kchen bei der Einwilligung setzen.");return}t.consentBusy=!0,c();let{data:n,error:a}=await t.sb.auth.updateUser({data:{einwilligung_am:new Date().toISOString(),einwilligung_version:ts}});if(t.consentBusy=!1,a)return m("Das hat nicht geklappt. Bitte noch einmal versuchen."),c();n&&n.user&&(t.USER=n.user),await en()}async function en(){if(je()){t.loaded=!0,t.canSave=!1,se("","Einwilligung fehlt"),c();return}se("","Lade deine Daten \u2026");try{let e=q("da-einladung"),n=null;if(e){W("da-einladung",null);let{data:s,error:r}=await t.sb.rpc("einladung_annehmen",{c:e});r?m("Die Einladung ist ung\xFCltig oder abgelaufen."):(n=s,m("Willkommen! Ihr pflegt jetzt gemeinsam."))}if(await pt(),!t.FAELLE.length){let s=q("dein-anspruch-gast");await ce(s||{}),s&&m("Deine Angaben von diesem Ger\xE4t wurden ins Konto \xFCbernommen.")}let a=n||q("da-fall-"+t.USER.id);t.ASSETS=Ya,t.BCOL=Xa,t.GUEST=!1,t.loaded=!0,se("ok","Gespeichert"),await re(t.FAELLE.some(s=>s.id===a)?a:t.FAELLE[0].id)}catch{t.canSave=!1,t.loaded=!0,se("warn","Speicher nicht erreichbar"),c()}}async function ns(){if(!t.USER||!t.FALL_ID||t.saveTimer)return;let{data:e}=await t.sb.from("fall").select("data,updated_at").eq("id",t.FALL_ID).maybeSingle(),n=t.FAELLE.find(a=>a.id===t.FALL_ID);if(e&&n&&e.updated_at!==n.updated_at){n.data=e.data,n.updated_at=e.updated_at;let a={};Qt.forEach(s=>a[s]=t.S[s]),t.S=$e({...e.data,...a,font:t.S.font}),c()}He()}async function sn(){try{let e=await ce({});await re(e),E(),m("Neue Person angelegt. Beantworte kurz die Fragen.")}catch{m("Anlegen hat nicht geklappt.")}}async function rn(){t.inviteBusy=!0,c();let{data:e,error:n}=await t.sb.rpc("einladung_erstellen",{f:t.FALL_ID});if(t.inviteBusy=!1,n)return m("Einladung konnte nicht erstellt werden."),c();t.inviteLink=location.origin+location.pathname+"?einladung="+e,c()}async function ln(e){let{error:n}=await t.sb.from("mitglied").delete().eq("fall_id",t.FALL_ID).eq("user_id",e);if(n)return m("Entfernen hat nicht geklappt.");if(e===t.USER.id)return t.FAELLE=t.FAELLE.filter(a=>a.id!==t.FALL_ID),m("Du bist ausgetreten."),t.FAELLE.length||await ce({}),re(t.FAELLE[0].id);m("Person entfernt."),We().then(c)}t.delPersonAsk=!1;async function on(){try{let e=t.BEL.map(a=>a.asset).filter(Boolean);e.length&&await t.sb.storage.from("belege").remove(e);let{error:n}=await t.sb.from("fall").delete().eq("id",t.FALL_ID);if(n)throw n;t.FAELLE=t.FAELLE.filter(a=>a.id!==t.FALL_ID),t.delPersonAsk=!1,m("Person und ihre Daten wurden gel\xF6scht."),t.FAELLE.length||await ce({}),re(t.FAELLE[0].id)}catch{m("L\xF6schen hat nicht geklappt.")}}function un(){let e=t.FAELLE.find(s=>s.id===t.FALL_ID)||{},n=e.rolle==="besitzer",a=t.MEMBERS.filter(s=>s.user_id!==t.USER.id);return`<section class="panel persons">
+    <div class="section-title"><h2>F\xFCr wen?</h2><button type="button" class="linkbtn" data-act="persons">Schlie\xDFen</button></div>
+    <div class="choices big">${t.FAELLE.map(s=>`<label class="choice" for="pf-${s.id}"><input type="radio" id="pf-${s.id}" name="pfall" data-fall="${s.id}" ${s.id===t.FALL_ID?"checked":""}><span>${d(Y(s))}<small>${s.rolle==="besitzer"?"angelegt von dir":"mit dir geteilt"}</small></span></label>`).join("")}</div>
+    <button class="btn ghost" type="button" data-act="add-person">${g("plus")}Weitere Person anlegen</button>
     <hr class="sep">
     <h3>Gemeinsam pflegen</h3>
-    <p class="small muted">Lade Geschwister oder andere Helfer ein. Sie sehen dann die Angaben, Belege und Fristen von ${esc(fallName(cur))} und können mithelfen.</p>
-    ${others.length?`<ul class="members">${others.map(m=>`<li><span>${esc(m.email||"Familienmitglied")}${m.rolle==="besitzer"?' <span class="tag">hat angelegt</span>':""}</span>${own?`<button type="button" class="linkbtn danger" data-rmember="${m.user_id}">Entfernen</button>`:""}</li>`).join("")}</ul>`:""}
-    ${inviteLink?`<div class="recip"><span><strong>Einladungslink</strong> (14 Tage gültig, für eine Person)</span><code>${esc(inviteLink)}</code>
-        <span class="btnrow"><button class="btn small" type="button" data-act="inv-copy">Link kopieren</button><a class="btn small soft" href="https://wa.me/?text=${encodeURIComponent("Ich lade dich zu „Dein Anspruch“ ein, damit wir uns gemeinsam um "+fallName(cur)+" kümmern können: "+inviteLink)}" target="_blank" rel="noopener">Per WhatsApp</a>
-        <a class="btn small ghost" href="mailto:?subject=${encodeURIComponent("Einladung: Dein Anspruch")}&body=${encodeURIComponent("Hallo, ich lade dich zu „Dein Anspruch“ ein, damit wir uns gemeinsam um "+fallName(cur)+" kümmern können:\n\n"+inviteLink)}">Per E-Mail</a></span></div>`
-      :`<button class="btn" type="button" data-act="invite" ${inviteBusy?"disabled":""}>${ic("user")}Jemanden einladen</button>`}
-    <hr class="sep">
-    ${own?(delPersonAsk?`<p class="notice bad">${ic("alert")}<span>${esc(fallName(cur))} mit allen Angaben und Belegen für alle löschen? <span class="btnrow" style="margin-top:8px"><button class="btn small danger" type="button" data-act="del-person-yes">Ja, löschen</button><button class="btn small ghost" type="button" data-act="del-person-no">Abbrechen</button></span></span></p>`
-      :`<button class="linkbtn danger" type="button" data-act="del-person">${esc(fallName(cur))} löschen</button>`)
-      :`<button class="linkbtn danger" type="button" data-rmember="${USER.id}">Aus diesem gemeinsamen Fall austreten</button>`}
-  </section>`;
-}
-function startGuest(){
-  GUEST=true; USER=null; ref=REF_LOCAL; canSave=true; ASSETS=null; BCOL=null;
-  const g=lsGet("dein-anspruch-gast"); S=g?merge(g):blank();
-  setSave("warn","Nur auf diesem Gerät"); render();
-}
-let loaded=false;
-// Testversion (…/test/): deutlich markieren, sie nutzt dieselbe Datenbank wie die echte App
-if(/\/test\//.test(location.pathname)){ const t=document.createElement("div"); t.className="testbanner"; t.textContent="TESTVERSION – zum Ausprobieren neuer Funktionen. Achtung: echte Daten!"; document.body.prepend(t) }
-async function initStore(){
-  try{ if(new URLSearchParams(location.search).has("rechner")) RECHNER={i:0,a:[]} }catch(e){}
-  try{ const q=new URLSearchParams(location.search); const c=q.get("einladung"); if(c){ lsSet("da-einladung",c); history.replaceState(null,"",location.pathname) } }catch(e){}
-  if(!window.supabase){ loaded=true; setSave("warn","Keine Verbindung – nur auf diesem Gerät"); startGuest(); return }
-  sb=window.supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,storageKey:"dein-anspruch-auth"}});
-  sb.auth.onAuthStateChange((ev,session)=>{
-    if(ev==="PASSWORD_RECOVERY"){ RECOVERY=true; render() }
-    const u=session?session.user:null;
-    if(u && (!USER || USER.id!==u.id)){ USER=u; setTimeout(loadUserData,0) }
-    if(!u && USER){ USER=null; S=blank(); BEL=[]; URLS={}; FAELLE=[]; FALL_ID=null; canSave=false; ref=null; ASSETS=null; BCOL=null; render() }
-  });
-  try{
-    const {data:{session}}=await sb.auth.getSession();
-    if(session&&session.user){ if(!USER){ USER=session.user; await loadUserData() } }
-    else { loaded=true; if(lsGet("dein-anspruch-modus")==="gast") startGuest(); else render() }
-  }catch(e){ loaded=true; render() }
-}
+    <p class="small muted">Lade Geschwister oder andere Helfer ein. Sie sehen dann die Angaben, Belege und Fristen von ${d(Y(e))} und k\xF6nnen mithelfen.</p>
+    ${a.length?`<ul class="members">${a.map(s=>`<li><span>${d(s.email||"Familienmitglied")}${s.rolle==="besitzer"?' <span class="tag">hat angelegt</span>':""}</span>${n?`<button type="button" class="linkbtn danger" data-rmember="${s.user_id}">Entfernen</button>`:""}</li>`).join("")}</ul>`:""}
+    ${t.inviteLink?`<div class="recip"><span><strong>Einladungslink</strong> (14 Tage g\xFCltig, f\xFCr eine Person)</span><code>${d(t.inviteLink)}</code>
+        <span class="btnrow"><button class="btn small" type="button" data-act="inv-copy">Link kopieren</button><a class="btn small soft" href="https://wa.me/?text=${encodeURIComponent("Ich lade dich zu \u201EDein Anspruch\u201C ein, damit wir uns gemeinsam um "+Y(e)+" k\xFCmmern k\xF6nnen: "+t.inviteLink)}" target="_blank" rel="noopener">Per WhatsApp</a>
+        <a class="btn small ghost" href="mailto:?subject=${encodeURIComponent("Einladung: Dein Anspruch")}&body=${encodeURIComponent("Hallo, ich lade dich zu \u201EDein Anspruch\u201C ein, damit wir uns gemeinsam um "+Y(e)+` k\xFCmmern k\xF6nnen:
 
-/* ---------- Anmeldung ---------- */
-function viewLogin(){
-  if(RECOVERY) return `<section class="panel auth"><h2>Neues Passwort festlegen</h2>
+`+t.inviteLink)}">Per E-Mail</a></span></div>`:`<button class="btn" type="button" data-act="invite" ${t.inviteBusy?"disabled":""}>${g("user")}Jemanden einladen</button>`}
+    <hr class="sep">
+    ${n?t.delPersonAsk?`<p class="notice bad">${g("alert")}<span>${d(Y(e))} mit allen Angaben und Belegen f\xFCr alle l\xF6schen? <span class="btnrow" style="margin-top:8px"><button class="btn small danger" type="button" data-act="del-person-yes">Ja, l\xF6schen</button><button class="btn small ghost" type="button" data-act="del-person-no">Abbrechen</button></span></span></p>`:`<button class="linkbtn danger" type="button" data-act="del-person">${d(Y(e))} l\xF6schen</button>`:`<button class="linkbtn danger" type="button" data-rmember="${t.USER.id}">Aus diesem gemeinsamen Fall austreten</button>`}
+  </section>`}function Ke(){t.GUEST=!0,t.USER=null,t.ref=es,t.canSave=!0,t.ASSETS=null,t.BCOL=null;let e=q("dein-anspruch-gast");t.S=e?$e(e):C(),se("warn","Nur auf diesem Ger\xE4t"),c()}t.loaded=!1;async function dn(){try{new URLSearchParams(location.search).has("rechner")&&(t.RECHNER={i:0,a:[]})}catch{}try{let n=new URLSearchParams(location.search).get("einladung");n&&(W("da-einladung",n),history.replaceState(null,"",location.pathname))}catch{}if(!window.supabase){t.loaded=!0,se("warn","Keine Verbindung \u2013 nur auf diesem Ger\xE4t"),Ke();return}t.sb=window.supabase.createClient(Za,qa,{auth:{persistSession:!0,autoRefreshToken:!0,detectSessionInUrl:!0,storageKey:"dein-anspruch-auth"}}),t.sb.auth.onAuthStateChange((e,n)=>{e==="PASSWORD_RECOVERY"&&(t.RECOVERY=!0,c());let a=n?n.user:null;a&&(!t.USER||t.USER.id!==a.id)&&(t.USER=a,setTimeout(en,0)),!a&&t.USER&&(t.USER=null,t.S=C(),t.BEL=[],t.URLS={},t.FAELLE=[],t.FALL_ID=null,t.canSave=!1,t.ref=null,t.ASSETS=null,t.BCOL=null,c())});try{let{data:{session:e}}=await t.sb.auth.getSession();e&&e.user?t.USER||(t.USER=e.user,await en()):(t.loaded=!0,q("dein-anspruch-modus")==="gast"?Ke():c())}catch{t.loaded=!0,c()}}function cn(){if(document.addEventListener("visibilitychange",()=>{document.visibilityState==="visible"&&ns().catch(()=>{})}),/\/test\//.test(location.pathname)){let e=document.createElement("div");e.className="testbanner",e.textContent="TESTVERSION \u2013 zum Ausprobieren neuer Funktionen. Achtung: echte Daten!",document.body.prepend(e)}}function Ue(){return window.jspdf?new window.jspdf.jsPDF({unit:"mm",format:"a4"}):(m("PDF-Erzeugung nicht geladen. Bitte Text kopieren."),null)}function wa(e,n){let a=t.S.person,s=t.S.rolle==="angehoerig",r=_e[n.to](),i=ie(n),l=25,o=165,u;e.setFont("helvetica","normal"),e.setFontSize(8);let p=[s?a.absender:a.name,s?a.absStrasse:a.strasse,s?a.absOrt:a.ort].filter(Boolean).join(" \xB7 ")||"[Absender]";e.text(p,l,47),e.setFontSize(11),e.text([r.name,"[Stra\xDFe / Postfach]","[PLZ Ort]"],l,55);let v=((s?a.absOrt:a.ort)||"").replace(/^\d{5}\s*/,"");e.text(`${v?v+", ":""}${mn()}`,190,95,{align:"right"}),e.setFont("helvetica","bold"),u=105;let y=e.splitTextToSize(i.subject,o);e.text(y,l,u),u+=y.length*5.5+6,e.setFont("helvetica","normal");for(let H of e.splitTextToSize(i.body,o))u>275&&(e.addPage(),u=20),e.text(H,l,u),u+=5.2;u+=10,u>270&&(e.addPage(),u=20),e.line(l,u,l+70,u),e.setFontSize(8),e.text("Unterschrift",l,u+4);let $=Be(n);if($.length){u+=14,u>260&&(e.addPage(),u=20),e.setFontSize(10),e.setFont("helvetica","bold"),e.text("Anlagen",l,u),e.setFont("helvetica","normal"),u+=5;for(let H of $)u>282&&(e.addPage(),u=20),e.text("\u2013 "+H,l,u),u+=5}}async function ze(e,n,a){let s=tn;try{await s.save({filename:e,data:n}),m(a||"Gespeichert")}catch(r){if(r&&r.code==="declined")return;m(r&&r.code==="rate_limited"?"Bitte kurz warten und erneut versuchen.":"Download nicht m\xF6glich.")}}async function hn(e){let n=Ue();n&&(wa(n,e),await ze(`Antrag-${e.k}.pdf`,n.output("blob"),"PDF gespeichert"))}async function as(e){let n=await fetch(ne(e));if(!n.ok)throw new Error("fetch");let a=await n.blob();if(!/^image\//.test(a.type))return null;let s=await createImageBitmap(a),r=document.createElement("canvas"),i=Math.min(1,1600/Math.max(s.width,s.height));return r.width=Math.round(s.width*i),r.height=Math.round(s.height*i),r.getContext("2d").drawImage(s,0,0,r.width,r.height),{url:r.toDataURL("image/jpeg",.8),w:r.width,h:r.height}}async function bt(e,n,a){let s=Ue();if(!s)return;m("PDF wird erstellt \u2026");let r=a||J(),i=t.S.belegFilter.kat||"",l=r.length===1?r[0]:r.slice().reverse().join("-"),o=t.BEL.filter($=>r.includes(String($.jahr)));n?o=o.filter($=>L[$.kat]&&L[$.kat].zz):i&&(o=o.filter($=>$.kat===i)),o.sort(($,H)=>($.kat+$.datum).localeCompare(H.kat+H.datum)),e&&(t.befJahr=r[0],wa(s,R.find($=>$.k==="befreiung")),s.addPage());let u=20,p=22;s.setFont("helvetica","bold"),s.setFontSize(15),s.text(`Beleg\xFCbersicht ${l.replace("-"," \u2013 ")}`,u,p),p+=7,s.setFont("helvetica","normal"),s.setFontSize(10),s.text([t.S.person.name||"",t.S.person.vnr?`Versichertennummer ${t.S.person.vnr}`:"",mt()].filter(Boolean).join(" \xB7 "),u,p),p+=10,s.setFont("helvetica","bold"),s.text("Nr.",u,p),s.text("Datum",u+12,p),s.text("Art / Beschreibung",u+36,p),s.text("Betrag",190,p,{align:"right"}),p+=2,s.line(u,p,190,p),p+=5,s.setFont("helvetica","normal");let v=0;o.forEach(($,H)=>{p>280&&(s.addPage(),p=20);let V=B($.datum),ke=`${(L[$.kat]||L.sonst).t}${$.titel?" \u2013 "+$.titel:""}${$.asset&&!/^image\//.test($.ctype||"")?" (PDF separat)":""}`;s.text(String(H+1),u,p),s.text(V?A(V):"\u2013",u+12,p),s.text(s.splitTextToSize(ke,110)[0],u+36,p),s.text($.betrag!==""&&$.betrag!=null?h(Number($.betrag),2):"\u2013",190,p,{align:"right"}),v+=Number($.betrag)||0,p+=6}),s.line(u,p-2,190,p-2),s.setFont("helvetica","bold"),s.text("Summe",u+36,p+3),s.text(h(v,2),190,p+3,{align:"right"});let y=0;for(let $ of o)if(y++,!(!$.asset||!/^image\//.test($.ctype||"")))try{let H=await as($.asset);if(!H)continue;s.addPage(),s.setFont("helvetica","normal"),s.setFontSize(10);let V=B($.datum);s.text(`Beleg ${y}: ${(L[$.kat]||L.sonst).t}${V?" \xB7 "+A(V):""}${$.betrag?" \xB7 "+h(Number($.betrag),2):""}`,20,15);let et=Math.min(170/H.w,260/H.h);s.addImage(H.url,"JPEG",20,22,H.w*et,H.h*et)}catch{}await ze(e?`Befreiungsantrag-${l}.pdf`:`Belegmappe-${l}.pdf`,s.output("blob"),"PDF gespeichert")}async function pn(){let e=J(),n=e.slice().reverse().join("-"),a=[["Datum","Art","Beschreibung","Betrag","Eingereicht"]];t.BEL.filter(r=>e.includes(String(r.jahr))&&(!t.S.belegFilter.kat||r.kat===t.S.belegFilter.kat)).sort((r,i)=>(r.datum||"").localeCompare(i.datum||"")).forEach(r=>a.push([r.datum?A(B(r.datum)):"",(L[r.kat]||L.sonst).t,r.titel||"",r.betrag!=null&&r.betrag!==""?Number(r.betrag).toFixed(2).replace(".",","):"",r.eingereicht?"ja":"nein"]));let s="\uFEFF"+a.map(r=>r.map(i=>`"${String(i).replace(/"/g,'""')}"`).join(";")).join(`\r
+`);await ze(`Belege-${n}.csv`,s,"Tabelle gespeichert")}var Sn={};M(Sn,{deleteBeleg:()=>vn,editBeleg:()=>fn,prepareFile:()=>ft,saveBeleg:()=>kn,startPending:()=>ge,toggleSubmitted:()=>wn});function ge(e){if(t.pending)return t.pending.preview&&t.pending.preview.startsWith("blob:")&&URL.revokeObjectURL(t.pending.preview),t.pending.file=e||null,t.pending.preview=e&&/^image\//.test(e.type)?URL.createObjectURL(e):"",t.pending.dropAsset=!1,c();t.pending={file:e||null,preview:e&&/^image\//.test(e.type)?URL.createObjectURL(e):"",kat:"apo",datum:F(x()),betrag:"",titel:""},c()}function fn(e){let n=t.BEL.find(a=>a.id===e);n&&(t.pending={editId:e,file:null,keepAsset:n.asset||"",keepType:n.ctype||"",preview:n.asset&&/^image\//.test(n.ctype||"")?ne(n.asset):"",kat:n.kat||"sonst",datum:n.datum||F(x()),betrag:n.betrag==null||n.betrag===""?"":String(n.betrag).replace(".",","),titel:n.titel||""},c(),E())}async function ft(e){if(e.type==="application/pdf")return{blob:e,type:"application/pdf"};try{let n=await createImageBitmap(e),a=Math.min(1,1800/Math.max(n.width,n.height)),s=document.createElement("canvas");s.width=Math.round(n.width*a),s.height=Math.round(n.height*a),s.getContext("2d").drawImage(n,0,0,s.width,s.height);let r=await new Promise(i=>s.toBlob(i,"image/jpeg",.82));if(r)return{blob:r,type:"image/jpeg"}}catch{}if(["image/jpeg","image/png","image/webp","image/gif"].includes(e.type))return{blob:e,type:e.type};throw{code:"unsupported_type"}}async function kn(){if(t.busy||!t.pending)return;let e=t.pending,n=String(e.betrag).trim()===""?"":P(e.betrag);if(String(e.betrag).trim()!==""&&!/^[\d.,\s]+$/.test(String(e.betrag).trim())){m("Bitte den Betrag nur als Zahl eingeben, z. B. 5,00");return}t.busy=!0,c();try{let a=e.keepAsset||"",s=e.keepType||"",r="";if(e.dropAsset&&(r=a,a="",s=""),e.file){if(!t.ASSETS)throw{code:"no_assets"};let{blob:o,type:u}=await ft(e.file),p=await t.ASSETS.upload(o,{type:u});r=e.keepAsset||"",a=p.id,s=p.contentType}let i=B(e.datum)||x(),l={kat:e.kat,datum:F(i),jahr:i.getFullYear(),betrag:n,titel:String(e.titel||"").trim(),asset:a,ctype:s};if(e.editId){if(t.BCOL&&!e.editId.startsWith("local-"))await t.BCOL.doc(e.editId).update(l);else{let o=t.BEL.find(u=>u.id===e.editId);o&&Object.assign(o,l)}if(r&&r!==a&&t.ASSETS)try{await t.ASSETS.delete(r)}catch{}}else l.eingereicht=!1,l.created=new Date().toISOString(),t.BCOL?await t.BCOL.add(l):t.BEL.push({id:"local-"+Date.now(),...l});e.preview&&e.preview.startsWith("blob:")&&URL.revokeObjectURL(e.preview),t.pending=null;{let o=String(i.getFullYear()),u=J();u.includes(o)||(t.S.belegFilter.jahre=[...u,o])}S(),m(e.editId?"\xC4nderungen gespeichert":"Beleg gespeichert")}catch(a){let s=a&&a.code;m(s==="too_large"?"Datei ist zu gro\xDF (max. 20 MB).":s==="unsupported_type"?"Dieses Dateiformat geht nicht. Bitte JPG, PNG oder PDF.":s==="quota_exceeded"?"Speicherplatz voll. Bitte alte Belege l\xF6schen.":s==="no_assets"?"Fotos k\xF6nnen in dieser Ansicht nicht gespeichert werden.":"Speichern hat nicht geklappt. Bitte noch einmal versuchen.")}t.busy=!1,c()}async function vn(e){let n=t.BEL.find(a=>a.id===e);if(t.delAsk=null,!n)return c();try{if(t.BCOL&&!e.startsWith("local-")?await t.BCOL.doc(e).delete():t.BEL=t.BEL.filter(a=>a.id!==e),n.asset&&t.ASSETS)try{await t.ASSETS.delete(n.asset)}catch{}m("Beleg gel\xF6scht")}catch{m("L\xF6schen fehlgeschlagen.")}c()}async function wn(e){let n=t.BEL.find(a=>a.id===e);if(n)if(t.BCOL&&!e.startsWith("local-"))try{await t.BCOL.doc(e).update({eingereicht:!n.eingereicht})}catch{m("\xC4ndern fehlgeschlagen.")}else n.eingereicht=!n.eingereicht,c()}var xn={};M(xn,{amountsIn:()=>Oe,bulkSave:()=>Pn,bulkView:()=>En,datesIn:()=>zn,groupPages:()=>ya,guessKat:()=>Ba,importPdf:()=>An,pickAmount:()=>za,pickDate:()=>Bn});t.bulk=null;t.pdfjsP=null;function ss(){return t.pdfjsP||(t.pdfjsP=import(new URL("vendor/pdf.min.js",location.href).href).then(e=>(e.GlobalWorkerOptions.workerSrc=new URL("vendor/pdf.worker.min.js",location.href).href,e)).catch(e=>{throw t.pdfjsP=null,e})),t.pdfjsP}function Sa(e){return String(e).padStart(2,"0")}var rs={januar:1,jan:1,februar:2,feb:2,m\u00E4rz:3,maerz:3,mrz:3,april:4,apr:4,mai:5,juni:6,jun:6,juli:7,jul:7,august:8,aug:8,september:9,sept:9,sep:9,oktober:10,okt:10,november:11,nov:11,dezember:12,dez:12};function $n(e,n,a){e=Number(e),e<100&&(e+=2e3),n=Number(n),a=Number(a);let s=new Date().getFullYear();return!(n>=1&&n<=12&&a>=1&&a<=31)||e<s-6||e>s+1?null:`${e}-${Sa(n)}-${Sa(a)}`}function zn(e){let n=[],a,s=/(?<!\d)(\d{1,2})\s?\.\s?(\d{1,2})\s?\.\s?(\d{4}|\d{2})(?!\d)/g;for(;a=s.exec(e);)n.push($n(a[3],a[2],a[1]));let r=/(?<!\d)(\d{1,2})\.?\s+(januar|jan|februar|feb|märz|maerz|mrz|april|apr|mai|juni|jun|juli|jul|august|aug|september|sept|sep|oktober|okt|november|nov|dezember|dez)\.?\s+(\d{4})/gi;for(;a=r.exec(e);)n.push($n(a[3],rs[a[2].toLowerCase()],a[1]));let i=/(?<!\d)(\d{4})-(\d{2})-(\d{2})(?!\d)/g;for(;a=i.exec(e);)n.push($n(a[1],a[2],a[3]));return n.filter(Boolean)}var is=/(?<![\d,.])(\d{1,3}(?:[.\s']\d{3})+|\d+),(\d{2})(?!\d)/g;function Oe(e){return[...e.matchAll(is)].map(n=>+(n[1].replace(/[.\s']/g,"")+"."+n[2])).filter(n=>n>0&&n<1e5)}var $a=/geb\.|geboren|geburt|fällig|zahlbar bis|zahlungsziel|gültig bis|bis zum|überweisen bis|skonto/i;function Bn(e){let n=/(rechnungs|beleg|quittungs|ausstellungs|kauf|verordnungs|abgabe)?datum|\bvom\b|\brechnung\b|\bquittung\b|\bdatum\b/i;for(let i of e)if(n.test(i)&&!$a.test(i)){let l=zn(i);if(l.length)return l[0]}let a={},s=null;for(let i of e)if(!$a.test(i))for(let l of zn(i))a[l]=(a[l]||0)+1,s=s||l;let r=Object.entries(a).sort((i,l)=>l[1]-i[1])[0];return r&&r[1]>1?r[0]:s}function za(e,n){let a=i=>{let l=Oe(e[i]);if(l.length)return l[l.length-1];let o=e[i+1]?Oe(e[i+1]):[];return o.length?o[0]:null};if(L[n]&&L[n].zz){for(let l=e.length-1;l>=0;l--)if(/(summe|gesamt)[^0-9]{0,20}zuzahlung|zuzahlung[^0-9]{0,12}(gesamt|summe)/i.test(e[l])){let o=a(l);if(o!=null)return o}let i=[];if(e.forEach((l,o)=>{if(/zuzahlung|eigenanteil/i.test(l)){let u=a(o);u!=null&&i.push(u)}}),i.length)return Math.round(i.reduce((l,o)=>l+o,0)*100)/100}let s=[/gesamtbetrag|rechnungsbetrag|endbetrag|zahlbetrag|zu zahlen|zu überweisen|gesamtsumme|bruttobetrag|summe brutto|rechnungssumme|gesamt brutto/i,/\bgesamt\b|\bsumme\b|\btotal\b|\bbetrag\b|\beur\b|€/i];for(let i of s)for(let l=e.length-1;l>=0;l--)if(i.test(e[l])&&!/netto|mwst|ust|steuer|rabatt/i.test(e[l])){let o=a(l);if(o!=null)return o}let r=e.flatMap(Oe);return r.length?Math.max(...r):null}var ls=[["vhp",/verhinderungspflege|§\s?39\b|kurzzeitpflege|§\s?42\b|ersatzpflege/i],["beratung",/beratungsbesuch|beratungseinsatz|§\s?37\s?abs\.?\s?3/i],["entl",/entlastungsbetrag|§\s?45\s?b|45b|alltagshilfe|haushaltshilfe|haushaltsnahe|betreuungsleistung|unterstützung im alltag|unterstuetzung im alltag|alltagsbegleitung|tagespflege|nachbarschaftshilfe/i],["pflhm",/pflegehilfsmittel|§\s?40\b|einmalhandschuh|bettschutzeinlage|pflegebox|desinfektion/i],["fahrt",/krankenfahrt|krankentransport|taxi|fahrdienst|beförderung/i],["heil",/physiotherap|krankengymnastik|ergotherap|logopäd|podolog|heilmittel|sanitätshaus|orthopädie|krankenhaus|klinik|stationär|hilfsmittel/i],["apo",/apotheke|pzn|rezept|arzneimittel|verordnung/i],["bescheid",/bescheid|widerspruch|sehr geehrte/i]];function Ba(e){for(let[n,a]of ls)if(a.test(e))return n;return"sonst"}function os(e){let n=/apotheke|pflegedienst|sozialstation|sanitätshaus|praxis|physiotherap|ergotherap|logopäd|taxi|klinik|krankenhaus|diakonie|caritas|\bdrk\b|\bawo\b|alltagshilfe|tagespflege|gmbh|\be\.\s?v\.|\bgbr\b|\bug\b|\bohg\b/i,a=e.slice(0,14),s=a.find(r=>n.test(r)&&r.length<70)||a.find(r=>r.length>=4&&r.length<=50&&!/\d{3,}/.test(r)&&!/rechnung|seite|datum/i.test(r));return s?s.replace(/\s{2,}/g," ").slice(0,50):""}function us(e){let n=e.match(/(rechnungs?|beleg|quittungs?)[-\s]*(nr|nummer|no)\.?\s*:?\s*([A-Z0-9][A-Z0-9\-\/]{2,})/i);return n?n[3]:""}async function ds(e){let n=await e.getTextContent(),a=new Map;for(let s of n.items){if(!s.str||!s.str.trim())continue;let r=Math.round(s.transform[5]/4),i=a.get(r)||[];i.push([s.transform[4],s.str]),a.set(r,i)}return[...a.entries()].sort((s,r)=>r[0]-s[0]).map(([,s])=>s.sort((r,i)=>r[0]-i[0]).map(r=>r[1]).join(" ").replace(/\s+/g," ").trim()).filter(Boolean)}async function yn(e,n){let a=e.getViewport({scale:1}),s=e.getViewport({scale:Math.min(3,n/a.width)}),r=document.createElement("canvas");r.width=Math.ceil(s.width),r.height=Math.ceil(s.height);let i=r.getContext("2d");return i.fillStyle="#fff",i.fillRect(0,0,r.width,r.height),await e.render({canvasContext:i,viewport:s}).promise,r}async function An(e){t.pending=null,t.bulk={phase:"lesen",n:0,total:0,items:[],file:e,msg:"Die PDF wird ge\xF6ffnet \u2026"},c(),E();let n=null;try{let a=await ss(),s=await e.arrayBuffer(),r=await a.getDocument({data:new Uint8Array(s),wasmUrl:new URL("vendor/wasm/",location.href).href,standardFontDataUrl:new URL("vendor/fonts/",location.href).href,isEvalSupported:!1}).promise;if(!t.bulk||t.bulk.file!==e)return;t.bulk.pdf=r,t.bulk.total=r.numPages,t.bulk.pages=[];for(let i=1;i<=r.numPages;i++){if(!t.bulk||t.bulk.file!==e)return;t.bulk.n=i,t.bulk.msg=`Seite ${i} von ${r.numPages} wird gelesen \u2026`,c();let l=await r.getPage(i),o=await ds(l),u=(await yn(l,160)).toDataURL("image/jpeg",.7);if(o.join("").length<40){t.bulk.msg=`Seite ${i} von ${r.numPages}: eingescannt, Text wird erkannt \u2026`,c();try{n||(n=await(await kt()).createWorker("deu"));let p=await yn(l,1700),{data:v}=await n.recognize(p);o=String(v.text||"").split(/\n+/).map(y=>y.replace(/\s+/g," ").trim()).filter(Boolean)}catch{}}t.bulk.pages.push({i,lines:o,text:o.join(`
+`),thumb:u})}if(!t.bulk||t.bulk.file!==e)return;t.bulk.items=ya(t.bulk.pages),t.bulk.phase="pruefen",t.bulk.msg=""}catch{t.bulk={phase:"fehler",file:e,items:[],msg:"Die PDF konnte nicht gelesen werden."}}finally{if(n)try{await n.terminate()}catch{}}c(),E()}function ya(e){let n=[];for(let a of e){let s=n[n.length-1],r=us(a.text),i=Bn(a.lines),l=Oe(a.text).length>0,o=/seite\s*([2-9]|[1-9]\d)\s*(von|\/|of)\s*\d+/i.test(a.text)&&!/seite\s*1\s*(von|\/|of)/i.test(a.text);if(s&&(o||r&&r===s.nr||!i&&!l&&a.text.length>0)){s.pages.push(a);continue}n.push({nr:r,pages:[a]})}return n.map((a,s)=>{let r=a.pages.flatMap(p=>p.lines),i=r.join(`
+`),l=Ba(i),o=Bn(r)||"",u=za(r,l);return{id:"bi"+s,on:!0,pages:a.pages.map(p=>p.i),thumb:a.pages[0].thumb,kat:l,datum:o,betrag:u==null?"":String(u.toFixed(2)).replace(".",","),titel:os(a.pages[0].lines)}})}function cs(){let e={};for(let n of t.bulk.items)if(n.on){let a=(n.datum||"").slice(0,4)||"ohne Datum";e[a]=(e[a]||0)+1}return Object.entries(e).sort()}function En(){let e=t.bulk;if(e.phase==="lesen"||e.phase==="speichern")return`<div class="pending bulk">
+    <h3>${e.phase==="lesen"?"Rechnungen werden erkannt":"Belege werden gespeichert"}</h3>
+    ${e.total?de(e.n,e.total,e.msg):`<p class="muted">${d(e.msg)}</p>`}
+    <p class="small muted">${e.phase==="lesen"?"Alles passiert auf deinem Ger\xE4t. Bei eingescannten Seiten dauert es etwas l\xE4nger.":"Bitte die Seite nicht schlie\xDFen."}</p>
+    ${e.phase==="lesen"?'<button class="btn ghost" type="button" data-act="bulk-cancel">Abbrechen</button>':""}
+  </div>`;if(e.phase==="fehler"||!e.items.length)return`<div class="pending bulk">
+    <p class="notice warn">${g("alert")}<span>${e.phase==="fehler"?d(e.msg):"In dieser PDF haben wir keine Rechnung erkannt."} Du kannst sie trotzdem als einen Beleg speichern.</span></p>
+    <div class="nav big go"><button class="btn ghost" type="button" data-act="bulk-cancel">Abbrechen</button><button class="btn" type="button" data-act="bulk-single">Als einen Beleg speichern</button></div></div>`;let n=e.items.filter(s=>s.on).length,a=cs();return`<div class="pending bulk">
+    <h3>${e.items.length===1?"1 Rechnung erkannt":`${e.items.length} Rechnungen erkannt`}</h3>
+    ${a.length?`<div class="yearchips">${a.map(([s,r])=>`<span class="chip" aria-pressed="true">${d(s)}: ${r}</span>`).join("")}</div>`:""}
+    ${e.pages&&e.pages.some(s=>!s.text)?`<p class="notice warn">${g("alert")}<span>Bei ${e.pages.filter(s=>!s.text).length===1?"einer Seite":e.pages.filter(s=>!s.text).length+" Seiten"} konnten wir den Text nicht lesen. Bitte dort Datum und Betrag selbst eintragen.</span></p>`:""}
+    <p class="notice info">${g("info")}<span>Bitte kurz pr\xFCfen. Du kannst alles \xE4ndern oder eine Rechnung abw\xE4hlen. Gespeichert wird erst, wenn du unten tippst.</span></p>
+    <div class="bulklist">${e.items.map((s,r)=>`<article class="bulkitem${s.on?"":" off"}" id="${s.id}">
+      <label class="bion" for="bion-${r}"><input type="checkbox" id="bion-${r}" data-bi="${r}:on" ${s.on?"checked":""}><span>\xFCbernehmen</span></label>
+      <img class="bthumb" src="${s.thumb}" alt="Seite ${s.pages[0]}">
+      <div class="bfields">
+        <span class="small muted">${s.pages.length>1?`Seiten ${s.pages[0]}\u2013${s.pages[s.pages.length-1]}`:`Seite ${s.pages[0]}`}</span>
+        <div class="field"><label for="bik-${r}">Art</label><select id="bik-${r}" data-bi="${r}:kat">${Object.entries(L).map(([i,l])=>`<option value="${i}" ${s.kat===i?"selected":""}>${d(l.t)}</option>`).join("")}</select></div>
+        <div class="grid2">
+          <div class="field"><label for="bid-${r}">Datum${s.datum?"":' <span class="miss">fehlt</span>'}</label><input type="date" id="bid-${r}" data-bi="${r}:datum" value="${d(s.datum)}"></div>
+          <div class="field"><label for="bib-${r}">Betrag${s.betrag?"":' <span class="miss">fehlt</span>'}</label><div class="euro"><input type="text" inputmode="decimal" id="bib-${r}" data-bi="${r}:betrag" value="${d(s.betrag)}" placeholder="z. B. 5,00"><span>\u20AC</span></div></div>
+        </div>
+        <div class="field"><label for="bit-${r}">Beschreibung</label><input type="text" id="bit-${r}" data-bi="${r}:titel" value="${d(s.titel)}" placeholder="z. B. Apotheke am Markt"></div>
+      </div>
+    </article>`).join("")}</div>
+    ${t.ASSETS?"":'<p class="small muted">Ohne Konto werden nur Datum, Betrag und Art gespeichert, nicht die Seiten selbst.</p>'}
+    <div class="nav big go"><button class="btn ghost" type="button" data-act="bulk-cancel">Abbrechen</button><button class="btn" type="button" data-act="bulk-save" ${n?"":"disabled"}>${n===1?"1 Beleg speichern":`${n} Belege speichern`}</button></div>
+  </div>`}async function gs(e){let n=t.bulk;if(n.items.length===1&&e.pages.length===n.total&&n.file.size<2e7)return{blob:n.file,type:"application/pdf"};let a=[];for(let r of e.pages)a.push(await yn(await n.pdf.getPage(r),1300));if(a.length===1||!window.jspdf){let r=a[0];if(a.length>1){let l=Math.max(...a.map(y=>y.width)),o=a.reduce((y,$)=>y+$.height,0),u=Math.min(1,12e3/o);r=document.createElement("canvas"),r.width=Math.round(l*u),r.height=Math.round(o*u);let p=r.getContext("2d");p.fillStyle="#fff",p.fillRect(0,0,r.width,r.height);let v=0;for(let y of a)p.drawImage(y,0,v,y.width*u,y.height*u),v+=y.height*u}return{blob:await new Promise(l=>r.toBlob(l,"image/jpeg",.8)),type:"image/jpeg"}}let s=new window.jspdf.jsPDF({unit:"mm",format:"a4"});return a.forEach((r,i)=>{i&&s.addPage();let l=210,o=Math.min(297,r.height/r.width*210);s.addImage(r.toDataURL("image/jpeg",.8),"JPEG",0,0,l,o)}),{blob:s.output("blob"),type:"application/pdf"}}async function Pn(){if(!t.bulk||t.bulk.phase!=="pruefen")return;if(t.bulk.items.find(i=>i.on&&String(i.betrag).trim()&&!/^[\d.,\s]+$/.test(String(i.betrag).trim()))){m("Bitte Betr\xE4ge nur als Zahl eingeben, z. B. 5,00");return}let n=t.bulk.items.filter(i=>i.on);t.bulk.phase="speichern",t.bulk.total=n.length,t.bulk.n=0,c();let a=0,s=new Set;for(let i of n){t.bulk.n++,t.bulk.msg=`Beleg ${t.bulk.n} von ${n.length}`,c();try{let l="",o="";if(t.ASSETS){let{blob:v,type:y}=await gs(i),$=await t.ASSETS.upload(v,{type:y});l=$.id,o=$.contentType}let u=B(i.datum)||x(),p={kat:i.kat,datum:F(u),jahr:u.getFullYear(),betrag:String(i.betrag).trim()===""?"":P(i.betrag),titel:String(i.titel||"").trim(),asset:l,ctype:o,eingereicht:!1,created:new Date().toISOString()};t.BCOL?await t.BCOL.add(p):t.BEL.push({id:"local-"+Date.now()+"-"+a,...p}),a++,s.add(String(u.getFullYear()))}catch{}}let r=J();t.S.belegFilter.jahre=[...new Set([...r,...s])],t.S.belegFilter.kat="",S(),t.bulk=null,c(),E(),m(a===n.length?a===1?"1 Beleg gespeichert":`${a} Belege gespeichert`:`${a} von ${n.length} Belegen gespeichert. Bitte die \xFCbrigen noch einmal versuchen.`)}var Fn={};M(Fn,{authAction:()=>Ln,googleLogin:()=>Mn,logout:()=>Ve,viewLogin:()=>Dn});function Dn(){if(t.RECOVERY)return`<section class="panel auth"><h2>Neues Passwort festlegen</h2>
     <div class="field"><label for="au-pw">Neues Passwort (mindestens 8 Zeichen)</label><input type="password" id="au-pw" autocomplete="new-password"></div>
-    ${authMsg?`<p class="notice">${ic("info")}<span>${esc(authMsg)}</span></p>`:""}
-    <button class="btn big" type="button" data-act="au-newpw" ${authBusy?"disabled":""}>Passwort speichern</button></section>`;
-  const reg=authMode==="register", fg=authMode==="forgot";
-  return `<section class="panel auth">
-    ${lsGet("da-einladung")?`<p class="notice good">${ic("user")}<span><strong>Du wurdest eingeladen.</strong> Melde dich an oder lege ein Konto an. Danach siehst du den gemeinsamen Fall.</span></p>`:""}
-    <h2>${reg?"Konto anlegen":fg?"Passwort vergessen":"Willkommen"}</h2>
-    <p class="muted">${reg?"Mit einem Konto sind deine Angaben und Belege sicher gespeichert und auf Handy und Computer gleich.":fg?"Gib deine E-Mail-Adresse ein. Wir schicken dir einen Link zum Zurücksetzen.":"Melde dich an, um deine Angaben und Belege zu sehen."}</p>
-    ${fg?"":`<button type="button" class="btn big gbtn" data-act="au-google"><svg viewBox="0 0 48 48" width="22" height="22" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>Mit Google anmelden</button>
+    ${t.authMsg?`<p class="notice">${g("info")}<span>${d(t.authMsg)}</span></p>`:""}
+    <button class="btn big" type="button" data-act="au-newpw" ${t.authBusy?"disabled":""}>Passwort speichern</button></section>`;let e=t.authMode==="register",n=t.authMode==="forgot";return`<section class="panel auth">
+    ${q("da-einladung")?`<p class="notice good">${g("user")}<span><strong>Du wurdest eingeladen.</strong> Melde dich an oder lege ein Konto an. Danach siehst du den gemeinsamen Fall.</span></p>`:""}
+    <h2>${e?"Konto anlegen":n?"Passwort vergessen":"Willkommen"}</h2>
+    <p class="muted">${e?"Mit einem Konto sind deine Angaben und Belege sicher gespeichert und auf Handy und Computer gleich.":n?"Gib deine E-Mail-Adresse ein. Wir schicken dir einen Link zum Zur\xFCcksetzen.":"Melde dich an, um deine Angaben und Belege zu sehen."}</p>
+    ${n?"":`<button type="button" class="btn big gbtn" data-act="au-google"><svg viewBox="0 0 48 48" width="22" height="22" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>Mit Google anmelden</button>
     <div class="orline"><span>oder mit E-Mail</span></div>`}
-    <div class="field"><label for="au-mail">E-Mail-Adresse</label><input type="email" id="au-mail" autocomplete="email" inputmode="email" value="${esc(lsGet("dein-anspruch-mail")||"")}"></div>
-    ${fg?"":`<div class="field"><label for="au-pw">Passwort${reg?" (mindestens 8 Zeichen)":""}</label><div class="euro"><input type="password" id="au-pw" autocomplete="${reg?"new-password":"current-password"}"><button type="button" class="btn small ghost" data-act="au-show">Zeigen</button></div></div>`}
-    ${authMsg?`<p class="notice ${/fehl|falsch|nicht/i.test(authMsg)?"bad":"info"}">${ic("info")}<span>${esc(authMsg)}</span></p>`:""}
-    <button class="btn big" type="button" data-act="${reg?"au-register":fg?"au-forgot":"au-login"}" ${authBusy?"disabled":""}>${authBusy?"Einen Moment …":reg?"Konto anlegen":fg?"Link schicken":"Anmelden"}</button>
+    <div class="field"><label for="au-mail">E-Mail-Adresse</label><input type="email" id="au-mail" autocomplete="email" inputmode="email" value="${d(q("dein-anspruch-mail")||"")}"></div>
+    ${n?"":`<div class="field"><label for="au-pw">Passwort${e?" (mindestens 8 Zeichen)":""}</label><div class="euro"><input type="password" id="au-pw" autocomplete="${e?"new-password":"current-password"}"><button type="button" class="btn small ghost" data-act="au-show">Zeigen</button></div></div>`}
+    ${t.authMsg?`<p class="notice ${/fehl|falsch|nicht/i.test(t.authMsg)?"bad":"info"}">${g("info")}<span>${d(t.authMsg)}</span></p>`:""}
+    <button class="btn big" type="button" data-act="${e?"au-register":n?"au-forgot":"au-login"}" ${t.authBusy?"disabled":""}>${t.authBusy?"Einen Moment \u2026":e?"Konto anlegen":n?"Link schicken":"Anmelden"}</button>
     <div class="btnrow">
-      ${authMode!=="login"?`<button type="button" class="linkbtn" data-act="au-mode" data-mode="login">Ich habe schon ein Konto</button>`:`<button type="button" class="linkbtn" data-act="au-mode" data-mode="register">Neu hier? Konto anlegen</button><button type="button" class="linkbtn" data-act="au-mode" data-mode="forgot">Passwort vergessen?</button>`}
+      ${t.authMode!=="login"?'<button type="button" class="linkbtn" data-act="au-mode" data-mode="login">Ich habe schon ein Konto</button>':'<button type="button" class="linkbtn" data-act="au-mode" data-mode="register">Neu hier? Konto anlegen</button><button type="button" class="linkbtn" data-act="au-mode" data-mode="forgot">Passwort vergessen?</button>'}
     </div>
     <hr style="border:0;border-top:1px solid var(--line);margin:4px 0">
     <button type="button" class="btn ghost" data-act="au-guest">Ohne Konto ausprobieren</button>
-    <button type="button" class="linkbtn" data-act="r-start">Pflegegrad-Rechner: ohne Anmeldung einschätzen, welcher Pflegegrad in Frage kommt</button>
-    <p class="small muted">Ohne Konto bleiben deine Angaben nur in diesem Browser, und Belege-Fotos werden nicht gespeichert. Du kannst später jederzeit ein Konto anlegen, deine Angaben werden dann übernommen.</p>
-  </section>`;
-}
-async function authAction(a){
-  const mail=($("au-mail")||{}).value?.trim()||"", pw=($("au-pw")||{}).value||"";
-  if(a!=="au-newpw" && !/^\S+@\S+\.\S+$/.test(mail)){ authMsg="Bitte eine gültige E-Mail-Adresse eingeben."; return render() }
-  if((a==="au-register"||a==="au-newpw") && pw.length<8){ authMsg="Das Passwort muss mindestens 8 Zeichen haben."; return render() }
-  lsSet("dein-anspruch-mail",mail||lsGet("dein-anspruch-mail"));
-  authBusy=true; authMsg=""; render();
-  const back=location.origin+location.pathname;
-  let r;
-  try{
-    if(a==="au-login"){ r=await sb.auth.signInWithPassword({email:mail,password:pw}); if(r.error) authMsg=/confirm/i.test(r.error.message)?"Die E-Mail-Adresse ist noch nicht bestätigt. Bitte den Link in der Bestätigungs-E-Mail antippen.":"Anmeldung fehlgeschlagen. E-Mail oder Passwort ist falsch."; else lsSet("dein-anspruch-modus","konto") }
-    else if(a==="au-register"){ r=await sb.auth.signUp({email:mail,password:pw,options:{emailRedirectTo:back}});
-      if(r.error) authMsg=/already|registered/i.test(r.error.message)?"Für diese E-Mail gibt es schon ein Konto. Bitte anmelden.":/rate|limit/i.test(r.error.message)?"Gerade werden zu viele E-Mails verschickt. Bitte in einer Stunde noch einmal versuchen.":"Konto anlegen hat nicht geklappt: "+r.error.message;
-      else if(!r.data.session){ authMsg="Fast geschafft! Wir haben dir eine E-Mail geschickt. Bitte den Link darin antippen und dich danach hier anmelden."; authMode="login" } }
-    else if(a==="au-forgot"){ r=await sb.auth.resetPasswordForEmail(mail,{redirectTo:back}); authMsg=r.error?"Das hat nicht geklappt. Bitte später noch einmal versuchen.":"Wenn es ein Konto mit dieser Adresse gibt, ist jetzt eine E-Mail mit einem Link unterwegs."; }
-    else if(a==="au-newpw"){ r=await sb.auth.updateUser({password:pw}); if(r.error) authMsg="Das neue Passwort konnte nicht gespeichert werden."; else { RECOVERY=false; authMsg=""; toast("Neues Passwort gespeichert") } }
-  }catch(e){ authMsg="Keine Verbindung. Bitte Internet prüfen." }
-  authBusy=false; render();
-}
-async function googleLogin(){
-  authBusy=true; authMsg=""; render();
-  const {error}=await sb.auth.signInWithOAuth({provider:"google",options:{redirectTo:location.origin+location.pathname}});
-  if(error){ authBusy=false; authMsg=/not enabled|provider/i.test(error.message)?"Die Anmeldung mit Google ist noch nicht eingeschaltet. Bitte vorerst mit E-Mail anmelden.":"Anmeldung mit Google hat nicht geklappt. Bitte erneut versuchen."; render() }
-}
-async function logout(){ try{ await sb.auth.signOut() }catch(e){} ERI=null; eriLoaded=false; lsSet("dein-anspruch-modus",""); USER=null; GUEST=false; S=blank(); BEL=[]; URLS={}; FAELLE=[]; FALL_ID=null; showPersons=false; canSave=false; ref=null; render(); scrollTop() }
-
-/* ---------- Sicherung herunterladen und wieder einspielen, Konto löschen ---------- */
-let wipeAsk=false, wipeBusy=false, dataBusy="";
-const WIPE_WORD=v=>/^l(ö|oe|o)schen$/i.test(String(v||"").trim());
-async function wipeAll(){
-  const w=$("wipe-word"); if(!w || !WIPE_WORD(w.value)){ toast("Bitte zum Bestätigen das Wort LÖSCHEN eintippen."); if(w) w.focus(); return }
-  if(wipeBusy) return;
-  if(!USER){ wipeAsk=false; lsSet("dein-anspruch-gast",null); S=blank(); BEL=[]; render(); toast("Alle Angaben auf diesem Gerät wurden gelöscht."); return }
-  wipeBusy=true; render();
-  let ok=false;
-  try{ const {data,error}=await sb.functions.invoke("konto-loeschen",{body:{bestaetigung:"LÖSCHEN"}}); ok=!error && data && data.ok }catch(e){}
-  wipeBusy=false;
-  if(!ok){ toast("Löschen hat nicht geklappt. Es wurde nichts gelöscht. Bitte später noch einmal versuchen."); return render() }
-  wipeAsk=false; lsSet("dein-anspruch-gast",null); lsSet("dein-anspruch-mail",null);
-  try{ for(const k of Object.keys(localStorage)) if(/^da-(ui|fall)-/.test(k)) localStorage.removeItem(k) }catch(e){}
-  await logout();
-  toast("Dein Konto und alle Daten wurden gelöscht.");
-}
-
-const blobToDataUrl=b=>new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsDataURL(b) });
-function cleanData(d){ const x=JSON.parse(JSON.stringify(d||{})); delete x.wiz; delete x.updated; return x }
-async function backupData(){
-  if(dataBusy) return; dataBusy="backup"; render();
-  try{
-    const out={app:"dein-anspruch",version:1,exportiert:new Date().toISOString(),personen:[]};
-    const list=USER?FAELLE:[{id:null,data:S}];
-    for(const f of list){
-      const data=cleanData(f.id===FALL_ID||!USER?S:f.data); const belege=[];
-      if(USER){
-        const {data:rows}=await sb.from("belege").select("*").eq("fall_id",f.id);
-        for(const r of rows||[]){
-          const b={kat:r.kat,datum:r.datum||"",jahr:r.jahr,betrag:r.betrag==null?"":Number(r.betrag),titel:r.titel||"",ctype:r.ctype||"",eingereicht:!!r.eingereicht};
-          if(r.pfad){ try{ const {data:blob}=await sb.storage.from("belege").download(r.pfad); if(blob) b.datei=await blobToDataUrl(blob) }catch(e){} }
-          belege.push(b);
-        }
-      } else BEL.forEach(b=>belege.push({kat:b.kat,datum:b.datum,jahr:b.jahr,betrag:b.betrag,titel:b.titel,eingereicht:!!b.eingereicht}));
-      out.personen.push({name:fallName({data}),data,belege});
-    }
-    const blob=new Blob([JSON.stringify(out)],{type:"application/json"});
-    const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=`dein-anspruch-sicherung-${isoD(TODAY())}.json`;
-    document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove() },4000);
-    toast("Sicherung heruntergeladen. Bewahre die Datei gut auf.");
-  }catch(e){ toast("Sicherung hat nicht geklappt. Bitte erneut versuchen.") }
-  dataBusy=""; render();
-}
-async function restoreData(file){
-  if(!file||dataBusy) return;
-  let j=null; try{ j=JSON.parse(await file.text()) }catch(e){}
-  if(!j||j.app!=="dein-anspruch"||!Array.isArray(j.personen)||!j.personen.length){ toast("Das ist keine Sicherung von Dein Anspruch."); return }
-  dataBusy="restore"; render();
-  try{
-    if(!USER){
-      const p=j.personen[0]; S=merge(p.data||{}); BEL=(p.belege||[]).map((b,i)=>({id:"local-r"+i,...b,asset:""})); save();
-      toast("Sicherung eingespielt (ohne Fotos, da ohne Konto).");
-    } else {
-      let first=null;
-      for(const p of j.personen){
-        const id=await createFall(p.data||{}); first=first||id;
-        for(const b of p.belege||[]){
-          let pfad="";
-          if(b.datei && /^data:/.test(b.datei)){
-            try{ const blob=await (await fetch(b.datei)).blob(); const type=blob.type||b.ctype||"image/jpeg";
-              const ext=type==="application/pdf"?"pdf":type==="image/png"?"png":type==="image/webp"?"webp":"jpg";
-              const path=`${id}/${crypto.randomUUID?crypto.randomUUID():Date.now()+Math.random().toString(16).slice(2)}.${ext}`;
-              const {error}=await sb.storage.from("belege").upload(path,blob,{contentType:type,upsert:false}); if(!error) pfad=path }catch(e){}
-          }
-          await sb.from("belege").insert({fall_id:id,kat:b.kat||"sonst",titel:b.titel||"",datum:b.datum||null,jahr:b.jahr||null,betrag:b.betrag===""||b.betrag==null?null:Number(b.betrag),eingereicht:!!b.eingereicht,ctype:pfad?(b.ctype||""):"",pfad});
-        }
-      }
-      await loadFaelle(); await openFall(first);
-      toast(j.personen.length===1?"Sicherung eingespielt.":`Sicherung eingespielt: ${j.personen.length} Personen.`);
-    }
-  }catch(e){ toast("Einspielen hat nicht vollständig geklappt. Bitte prüfen.") }
-  dataBusy=""; render();
-}
-function datenBox(){
-  return `<section class="panel datenbox">
-    <h3>Deine Daten</h3>
-    <p class="small muted">Lade ab und zu eine Sicherung herunter. Mit der Datei kannst du alles wiederherstellen, auch nach dem Löschen.</p>
-    <div class="btnrow"><button class="btn small soft" type="button" data-act="backup" ${dataBusy?"disabled":""}>${ic("down")}${dataBusy==="backup"?"Sicherung wird erstellt …":"Sicherung herunterladen"}</button><button class="btn small ghost" type="button" data-act="restore" ${dataBusy?"disabled":""}>${dataBusy==="restore"?"Wird eingespielt …":"Sicherung einspielen"}</button></div>
-    ${wipeAsk?`<div class="notice bad" id="wipebox">${ic("alert")}<span><strong>Bist du sicher?</strong> ${USER?`Dein Konto und alle Angaben, Belege und Fotos werden für immer gelöscht${MEMBERS.length>1?". Eingeladene Familienmitglieder verlieren den Zugriff auf die gemeinsamen Angaben":""}.`:"Alle Angaben auf diesem Gerät werden gelöscht."} Das kann nicht rückgängig gemacht werden. Lade vorher am besten eine Sicherung herunter.
-      <span class="btnrow" style="margin-top:10px"><button class="btn small soft" type="button" data-act="backup" ${dataBusy?"disabled":""}>${ic("down")}Erst Sicherung herunterladen</button></span>
-      <span class="field" style="margin-top:10px"><label for="wipe-word">Zum Bestätigen <strong>LÖSCHEN</strong> eintippen</label><input type="text" id="wipe-word" autocomplete="off" autocapitalize="characters" spellcheck="false"></span>
-      <span class="btnrow" style="margin-top:10px"><button class="btn small danger" type="button" data-act="wipe-yes" ${wipeBusy?"disabled":""}>${wipeBusy?"Wird gelöscht …":"Ja, endgültig löschen"}</button><button class="btn small ghost" type="button" data-act="wipe-no" ${wipeBusy?"disabled":""}>Abbrechen</button></span></span></div>`
-    :`<button class="linkbtn danger" type="button" data-act="wipe" style="align-self:flex-start">${USER?"Konto und alle Daten löschen":"Alle Angaben auf diesem Gerät löschen"}</button>`}
-  </section>`;
-}
-
-/* ---------- E-Mail-Erinnerungen ---------- */
-let ERI=null, eriLoaded=false;
-async function loadEri(){ if(!USER) return; const {data}=await sb.from("erinnerung").select("aktiv,email").eq("user_id",USER.id).maybeSingle(); ERI=data||null; eriLoaded=true; render() }
-async function setEri(aktiv,email){
-  const mail=(email||(ERI&&ERI.email)||USER.email||"").trim();
-  if(aktiv && !/^\S+@\S+\.\S+$/.test(mail)){ toast("Bitte eine gültige E-Mail-Adresse eingeben."); return }
-  const {error}=await sb.from("erinnerung").upsert({user_id:USER.id,aktiv,email:mail,updated_at:new Date().toISOString()});
-  if(error){ toast("Speichern hat nicht geklappt."); return }
-  ERI={aktiv,email:mail}; toast(aktiv?"Erinnerungen per E-Mail sind an.":"Erinnerungen per E-Mail sind aus."); render();
-}
-function eriCard(){
-  if(!USER) return "";
-  if(!eriLoaded){ loadEri(); return "" }
-  const on=ERI&&ERI.aktiv;
-  return `<section class="panel mini">
-    <div class="mini-head">${ic("bell")}<div><h3>Erinnerungen per E-Mail</h3><p class="small muted">Wir schreiben dir 14, 7 und 1 Tag vor jeder Frist, für alle Personen in deinem Konto.</p></div></div>
-    ${on?`<p class="small">An: <strong>${esc(ERI.email)}</strong></p><div class="btnrow"><button class="btn small ghost" type="button" data-act="eri-off">Ausschalten</button></div>`
-      :`<div class="grid2" style="align-items:end"><div class="field"><label for="eri-mail">E-Mail-Adresse</label><input type="email" id="eri-mail" value="${esc((ERI&&ERI.email)||USER.email||"")}"></div><div><button class="btn" type="button" data-act="eri-on">${ic("bell")}Einschalten</button></div></div>`}
-  </section>`;
-}
-
-/* ---------- Fehlerprotokoll (ohne persönliche Daten), Feedback, Weiterempfehlen ---------- */
-const APP_VERSION="0d111243"; let errN=0;
-function reportError(msg,stack){
-  if(!sb||errN>=5) return; errN++;
-  const clean=s=>String(s||"").replace(/[\w.+-]+@[\w-]+\.[\w.]+/g,"[mail]").replace(/\d{5,}/g,"[zahl]");
-  let seite=""; try{ seite=famKey().split(":")[0] }catch(e){}
-  try{ sb.from("fehler").insert({meldung:clean(msg).slice(0,500)||"?",stelle:clean(stack).slice(0,1500),seite:seite.slice(0,100),version:APP_VERSION,geraet:navigator.userAgent.slice(0,200)}).then(()=>{},()=>{}) }catch(e){}
-}
-window.addEventListener("error",e=>{ if(e.message && !/ResizeObserver|^Script error/.test(e.message)) reportError(e.message,(e.error&&e.error.stack)||((e.filename||"")+":"+(e.lineno||""))) });
-window.addEventListener("unhandledrejection",e=>{ const r=e.reason; if(r&&r.name==="AbortError") return; reportError((r&&r.message)||String(r),r&&r.stack) });
-function openFeedback(){
-  let d=$("fbbox"); if(!d){ d=document.createElement("div"); d.id="fbbox"; d.className="overlay"; document.body.appendChild(d) }
-  d.hidden=false;
-  d.innerHTML=`<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="fb-h">
+    <button type="button" class="linkbtn" data-act="r-start">Pflegegrad-Rechner: ohne Anmeldung einsch\xE4tzen, welcher Pflegegrad in Frage kommt</button>
+    <p class="small muted">Ohne Konto bleiben deine Angaben nur in diesem Browser, und Belege-Fotos werden nicht gespeichert. Du kannst sp\xE4ter jederzeit ein Konto anlegen, deine Angaben werden dann \xFCbernommen.</p>
+  </section>`}async function Ln(e){let n=(f("au-mail")||{}).value?.trim()||"",a=(f("au-pw")||{}).value||"";if(e!=="au-newpw"&&!/^\S+@\S+\.\S+$/.test(n))return t.authMsg="Bitte eine g\xFCltige E-Mail-Adresse eingeben.",c();if((e==="au-register"||e==="au-newpw")&&a.length<8)return t.authMsg="Das Passwort muss mindestens 8 Zeichen haben.",c();W("dein-anspruch-mail",n||q("dein-anspruch-mail")),t.authBusy=!0,t.authMsg="",c();let s=location.origin+location.pathname,r;try{e==="au-login"?(r=await t.sb.auth.signInWithPassword({email:n,password:a}),r.error?t.authMsg=/confirm/i.test(r.error.message)?"Die E-Mail-Adresse ist noch nicht best\xE4tigt. Bitte den Link in der Best\xE4tigungs-E-Mail antippen.":"Anmeldung fehlgeschlagen. E-Mail oder Passwort ist falsch.":W("dein-anspruch-modus","konto")):e==="au-register"?(r=await t.sb.auth.signUp({email:n,password:a,options:{emailRedirectTo:s}}),r.error?t.authMsg=/already|registered/i.test(r.error.message)?"F\xFCr diese E-Mail gibt es schon ein Konto. Bitte anmelden.":/rate|limit/i.test(r.error.message)?"Gerade werden zu viele E-Mails verschickt. Bitte in einer Stunde noch einmal versuchen.":"Konto anlegen hat nicht geklappt: "+r.error.message:r.data.session||(t.authMsg="Fast geschafft! Wir haben dir eine E-Mail geschickt. Bitte den Link darin antippen und dich danach hier anmelden.",t.authMode="login")):e==="au-forgot"?(r=await t.sb.auth.resetPasswordForEmail(n,{redirectTo:s}),t.authMsg=r.error?"Das hat nicht geklappt. Bitte sp\xE4ter noch einmal versuchen.":"Wenn es ein Konto mit dieser Adresse gibt, ist jetzt eine E-Mail mit einem Link unterwegs."):e==="au-newpw"&&(r=await t.sb.auth.updateUser({password:a}),r.error?t.authMsg="Das neue Passwort konnte nicht gespeichert werden.":(t.RECOVERY=!1,t.authMsg="",m("Neues Passwort gespeichert")))}catch{t.authMsg="Keine Verbindung. Bitte Internet pr\xFCfen."}t.authBusy=!1,c()}async function Mn(){t.authBusy=!0,t.authMsg="",c();let{error:e}=await t.sb.auth.signInWithOAuth({provider:"google",options:{redirectTo:location.origin+location.pathname}});e&&(t.authBusy=!1,t.authMsg=/not enabled|provider/i.test(e.message)?"Die Anmeldung mit Google ist noch nicht eingeschaltet. Bitte vorerst mit E-Mail anmelden.":"Anmeldung mit Google hat nicht geklappt. Bitte erneut versuchen.",c())}async function Ve(){try{await t.sb.auth.signOut()}catch{}t.ERI=null,t.eriLoaded=!1,W("dein-anspruch-modus",""),t.USER=null,t.GUEST=!1,t.S=C(),t.BEL=[],t.URLS={},t.FAELLE=[],t.FALL_ID=null,t.showPersons=!1,t.canSave=!1,t.ref=null,c(),E()}var In={};M(In,{closeFeedback:()=>Ce,openFeedback:()=>Rn,sendFeedback:()=>Nn,shareApp:()=>Tn,start23:()=>Gn});var Ea="ae708984";t.errN=0;function Aa(e,n){if(!t.sb||t.errN>=5)return;t.errN++;let a=r=>String(r||"").replace(/[\w.+-]+@[\w-]+\.[\w.]+/g,"[mail]").replace(/\d{5,}/g,"[zahl]"),s="";try{s=vt().split(":")[0]}catch{}try{t.sb.from("fehler").insert({meldung:a(e).slice(0,500)||"?",stelle:a(n).slice(0,1500),seite:s.slice(0,100),version:Ea,geraet:navigator.userAgent.slice(0,200)}).then(()=>{},()=>{})}catch{}}function Rn(){let e=f("fbbox");e||(e=document.createElement("div"),e.id="fbbox",e.className="overlay",document.body.appendChild(e)),e.hidden=!1,e.innerHTML=`<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="fb-h">
     <h3 id="fb-h">Feedback geben</h3>
-    <p class="small muted">Was gefällt dir, was fehlt, was klappt nicht? Jede Nachricht wird gelesen. Bitte keine Gesundheitsdaten hineinschreiben.</p>
+    <p class="small muted">Was gef\xE4llt dir, was fehlt, was klappt nicht? Jede Nachricht wird gelesen. Bitte keine Gesundheitsdaten hineinschreiben.</p>
     <div class="field"><label for="fb-text">Deine Nachricht</label><textarea id="fb-text" rows="5" maxlength="3000"></textarea></div>
-    <div class="field"><label for="fb-kontakt">E-Mail für Rückfragen (freiwillig)</label><input type="email" id="fb-kontakt" value="${esc((USER&&USER.email)||"")}"></div>
+    <div class="field"><label for="fb-kontakt">E-Mail f\xFCr R\xFCckfragen (freiwillig)</label><input type="email" id="fb-kontakt" value="${d(t.USER&&t.USER.email||"")}"></div>
     <div class="btnrow"><button class="btn" type="button" data-act="fb-send">Senden</button><button class="btn ghost" type="button" data-act="fb-close">Abbrechen</button></div>
-  </div>`;
-  try{ applyI18n(d) }catch(e){}
-  setTimeout(()=>{ const t=$("fb-text"); if(t) try{ t.focus() }catch(e){} },60);
-}
-function closeFeedback(){ const d=$("fbbox"); if(d) d.hidden=true }
-async function sendFeedback(){
-  const t=(($("fb-text")||{}).value||"").trim(); if(t.length<2){ toast("Bitte kurz schreiben, worum es geht."); return }
-  if(!sb){ toast("Keine Verbindung. Bitte später noch einmal versuchen."); return }
-  const btn=document.querySelector('#fbbox [data-act="fb-send"]'); if(btn){ btn.disabled=true; btn.textContent="Wird gesendet …" }
-  const kontakt=(($("fb-kontakt")||{}).value||"").trim().slice(0,200);
-  const {error}=await sb.from("rueckmeldung").insert({text:t.slice(0,3000),kontakt:kontakt||null,version:APP_VERSION});
-  if(error){ toast("Senden hat nicht geklappt. Bitte noch einmal versuchen."); if(btn){ btn.disabled=false; btn.textContent="Senden" } return }
-  closeFeedback(); toast("Danke! Deine Nachricht ist angekommen.");
-}
-async function shareApp(){
-  const url="https://yotan31.github.io/dein-anspruch/";
-  const text="Schau mal: Mit „Dein Anspruch“ siehst du kostenlos, welche Pflege-Leistungen euch noch zustehen. Mit fertigen Anträgen und Erinnerung an Fristen.";
-  if(navigator.share){ try{ await navigator.share({title:"Dein Anspruch",text,url}); return }catch(e){ if(e&&e.name==="AbortError") return } }
-  window.open("https://wa.me/?text="+encodeURIComponent(text+" "+url),"_blank","noopener");
-}
-document.addEventListener("click",e=>{ if(e.target && e.target.id==="fbbox") closeFeedback() });
+  </div>`;try{Te(e)}catch{}setTimeout(()=>{let n=f("fb-text");if(n)try{n.focus()}catch{}},60)}function Ce(){let e=f("fbbox");e&&(e.hidden=!0)}async function Nn(){let e=((f("fb-text")||{}).value||"").trim();if(e.length<2){m("Bitte kurz schreiben, worum es geht.");return}if(!t.sb){m("Keine Verbindung. Bitte sp\xE4ter noch einmal versuchen.");return}let n=document.querySelector('#fbbox [data-act="fb-send"]');n&&(n.disabled=!0,n.textContent="Wird gesendet \u2026");let a=((f("fb-kontakt")||{}).value||"").trim().slice(0,200),{error:s}=await t.sb.from("rueckmeldung").insert({text:e.slice(0,3e3),kontakt:a||null,version:Ea});if(s){m("Senden hat nicht geklappt. Bitte noch einmal versuchen."),n&&(n.disabled=!1,n.textContent="Senden");return}Ce(),m("Danke! Deine Nachricht ist angekommen.")}async function Tn(){let e="https://yotan31.github.io/dein-anspruch/",n="Schau mal: Mit \u201EDein Anspruch\u201C siehst du kostenlos, welche Pflege-Leistungen euch noch zustehen. Mit fertigen Antr\xE4gen und Erinnerung an Fristen.";if(navigator.share)try{await navigator.share({title:"Dein Anspruch",text:n,url:e});return}catch(a){if(a&&a.name==="AbortError")return}window.open("https://wa.me/?text="+encodeURIComponent(n+" "+e),"_blank","noopener")}function Gn(){window.addEventListener("error",e=>{e.message&&!/ResizeObserver|^Script error/.test(e.message)&&Aa(e.message,e.error&&e.error.stack||(e.filename||"")+":"+(e.lineno||""))}),window.addEventListener("unhandledrejection",e=>{let n=e.reason;n&&n.name==="AbortError"||Aa(n&&n.message||String(n),n&&n.stack)}),document.addEventListener("click",e=>{let n=e.target;n&&n.id==="fbbox"&&Ce()})}async function wt(e){try{await navigator.clipboard.writeText(e),m("Text kopiert")}catch{let a=document.querySelector("textarea[data-tx]");a&&(a.focus(),a.select()),m("Bitte Text markieren und kopieren (Strg+C)")}}t.tT=void 0;function m(e){let n=f("toast");n.textContent=ot(e),n.hidden=!1,clearTimeout(t.tT),t.tT=setTimeout(()=>n.hidden=!0,2800)}function Hn(){document.addEventListener("click",e=>{let n=e.target.closest("[data-act],[data-open],[data-copy],[data-pdf],[data-resettx],[data-tab],[data-area],[data-kat],[data-del],[data-delyes],[data-delno],[data-sub-toggle],[data-view],[data-delown],[data-year],[data-befpdf],[data-befcopy],[data-edit],[data-wopen],[data-wnav],[data-font],[data-gotoclaim],[data-rmember]");if(!n)return;let a=n.dataset.act;if(n.dataset.tab){n.classList.contains("howbtn")&&(t.S.welcomeSeen=!0),t.S.tab=n.dataset.tab,t.openKey=null,S(),c(),E();return}if(n.dataset.area){t.areaFilter=n.dataset.area,c();return}if(n.dataset.gotoclaim){t.S.tab="ansprueche",t.openKey=n.dataset.gotoclaim,c();let s=f("it-"+t.openKey);s&&s.scrollIntoView({block:"start"});return}if(n.dataset.rmember){ln(n.dataset.rmember);return}if(n.dataset.font){t.S.font=n.dataset.font,S(),c();return}if(n.dataset.edit){fn(n.dataset.edit);return}if(n.dataset.wopen){$t(n.dataset.wopen);return}if(n.dataset.wnav){let s=n.dataset.wnav,r=oe().list.length;if(s==="close"){let l=t.S.wiz.k;t.S.wiz=null,t.openKey=l,S(),c();let o=f("it-"+l);o&&o.scrollIntoView({block:"start"});return}s==="next"?t.S.wiz.i=Math.min(r-1,t.S.wiz.i+1):s==="back"?t.S.wiz.i=Math.max(0,t.S.wiz.i-1):s.startsWith("goto:")&&(t.S.wiz.i=Number(s.slice(5))),S(),c(),E();let i=document.querySelector(".wiz input[type=text],.wiz input[type=date],.wiz input[type=tel],.wiz textarea");if(i&&!i.value)try{i.focus({preventScroll:!0})}catch{}return}if(n.dataset.year){let s=n.dataset.year,r=J();if(r=r.includes(s)?r.filter(i=>i!==s):[...r,s],!r.length){m("Mindestens ein Jahr ausw\xE4hlen");return}t.S.belegFilter.jahre=r,S(),c();return}if(n.dataset.befpdf){bt(!0,!0,[n.dataset.befpdf]);return}if(n.dataset.befcopy){t.befJahr=n.dataset.befcopy;let s=ie(R.find(r=>r.k==="befreiung"));wt(`Betreff: ${s.subject}
 
-render();
-initStore();
+${s.body}`);return}if(n.dataset.kat!==void 0&&n.classList.contains("chip")){t.S.belegFilter.kat=n.dataset.kat,S(),c();return}if(n.dataset.del){t.delAsk=n.dataset.del,c();return}if(n.dataset.delno){t.delAsk=null,c();return}if(n.dataset.delyes){vn(n.dataset.delyes);return}if(n.dataset.subToggle){wn(n.dataset.subToggle);return}if(n.dataset.view){f("lbimg").src=ne(n.dataset.view),f("lightbox").hidden=!1;return}if(n.dataset.delown){t.S.termine.eigene=(t.S.termine.eigene||[]).filter(s=>s.id!==n.dataset.delown),S(),c();return}if(n.dataset.open){t.openKey=t.openKey===n.dataset.open?null:n.dataset.open,c(),t.openKey&&Un(f("it-"+t.openKey));return}if(n.dataset.copy){let s=R.find(i=>i.k===n.dataset.copy),r=ie(s);wt(`Betreff: ${r.subject}
+
+${r.body}`);return}if(n.dataset.pdf){hn(R.find(s=>s.k===n.dataset.pdf));return}if(n.dataset.resettx){delete t.S.texte[n.dataset.resettx],delete t.S.texte[n.dataset.resettx+"_sub"],S(),c();return}switch(a){case"next":{if(n.dataset.ok==="0"){let r=f("navwarn");r&&(r.hidden=!1,r.scrollIntoView({block:"center",behavior:"smooth"}));break}let s=Ee();t.S.step>=s.length-1?(t.S.done=!0,t.S.tab="ansprueche"):t.S.step++,S(),c(),E();break}case"back":t.S.step=Math.max(0,t.S.step-1),S(),c(),E();break;case"edit":t.S.done=!1,t.S.step=0,S(),c(),E();break;case"reset":f("resetconfirm").hidden=!1;break;case"sent":{let s=n.dataset.k;t.S.status[s]="beantragt",t.S.sent=t.S.sent||{},t.S.sent[s]=F(x());let r=R.find(i=>i.k===s);t.S.termine.eigene=[...t.S.termine.eigene||[],{id:String(Date.now()),t:`Antwort auf Antrag \u201E${r?r.t:s}\u201C da?`,d:F(X(x(),28)),n:"Falls noch keine Antwort da ist: bei der Kasse nachfragen. Das Datum des Antrags steht in der App."}],S(),c(),m("Super! Wir erinnern dich in 4 Wochen.");break}case"dropphoto":t.pending&&(t.pending.preview&&t.pending.preview.startsWith("blob:")&&URL.revokeObjectURL(t.pending.preview),t.pending.file=null,t.pending.preview="",t.pending.keepAsset&&(t.pending.dropAsset=!0),c());break;case"bes-cam":t.fileTarget="bescheid",f("fileCam").value="",f("fileCam").click();break;case"bes-manual":case"bes-edit":t.bescheidDraft={...t.S.bescheid||{},pg:t.S.bescheid&&t.S.bescheid.pg||String(b()||"")},t.ocrMsg="",c();break;case"bes-cancel":t.bescheidDraft=null,t.ocrMsg="",c();break;case"bes-save":On();break;case"entl-add":t.S.tab="belege",t.pending=null,ge(null),t.pending&&(t.pending.kat="entl",c()),E();break;case"r-start":it();break;case"r-next":t.RECHNER.i++,c(),E();break;case"r-back":t.RECHNER.i=Math.max(0,t.RECHNER.i-1),c(),E();break;case"r-close":t.RECHNER=null,c(),E();break;case"r-neu":it();break;case"r-antrag":{let s=b()?"pg_hoch":"pg_antrag";t.RECHNER=null,t.S.bereiche.pflege=!0,t.S.done||(t.S.done=!0),$t(s);break}case"r-konto":t.RECHNER=null,typeof t.authMode<"u"&&(t.authMode="register",t.authMsg="Lege ein kostenloses Konto an. Danach hilft dir die App Schritt f\xFCr Schritt beim Antrag."),c(),E();break;case"au-google":Mn();break;case"au-login":case"au-register":case"au-forgot":case"au-newpw":Ln(a);break;case"au-mode":t.authMode=n.dataset.mode,t.authMsg="",c();break;case"au-show":{let s=f("au-pw");s&&(s.type=s.type==="password"?"text":"password",n.textContent=s.type==="password"?"Zeigen":"Verbergen");break}case"au-guest":W("dein-anspruch-modus","gast"),Ke(),E();break;case"guest-register":t.GUEST=!1,t.authMode="register",t.authMsg="",W("dein-anspruch-modus",""),c(),E();break;case"logout":Ve();break;case"cs-yes":an();break;case"fb-open":Rn();break;case"fb-close":Ce();break;case"fb-send":Nn();break;case"teilen":Tn();break;case"eri-on":dt(!0,(f("eri-mail")||{}).value);break;case"eri-off":dt(!1);break;case"persons":t.showPersons=!t.showPersons,t.delPersonAsk=!1,t.showPersons&&We(),c(),E();break;case"add-person":sn();break;case"invite":rn();break;case"inv-copy":wt(t.inviteLink);break;case"del-person":t.delPersonAsk=!0,c();break;case"del-person-no":t.delPersonAsk=!1,c();break;case"del-person-yes":on();break;case"wipe":t.wipeAsk=!0,c();{let s=f("wipe-word");if(s)try{s.focus({preventScroll:!0})}catch{}}break;case"wipe-no":t.wipeAsk=!1,c();break;case"wipe-yes":Wn();break;case"backup":jn();break;case"restore":{let s=f("fileJson");s&&(s.value="",s.click());break}case"welcome-ok":t.S.welcomeSeen=!0,S(),c();break;case"vhp-quittung":Vn();break;case"reset-no":f("resetconfirm").hidden=!0;break;case"reset-yes":t.S=C(),t.openKey=null,S(),c(),E();break;case"cam":f("fileCam").value="",f("fileCam").click();break;case"pick":f("fileAny").value="",f("fileAny").click();break;case"manual":ge(null);break;case"cancelbeleg":t.pending&&t.pending.preview&&t.pending.preview.startsWith("blob:")&&URL.revokeObjectURL(t.pending.preview),t.pending=null,c();break;case"savebeleg":kn();break;case"bulk-save":Pn();break;case"bulk-cancel":t.bulk=null,c();break;case"bulk-single":{let s=t.bulk&&t.bulk.file;t.bulk=null,ge(s);break}case"mappe":bt(!1,!1);break;case"csv":pn();break;case"addbesuch":{let s=f("tbesuch").value;if(!B(s)){m("Bitte ein Datum w\xE4hlen");break}t.S.termine.besuche=[...t.S.termine.besuche||[],{d:s}],S(),c(),m("Besuch eingetragen");break}case"copypd":wt(ct());break;case"addown":{let s=f("ownt").value.trim(),r=f("ownd").value;if(!s||!B(r)){m("Bitte Text und Datum angeben");break}t.S.termine.eigene=[...t.S.termine.eigene||[],{id:String(Date.now()),t:s,d:r}],S(),c(),m("Erinnerung hinzugef\xFCgt");break}}}),document.addEventListener("change",e=>{let n=e.target,a=n.name;if(n.id==="langsel"){t.LANG=n.value;try{localStorage.setItem("da-lang",JSON.stringify(t.LANG))}catch{}c();return}if(n.dataset.plz){/^\d{5}$/.test(n.value.trim())&&(t.S.plz=n.value.trim(),S(),c());return}if(n.dataset.rq!=null&&t.RECHNER){t.RECHNER.a[t.RECHNER.i]=n.dataset.rq,c(),setTimeout(()=>{t.RECHNER&&t.RECHNER.a[t.RECHNER.i]!=null&&(t.RECHNER.i++,c(),E())},350);return}if(n.id==="fileJson"){let s=n.files&&n.files[0];s&&typeof St=="function"&&St(s);return}if(n.id==="fileCam"||n.id==="fileAny"){let s=n.files&&n.files[0];s&&(t.fileTarget==="bescheid"?(t.fileTarget=null,_n(s)):!t.pending&&(s.type==="application/pdf"||/\.pdf$/i.test(s.name||""))?An(s):ge(s));return}if(n.dataset.bd&&t.bescheidDraft){t.bescheidDraft[n.dataset.bd]=n.value;return}if(n.dataset.bi&&t.bulk&&t.bulk.items){let[s,r]=n.dataset.bi.split(":"),i=t.bulk.items[+s];i&&(i[r]=n.type==="checkbox"?n.checked:n.value,c());return}if(n.dataset.fall){re(n.dataset.fall),E();return}if(n.id==="entl-seit"){t.S.entlSeit=n.value,S(),c();return}if(n.dataset.wq&&n.type==="radio"){let s=oe().list.find(r=>r.k===n.dataset.wq);if(s){ye(s,n.value),c();let r=t.S.wiz.k,i=t.S.wiz.i;setTimeout(()=>{if(t.S.wiz&&t.S.wiz.k===r&&t.S.wiz.i===i){let l=document.querySelector('.wiz .nav [data-wnav="next"]:not(.ghost)');l&&l.click()}},420)}return}if(n.dataset.wqm){let s=oe().list.find(r=>r.k===n.dataset.wqm);if(s){let r=Array.isArray(Ae(s))?Ae(s):[];ye(s,n.checked?[...r,n.value]:r.filter(i=>i!==n.value)),c()}return}if(n.dataset.wq&&n.type==="date"){let s=oe().list.find(r=>r.k===n.dataset.wq);s&&(ye(s,n.value),c());return}if(a==="rolle")t.S.rolle=n.value;else if(a==="bereich")t.S.bereiche[n.value]=n.checked;else if(a==="kasse")t.S.kasse=n.value;else if(n.id==="aokRegion")t.S.aokRegion=n.value;else if(a==="pg")t.S.pg=n.value;else if(a==="wohnen")t.S.wohnen=n.value;else if(a==="stunden10")t.S.pp.stunden10=n.value;else if(a==="arbeit")t.S.pp.arbeit=n.value;else if(a==="sbstatus")t.S.sb.status=n.value;else if(n.id==="gdb")t.S.sb.gdb=n.value;else if(a==="mz")t.S.sb.mz[n.value]=n.checked;else if(a==="sbx")t.S.sb[n.value]=n.checked;else if(a==="genutzt")t.S.genutzt[n.value]=n.checked;else if(n.dataset.check){t.S.checks[n.dataset.check]=n.checked,S();return}else if(n.dataset.status)t.S.status[n.dataset.status]=n.value;else if(n.dataset.gen)t.S.genutzt[n.dataset.gen]=n.checked,t.openKey=null;else if(n.id==="chron")t.S.chronisch=n.value;else if(n.dataset.brutto)t.S.bruttoJahr={...t.S.bruttoJahr||{},[n.dataset.brutto]:n.value};else if(n.dataset.vhp)t.S.vhp[n.dataset.vhp]=n.value,delete t.S.texte.jahresbetrag,delete t.S.texte.jahresbetrag_sub;else if(n.id==="twm")t.S.termine.wertmarke=n.value;else if(n.dataset.pend){t.pending[n.dataset.pend]=n.value,n.type==="radio"&&c();return}else return;S(),c()}),document.addEventListener("input",e=>{let n=e.target;if(n.dataset.wq&&n.type!=="radio"&&n.type!=="date"){let a=oe().list.find(s=>s.k===n.dataset.wq);if(a){ye(a,n.value);let s=document.querySelector('.wiz [data-wnav="next"].ghost');s&&(s.hidden=!!n.value.trim())}return}if(n.dataset.bd&&t.bescheidDraft){t.bescheidDraft[n.dataset.bd]=n.value;return}if(n.dataset.bi&&t.bulk&&t.bulk.items&&n.type!=="checkbox"){let[a,s]=n.dataset.bi.split(":"),r=t.bulk.items[+a];r&&(r[s]=n.value);return}if(n.dataset.wqp){t.S.person[n.dataset.wqp]=n.value,S();return}n.id==="kasseAndere"?(t.S.kasseAndere=n.value,S()):n.dataset.p?(t.S.person[n.dataset.p]=n.value,S()):n.dataset.tx?(t.S.texte[n.dataset.tx]=n.value,S()):n.dataset.sub?(t.S.texte[n.dataset.sub+"_sub"]=n.value,S()):n.dataset.pend?t.pending[n.dataset.pend]=n.value:n.dataset.vhp&&n.type!=="radio"?(t.S.vhp[n.dataset.vhp]=n.value,S()):n.id==="tdienst"?(t.S.termine.dienst=n.value,S()):n.id==="ttel"&&(t.S.termine.tel=n.value,S())}),document.addEventListener("dragover",e=>{let n=e.target,a=n.closest&&n.closest("#drop");a&&t.ASSETS&&(e.preventDefault(),a.classList.add("over"))}),document.addEventListener("dragleave",e=>{let n=e.target,a=n.closest&&n.closest("#drop");a&&a.classList.remove("over")}),document.addEventListener("drop",e=>{let n=e.target;if(n.closest&&n.closest("#drop")&&t.ASSETS){e.preventDefault();let s=e.dataTransfer.files[0];s&&ge(s)}}),f("lbclose").onclick=()=>{f("lightbox").hidden=!0},f("lightbox").onclick=e=>{e.target.id==="lightbox"&&(f("lightbox").hidden=!0)},document.addEventListener("keydown",e=>{let n=e.target;if(e.key==="Escape"){f("lightbox").hidden=!0;let a=f("fbbox");a&&(a.hidden=!0)}if(e.key==="Enter"&&n.closest&&n.closest(".auth")&&n.tagName==="INPUT"){e.preventDefault();let a=document.querySelector(".auth .btn.big");a&&a.click();return}if(e.key==="Enter"&&t.S.wiz&&n.matches&&n.matches(".wiz input")){e.preventDefault();let a=document.querySelector('.wiz .nav [data-wnav="next"]:not(.ghost)');a&&a.click()}})}t.wipeAsk=!1;t.wipeBusy=!1;t.dataBusy="";function hs(e){return/^l(ö|oe|o)schen$/i.test(String(e||"").trim())}async function Wn(){let e=f("wipe-word");if(!e||!hs(e.value)){m("Bitte zum Best\xE4tigen das Wort L\xD6SCHEN eintippen."),e&&e.focus();return}if(t.wipeBusy)return;if(!t.USER){t.wipeAsk=!1,W("dein-anspruch-gast",null),t.S=C(),t.BEL=[],c(),m("Alle Angaben auf diesem Ger\xE4t wurden gel\xF6scht.");return}t.wipeBusy=!0,c();let n=!1;try{let{data:a,error:s}=await t.sb.functions.invoke("konto-loeschen",{body:{bestaetigung:"L\xD6SCHEN"}});n=!s&&a&&a.ok}catch{}if(t.wipeBusy=!1,!n)return m("L\xF6schen hat nicht geklappt. Es wurde nichts gel\xF6scht. Bitte sp\xE4ter noch einmal versuchen."),c();t.wipeAsk=!1,W("dein-anspruch-gast",null),W("dein-anspruch-mail",null);try{for(let a of Object.keys(localStorage))/^da-(ui|fall)-/.test(a)&&localStorage.removeItem(a)}catch{}await Ve(),m("Dein Konto und alle Daten wurden gel\xF6scht.")}function ps(e){return new Promise((n,a)=>{let s=new FileReader;s.onload=()=>n(s.result),s.onerror=a,s.readAsDataURL(e)})}function bs(e){let n=JSON.parse(JSON.stringify(e||{}));return delete n.wiz,delete n.updated,n}async function jn(){if(!t.dataBusy){t.dataBusy="backup",c();try{let e={app:"dein-anspruch",version:1,exportiert:new Date().toISOString(),personen:[]},n=t.USER?t.FAELLE:[{id:null,data:t.S}];for(let r of n){let i=bs(r.id===t.FALL_ID||!t.USER?t.S:r.data),l=[];if(t.USER){let{data:o}=await t.sb.from("belege").select("*").eq("fall_id",r.id);for(let u of o||[]){let p={kat:u.kat,datum:u.datum||"",jahr:u.jahr,betrag:u.betrag==null?"":Number(u.betrag),titel:u.titel||"",ctype:u.ctype||"",eingereicht:!!u.eingereicht};if(u.pfad)try{let{data:v}=await t.sb.storage.from("belege").download(u.pfad);v&&(p.datei=await ps(v))}catch{}l.push(p)}}else t.BEL.forEach(o=>l.push({kat:o.kat,datum:o.datum,jahr:o.jahr,betrag:o.betrag,titel:o.titel,eingereicht:!!o.eingereicht}));e.personen.push({name:Y({data:i}),data:i,belege:l})}let a=new Blob([JSON.stringify(e)],{type:"application/json"}),s=document.createElement("a");s.href=URL.createObjectURL(a),s.download=`dein-anspruch-sicherung-${F(x())}.json`,document.body.appendChild(s),s.click(),setTimeout(()=>{URL.revokeObjectURL(s.href),s.remove()},4e3),m("Sicherung heruntergeladen. Bewahre die Datei gut auf.")}catch{m("Sicherung hat nicht geklappt. Bitte erneut versuchen.")}t.dataBusy="",c()}}async function St(e){if(!e||t.dataBusy)return;let n=null;try{n=JSON.parse(await e.text())}catch{}if(!n||n.app!=="dein-anspruch"||!Array.isArray(n.personen)||!n.personen.length){m("Das ist keine Sicherung von Dein Anspruch.");return}t.dataBusy="restore",c();try{if(t.USER){let a=null;for(let s of n.personen){let r=await ce(s.data||{});a=a||r;for(let i of s.belege||[]){let l="";if(i.datei&&/^data:/.test(i.datei))try{let o=await(await fetch(i.datei)).blob(),u=o.type||i.ctype||"image/jpeg",p=u==="application/pdf"?"pdf":u==="image/png"?"png":u==="image/webp"?"webp":"jpg",v=`${r}/${crypto.randomUUID?crypto.randomUUID():Date.now()+Math.random().toString(16).slice(2)}.${p}`,{error:y}=await t.sb.storage.from("belege").upload(v,o,{contentType:u,upsert:!1});y||(l=v)}catch{}await t.sb.from("belege").insert({fall_id:r,kat:i.kat||"sonst",titel:i.titel||"",datum:i.datum||null,jahr:i.jahr||null,betrag:i.betrag===""||i.betrag==null?null:Number(i.betrag),eingereicht:!!i.eingereicht,ctype:l&&i.ctype||"",pfad:l})}}await pt(),await re(a),m(n.personen.length===1?"Sicherung eingespielt.":`Sicherung eingespielt: ${n.personen.length} Personen.`)}else{let a=n.personen[0];t.S=$e(a.data||{}),t.BEL=(a.belege||[]).map((s,r)=>({id:"local-r"+r,...s,asset:""})),S(),m("Sicherung eingespielt (ohne Fotos, da ohne Konto).")}}catch{m("Einspielen hat nicht vollst\xE4ndig geklappt. Bitte pr\xFCfen.")}t.dataBusy="",c()}function Cn(){return`<section class="panel datenbox">
+    <h3>Deine Daten</h3>
+    <p class="small muted">Lade ab und zu eine Sicherung herunter. Mit der Datei kannst du alles wiederherstellen, auch nach dem L\xF6schen.</p>
+    <div class="btnrow"><button class="btn small soft" type="button" data-act="backup" ${t.dataBusy?"disabled":""}>${g("down")}${t.dataBusy==="backup"?"Sicherung wird erstellt \u2026":"Sicherung herunterladen"}</button><button class="btn small ghost" type="button" data-act="restore" ${t.dataBusy?"disabled":""}>${t.dataBusy==="restore"?"Wird eingespielt \u2026":"Sicherung einspielen"}</button></div>
+    ${t.wipeAsk?`<div class="notice bad" id="wipebox">${g("alert")}<span><strong>Bist du sicher?</strong> ${t.USER?`Dein Konto und alle Angaben, Belege und Fotos werden f\xFCr immer gel\xF6scht${t.MEMBERS.length>1?". Eingeladene Familienmitglieder verlieren den Zugriff auf die gemeinsamen Angaben":""}.`:"Alle Angaben auf diesem Ger\xE4t werden gel\xF6scht."} Das kann nicht r\xFCckg\xE4ngig gemacht werden. Lade vorher am besten eine Sicherung herunter.
+      <span class="btnrow" style="margin-top:10px"><button class="btn small soft" type="button" data-act="backup" ${t.dataBusy?"disabled":""}>${g("down")}Erst Sicherung herunterladen</button></span>
+      <span class="field" style="margin-top:10px"><label for="wipe-word">Zum Best\xE4tigen <strong>L\xD6SCHEN</strong> eintippen</label><input type="text" id="wipe-word" autocomplete="off" autocapitalize="characters" spellcheck="false"></span>
+      <span class="btnrow" style="margin-top:10px"><button class="btn small danger" type="button" data-act="wipe-yes" ${t.wipeBusy?"disabled":""}>${t.wipeBusy?"Wird gel\xF6scht \u2026":"Ja, endg\xFCltig l\xF6schen"}</button><button class="btn small ghost" type="button" data-act="wipe-no" ${t.wipeBusy?"disabled":""}>Abbrechen</button></span></span></div>`:`<button class="linkbtn danger" type="button" data-act="wipe" style="align-self:flex-start">${t.USER?"Konto und alle Daten l\xF6schen":"Alle Angaben auf diesem Ger\xE4t l\xF6schen"}</button>`}
+  </section>`}function qn(){let{all:e,offen:n}=Ze(),a=e.filter(l=>t.S.genutzt[l.k]),s=["Alle",...new Set(n.map(l=>l.area))];s.includes(t.areaFilter)||(t.areaFilter="Alle");let r=n.filter(l=>t.areaFilter==="Alle"||l.area===t.areaFilter).sort((l,o)=>+!!l.opt-+!!o.opt||(o.val()||0)-(l.val()||0)||(o.mon?o.mon():0)-(l.mon?l.mon():0));return`
+   ${le().filter(l=>!l.ok&&te(l.d)!=="ok").slice(0,2).map(l=>`<p class="notice ${te(l.d)==="late"?"bad":""}">${g("bell")}<span><strong>${d(l.t)}</strong> \u2013 Frist ${A(l.d)} (${Z(l.d)}). <button type="button" class="linkbtn" data-tab="termine">Zu den Terminen</button></span></p>`).join("")}
+   ${t.S.welcomeSeen?"":`<section class="panel" style="gap:12px">
+     <div class="section-title"><h2>Fertig! So geht's weiter</h2><button type="button" class="linkbtn" data-act="welcome-ok">Ausblenden</button></div>
+     <div class="howto">
+       <button type="button" class="howbtn" data-act="welcome-ok"><b>${g("list")}Anspr\xFCche pr\xFCfen</b><span>Unten antippen: Anleitung, Checkliste, fertiger Antrag als Text oder PDF.</span></button>
+       <button type="button" class="howbtn" data-tab="belege"><b>${g("receipt")}Belege sammeln</b><span>Rezepte und Rechnungen fotografieren, nach Jahr sortieren, einreichen.</span></button>
+       <button type="button" class="howbtn" data-tab="termine"><b>${g("bell")}Fristen im Blick</b><span>Erinnerung an Beratungsbesuch und Abgabefristen im Kalender.</span></button>
+     </div></section>`}
+   ${zt()||Bt()?`<div class="minis">${zt()}${Bt()}</div>`:""}
+   ${Wt()}
+   <div class="section-title"><h2>Deine offenen Anspr\xFCche</h2><span class="small muted">Antippen f\xFCr Antrag und Checkliste</span></div>
+   ${s.length>2?`<div class="filters">${s.map(l=>`<button type="button" class="chip" data-area="${d(l)}" aria-pressed="${t.areaFilter===l}">${d(l)}</button>`).join("")}</div>`:""}
+   <div class="list">${r.map(Pa).join("")||'<p class="muted">Ihr nutzt bereits alles, was wir pr\xFCfen konnten.</p>'}</div>
+   ${a.length?`<details class="used"><summary>Bereits genutzt (${a.length})</summary><div class="list" style="margin-top:10px">${a.map(Pa).join("")}</div></details>`:""}
+   <div class="nav"><button class="btn ghost" type="button" data-act="edit">Angaben \xE4ndern</button><button class="btn ghost" type="button" data-act="reset">Antworten zur\xFCcksetzen</button></div>
+   <div id="resetconfirm" hidden class="notice bad">${g("alert")}<span>Alle Antworten aus dem Fragebogen zur\xFCcksetzen und neu anfangen? Belege und Fristen bleiben erhalten. <span class="btnrow" style="margin-top:8px"><button class="btn small danger" type="button" data-act="reset-yes">Ja, l\xF6schen</button><button class="btn small ghost" type="button" data-act="reset-no">Abbrechen</button></span></span></div>
+   ${Cn()}`}function ms(e){return e.val&&e.val()?`<span class="val">${h(e.val())}/Jahr</span>`:e.mon&&e.mon()?`<span class="val">bis ${h(e.mon(),e.mon()%1?2:0)}/Mon.</span>`:e.once?`<span class="val">bis ${h(e.once)}</span>`:e.frei?`<span class="val">${h(e.frei())} Freibetrag</span>`:`<span class="val neutral">${e.opt?"pr\xFCfen":"kostenlos"}</span>`}t.openKey=null;function Pa(e){let n=t.S.status[e.k]||"offen",a=t.openKey===e.k;return`<article class="item" id="it-${e.k}">
+    <button class="head" type="button" data-open="${e.k}" aria-expanded="${a}">
+      <span class="ico a-${d(e.area)}">${g(Yn[e.area]||"heart")}</span>
+      <span class="ttl">${d(e.t)}<span class="para">${d(e.p)} \xB7 ${d(e.area)}</span></span>${ms(e)}
+      <span class="short">${d(he(e.short))}</span>
+      ${e.opt||n!=="offen"?`<span class="tags">${e.opt?'<span class="tag">je nach Lage</span>':""}${n!=="offen"?`<span class="tag st-${n}">${n}</span>`:""}</span>`:""}
+    </button>
+    ${a?fs(e):""}
+  </article>`}function Be(e){let n=[...he(e.docs)||[]].filter(Boolean);return t.S.rolle==="angehoerig"&&e.to!==Pe&&e.to!=="arbeitgeber"&&!n.some(a=>/Vollmacht/.test(a))&&n.push("Vollmacht oder Betreuungsurkunde"),n}function fs(e){let n=Be(e),a=t.S.status[e.k]||"offen",s=(e.q||[]).filter(r=>!r.show||r.show()).length;return`<div class="detail">
+    ${e.ask?`<div class="startbox">
+        <button class="btn big" type="button" data-wopen="${e.k}">${g("file")}${a==="offen"?"Antrag ausf\xFCllen":"Antrag ansehen"}</button>
+        ${["pg_antrag","pg_hoch"].includes(e.k)?'<button class="btn ghost" type="button" data-act="r-start">Erst selbst einsch\xE4tzen: Pflegegrad-Rechner</button>':""}
+        <p class="small muted">${s?`${s} einfache Fragen, Schritt f\xFCr Schritt. Du kannst jederzeit zur\xFCck, nichts wird ohne dich abgeschickt.`:"Der Antrag ist schon fertig vorbereitet. Du musst nur noch pr\xFCfen."}</p>
+      </div>`:`<p class="notice info">${g("info")}<span>Daf\xFCr ist kein Antrag n\xF6tig. Trage den Betrag einfach in der Steuererkl\xE4rung ein (oder gib diese Info an deine Steuerberatung weiter).</span></p>`}
+    <div><h4>So l\xE4uft es ab</h4><ol>${e.steps.map(r=>`<li>${d(r)}</li>`).join("")}</ol></div>
+    ${_t(e.k)}
+    ${n.length?`<div><h4>Diese Unterlagen brauchst du</h4><ul class="checks">${n.map((r,i)=>`<li><label><input type="checkbox" data-check="${e.k}:${i}" ${t.S.checks[e.k+":"+i]?"checked":""}><span>${d(r)}</span></label></li>`).join("")}</ul></div>`:""}
+    <div class="status"><label for="st-${e.k}"><strong>Stand:</strong></label><select id="st-${e.k}" data-status="${e.k}">${[["offen","noch nicht beantragt"],["beantragt","beantragt, warte auf Antwort"],["bewilligt","bewilligt"]].map(([r,i])=>`<option value="${r}" ${a===r?"selected":""}>${i}</option>`).join("")}</select>
+    <label class="choice" for="gn-${e.k}" style="padding:6px 10px"><input type="checkbox" id="gn-${e.k}" data-gen="${e.k}" ${t.S.genutzt[e.k]?"checked":""}><span>bekommen wir schon</span></label></div>
+  </div>`}function mn(){return new Date().toLocaleDateString("de-DE")}function ks(e){let n=t.S.person,a=t.S.rolle==="angehoerig",s=n.name||"[Name]",r=[n.vnr&&(e.to===D||e.to===Q)?`Versichertennummer: ${n.vnr}`:"",n.geb?`geboren am ${n.geb}`:""].filter(Boolean).join(", "),i=`${e.t}${e.to===D||e.to===Q?" \u2013 "+(n.vnr?"Versichertennr. "+n.vnr:s):" \u2013 "+s}`,l=a?`ich wende mich als ${n.beziehung||"[Beziehung]"} im Namen von ${s}${r?" ("+r+")":""} an Sie. Eine Vollmacht liegt bei.
+
+F\xFCr ${s}`:`${r?"("+r+`)
+
+`:""}hiermit`,o=b()>=1&&(e.to===D||e.to===Q)?`
+
+Es ist Pflegegrad ${b()} festgestellt.`:"",u=he(e.ask);a||(u=u.replace(/^(\S+) ich hiermit /,"$1 ich "));let p=`Sehr geehrte Damen und Herren,
+
+${l} ${u}${o}
+
+Bitte best\xE4tigen Sie mir den Eingang dieses Antrags. Falls Sie ein bestimmtes Formular oder weitere Unterlagen ben\xF6tigen, senden Sie mir diese bitte zu. Dieses Schreiben gilt als fristwahrende Antragstellung (\xA7 16 SGB I).
+
+Mit freundlichen Gr\xFC\xDFen
+
+${a?n.absender||"[Dein Name]":s}${n.tel?`
+Tel. `+n.tel:""}${n.mail?`
+`+n.mail:""}`;return{subject:i,body:p}}function ie(e){let n=ks(e);return{subject:t.S.texte[e.k+"_sub"]??n.subject,body:t.S.texte[e.k]??n.body}}function Jn(e,n){let a=ie(e);return`mailto:${n}?subject=${encodeURIComponent(a.subject)}&body=${encodeURIComponent(a.body)}`}var ea={};M(ea,{viewBelege:()=>Qn});function vs(){let e=new Date().getFullYear(),n=new Set([e,e-1,e-2,e-3].map(String));return t.BEL.forEach(a=>a.jahr&&n.add(String(a.jahr))),[...n].sort().reverse()}function Qn(){let e=J(),n=t.S.belegFilter.kat||"",a=t.BEL.filter(o=>e.includes(String(o.jahr))),s=a.filter(o=>!n||o.kat===n).sort((o,u)=>(u.datum||"").localeCompare(o.datum||"")),r=!!t.ASSETS,i=e.length===1?e[0]:e.slice().reverse().join(", "),l={};for(let o of s){let u=String(o.jahr);l[u]=l[u]||{},(l[u][o.kat]=l[u][o.kat]||[]).push(o)}return`
+  <section class="panel">
+    <h2>Belege</h2>
+    <div class="yearchips"><span class="small muted">Jahre anzeigen:</span>${vs().map(o=>`<button type="button" class="chip" data-year="${o}" aria-pressed="${e.includes(o)}">${o}</button>`).join("")}</div>
+    ${t.bulk?En():t.pending?Ss():`
+    <div class="drop" id="drop">
+      ${g("camera")}
+      <p><strong>Rezept, Quittung oder Rechnung erfassen</strong><br><span class="small muted">Fotografieren oder Datei (Bild/PDF) w\xE4hlen. Auch \xE4ltere Belege, z. B. aus ${new Date().getFullYear()-2}: einfach das Datum vom Beleg eintragen.</span>${r?'<br><span class="small"><strong>Neu:</strong> Eine PDF mit vielen Rechnungen? Die App erkennt jede Rechnung und sortiert sie nach Jahr.</span>':""}</p>
+      <div class="btnrow" style="justify-content:center">
+        ${r?`<button class="btn" type="button" data-act="cam">${g("camera")}Foto aufnehmen</button><button class="btn soft" type="button" data-act="pick">${g("file")}Datei w\xE4hlen</button>`:""}
+        <button class="btn ${r?"ghost":""}" type="button" data-act="manual">${g("plus")}Ohne Foto erfassen</button>
+      </div>
+      ${r?"":'<p class="small muted">Fotos speichern geht nur mit Konto. Betr\xE4ge kannst du trotzdem erfassen, sie bleiben aber nur bis zum Schlie\xDFen der Seite.</p>'}
+    </div>`}
+  </section>
+
+  <section class="panel">
+    <div class="section-title"><h3>Zuzahlungen und Belastungsgrenze</h3><span class="small muted">\xA7 62 SGB V</span></div>
+    <p class="small muted">Pro Jahr zahlt man h\xF6chstens 2 % der Bruttoeinnahmen des Haushalts zu, chronisch Kranke 1 %. F\xFCr Ehepartner und Kinder zieht die Kasse Freibetr\xE4ge ab. Zuviel Gezahltes kann meist bis zu 4 Jahre r\xFCckwirkend erstattet werden, f\xFCr jedes Jahr mit eigenem Antrag.</p>
+    <div class="field" style="max-width:320px"><label for="chron">Schwerwiegend chronisch krank?</label><select id="chron"><option value="" ${t.S.chronisch?"":"selected"}>Automatisch (${At()?"ja":"nein"})</option><option value="ja" ${t.S.chronisch==="ja"?"selected":""}>Ja, 1 %</option><option value="nein" ${t.S.chronisch==="nein"?"selected":""}>Nein, 2 %</option></select></div>
+    ${e.map(o=>{let u=qe(o),p=u.grenze?Math.min(100,u.sum/u.grenze*100):0,v=u.grenze&&u.sum>=u.grenze;return`<div class="meter" style="border-top:1px solid var(--line);padding-top:12px">
+        <div class="section-title"><strong>${o}</strong><div class="field" style="flex-direction:row;align-items:center;gap:8px"><label for="brutto-${o}" class="small">Brutto ${o} (\u20AC)</label><input type="text" inputmode="decimal" id="brutto-${o}" data-brutto="${o}" value="${d(yt(o))}" placeholder="z. B. 24000" style="width:130px"></div></div>
+        <div class="nums"><span>Gezahlt: <strong>${h(u.sum,2)}</strong></span><span>Grenze (${u.pct} %): <strong>${u.grenze?h(u.grenze,2):"Brutto eintragen"}</strong></span></div>
+        <div class="track" role="progressbar" aria-label="Zuzahlungen ${o}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(p)}"><i class="${v?"over":""}" style="width:${p}%"></i></div>
+        ${u.grenze?v?`<p class="notice good">${g("check")}<span><strong>Grenze erreicht.</strong> ${h(u.sum-u.grenze,2)} zur\xFCckholen${o===String(new Date().getFullYear())?", und f\xFCr den Rest des Jahres entfallen Zuzahlungen":""}.</span></p>`:`<p class="small muted">Noch ${h(u.grenze-u.sum,2)} bis zur Grenze.</p>`:""}
+        <div class="btnrow"><button class="btn small ${v?"":"soft"}" type="button" data-befpdf="${o}">${g("down")}Antrag ${o} + Belege (PDF)</button><button class="btn small ghost" type="button" data-befcopy="${o}">Antragstext kopieren</button></div>
+      </div>`}).join("")}
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:12px">
+    <div class="section-title"><h3>Abgelegt: ${d(i)}</h3><span class="small muted">${s.length} Belege \xB7 ${h(s.reduce((o,u)=>o+(Number(u.betrag)||0),0),2)}</span></div>
+    <div class="filters"><button type="button" class="chip" data-kat="" aria-pressed="${!n}">Alle Arten</button>${Object.entries(L).filter(([o])=>a.some(u=>u.kat===o)).map(([o,u])=>`<button type="button" class="chip" data-kat="${o}" aria-pressed="${n===o}">${d(u.t)}</button>`).join("")}</div>
+    ${s.length?Object.keys(l).sort().reverse().map(o=>`${e.length>1?`<h3 style="margin-top:4px">${o}</h3>`:""}${Object.entries(l[o]).map(([u,p])=>`<div class="group"><header><span>${d((L[u]||L.sonst).t)}</span><span>${h(p.reduce((v,y)=>v+(Number(y.betrag)||0),0),2)}</span></header>${p.map(ws).join("")}</div>`).join("")}`).join(""):`<p class="notice info">${g("receipt")}<span>Noch keine Belege f\xFCr ${d(i)}. Fotografiere jede Apotheken-Quittung mit Zuzahlung direkt nach dem Kauf, dann ist am Jahresende alles beisammen.</span></p>`}
+    ${s.length?`<div class="btnrow"><button class="btn small" type="button" data-act="mappe">${g("down")}Belegmappe ${d(i)} (PDF)</button><button class="btn small ghost" type="button" data-act="csv">Liste als Tabelle (CSV)</button></div>`:""}
+  </section>`}function ws(e){let n=e.asset&&/^image\//.test(e.ctype||""),a=e.asset?n?`<button type="button" class="thumb" data-view="${e.asset}" style="padding:0;cursor:zoom-in" aria-label="Beleg ansehen"><img src="${d(ne(e.asset))}" alt="" loading="lazy"></button>`:`<a class="thumb" href="${d(ne(e.asset))}" target="_blank" rel="noopener" aria-label="PDF \xF6ffnen">${g("file")}</a>`:`<span class="thumb">${g("receipt")}</span>`,s=B(e.datum);return`<div class="beleg">${a}
+    <div style="min-width:0"><div class="b-t">${d(e.titel||(L[e.kat]||L.sonst).t)}</div><div class="b-m">${s?A(s):"ohne Datum"}${e.eingereicht?' \xB7 <span style="color:var(--money);font-weight:700">eingereicht</span>':""}</div></div>
+    <div class="b-v">${e.betrag!==""&&e.betrag!=null?h(Number(e.betrag),2):"\u2013"}</div>
+    <div class="b-a">${t.delAsk===e.id?`<span class="small">Wirklich l\xF6schen?</span><button type="button" class="linkbtn danger" data-delyes="${e.id}">Ja, l\xF6schen</button><button type="button" class="linkbtn" data-delno="1">Abbrechen</button>`:`<button type="button" class="linkbtn" data-edit="${e.id}">Bearbeiten</button><button type="button" class="linkbtn" data-sub-toggle="${e.id}">${e.eingereicht?"Als offen markieren":"Als eingereicht markieren"}</button><button type="button" class="linkbtn danger" data-del="${e.id}">L\xF6schen</button>`}</div>
+  </div>`}function Ss(){let e=t.pending,n=!!t.ASSETS;return`<div class="pending">
+    <h3>${e.editId?"Beleg bearbeiten":"Neuer Beleg"}</h3>
+    <div class="preview">
+      ${e.preview?`<span class="thumb big"><img src="${d(e.preview)}" alt="Vorschau"></span>`:e.file||e.keepAsset?`<span class="thumb big">${g("file")}</span>`:`<span class="thumb big">${g("receipt")}</span>`}
+      ${n?`<div class="btnrow" style="flex-direction:column;align-items:flex-start"><button class="btn small soft" type="button" data-act="cam">${g("camera")}${e.preview||e.file||e.keepAsset?"Neues Foto":"Foto aufnehmen"}</button><button class="btn small ghost" type="button" data-act="pick">${g("file")}Datei w\xE4hlen</button>${e.file||e.keepAsset?'<button class="linkbtn danger" type="button" data-act="dropphoto">Foto entfernen</button>':""}</div>`:""}
+    </div>
+    <fieldset class="q"><legend>Was ist das f\xFCr ein Beleg?</legend><div class="choices">${Object.entries(L).map(([a,s])=>`<label class="choice" for="pk-${a}"><input type="radio" id="pk-${a}" name="pk" data-pend="kat" value="${a}" ${e.kat===a?"checked":""}><span>${d(s.t)}</span></label>`).join("")}</div></fieldset>
+    <div class="grid2">
+      <div class="field"><label for="pd">Datum auf dem Beleg</label><input type="date" id="pd" data-pend="datum" value="${d(e.datum)}"></div>
+      <div class="field"><label for="pb">Betrag</label><div class="euro"><input type="text" inputmode="decimal" id="pb" data-pend="betrag" value="${d(e.betrag)}" placeholder="z. B. 5,00"><span>\u20AC</span></div></div>
+    </div>
+    <div class="field"><label for="pt">Kurze Beschreibung (freiwillig)</label><input type="text" id="pt" data-pend="titel" value="${d(e.titel)}" placeholder="z. B. Apotheke am Markt"></div>
+    <div class="nav big go"><button class="btn ghost" type="button" data-act="cancelbeleg" ${t.busy?"disabled":""}>Abbrechen</button><button class="btn" type="button" data-act="savebeleg" ${t.busy?"disabled":""}>${t.busy?"Speichert \u2026":e.editId?"\xC4nderungen speichern":"Beleg speichern"}</button></div>
+  </div>`}function f(e){return document.getElementById(e)}function N(e,n,a,s,r="radio",i=!1){let l=`${e}-${n}`.replace(/[^a-zA-Z0-9-_]/g,"_");return`<label class="choice" for="${l}"><input type="${r}" id="${l}" name="${e}" value="${d(n)}" ${i?"checked":""}><span>${d(a)}${s?`<small>${d(s)}</small>`:""}</span></label>`}var ta=(()=>{try{return matchMedia("(prefers-reduced-motion: reduce)").matches}catch{return!1}})(),xa=Object.getOwnPropertyDescriptor(Element.prototype,"innerHTML");function $s(e,n){return e.nodeType!==n.nodeType||e.nodeName!==n.nodeName?!1:e.nodeType!==1?!0:e.id||n.id?e.id===n.id:!(e.nodeName==="INPUT"&&e.type!==n.getAttribute("type"))}function La(e,n){let a=e.firstChild,s=n.firstChild;for(;s;){let r=s.nextSibling;if(a&&$s(a,s))Da(a,s),a=a.nextSibling;else{let i=null;if(s.nodeType===1&&s.id){for(let l=a;l;l=l.nextSibling)if(l.nodeType===1&&l.id===s.id){i=l;break}}i?(e.insertBefore(i,a),Da(i,s)):e.insertBefore(s,a)}s=r}for(;a;){let r=a.nextSibling;e.removeChild(a),a=r}}function Da(e,n){if(e.nodeType!==1){e.nodeValue!==n.nodeValue&&(e.nodeValue=n.nodeValue);return}for(let s of[...e.attributes])n.hasAttribute(s.name)||e.removeAttribute(s.name);for(let s of n.attributes)e.getAttribute(s.name)!==s.value&&e.setAttribute(s.name,s.value);let a=e.nodeName;if(a==="INPUT"){if(e.type==="checkbox"||e.type==="radio")e.checked=n.hasAttribute("checked");else if(e.type!=="file"&&document.activeElement!==e){let s=n.getAttribute("value")||"";e.value!==s&&(e.value=s)}return}if(a==="TEXTAREA"){if(document.activeElement!==e){let s=n.textContent;e.value!==s&&(e.value=s)}return}if(La(e,n),a==="SELECT"){let s=e.querySelector("option[selected]");s?e.value=s.value:e.options.length&&!n.querySelector("option[selected]")&&(e.selectedIndex=0)}}function zs(e){!e||e._smooth||(e._smooth=!0,Object.defineProperty(e,"innerHTML",{configurable:!0,get(){return xa.get.call(this)},set(n){let a=document.createElement("template");xa.set.call(a,n),La(this,a.content)}}))}var Bs=["ansprueche","belege","termine"];function vt(){return t.RECHNER?"r":typeof t.USER<"u"&&!t.USER&&!t.GUEST?"login":typeof t.showPersons<"u"&&t.showPersons?"persons":t.S.wiz?"w:"+t.S.wiz.k:t.S.done?"tab:"+(typeof t.FALL_ID<"u"?t.FALL_ID:""):"q"}function ys(){return t.RECHNER?t.RECHNER.i:t.S.wiz?t.S.wiz.i:t.S.done?Bs.indexOf(t.S.tab):t.S.step}t.lastFam=null;t.lastIdx=0;t.lastCash=null;t.figAnim=0;function As(e){if(ta)return;let n=f("main");n.classList.remove("go-f","go-b","go-fade"),n.offsetWidth,n.classList.add(e)}function Es(){let e=document.querySelector("#hero .figure");if(!e){t.lastCash=null;return}let n=Ze().cash,a=t.lastCash;if(t.lastCash=n,a==null||a===n||ta)return;e.classList.remove("flash"),e.offsetWidth,e.classList.add("flash");let s=performance.now(),r=700,i=l=>{let o=Math.min(1,(l-s)/r),u=1-Math.pow(1-o,3);e.textContent=h(Math.round(a+(n-a)*u)),o<1&&(t.figAnim=requestAnimationFrame(i))};t.figAnim=requestAnimationFrame(i)}function Un(e){if(!e)return;let n=e.getBoundingClientRect();(n.top<70||n.top>innerHeight*.45)&&e.scrollIntoView({block:"start",behavior:ta?"auto":"smooth"})}function c(){let e=vt(),n=ys(),a=t.lastFam!==null&&(e!==t.lastFam||n!==t.lastIdx);if(a){let s=document.activeElement;if(s&&s!==document.body&&s.blur&&!(s.closest&&s.closest("#hero")))try{s.blur()}catch{}}cancelAnimationFrame(t.figAnim),Ps(),xs(),Ds();try{Te(document.querySelector(".wrap"))}catch{}a&&As(e===t.lastFam?n>=t.lastIdx?"go-f":"go-b":"go-fade"),t.lastFam=e,t.lastIdx=n,Es()}function E(){window.scrollTo({top:0,behavior:"instant"})}function Ze(){let e=Et(),n=e.filter(r=>!t.S.genutzt[r.k]),a=n.filter(r=>r.cash&&(t.S.status[r.k]||"offen")==="offen").reduce((r,i)=>r+(i.val()||0),0),s=n.filter(r=>r.frei).reduce((r,i)=>r+i.frei(),0);return{all:e,offen:n,cash:a,frei:s}}function Ps(){let e=`<div class="savestate"><span class="dot ${t.saveState.c}" id="savedot"></span><span id="savetxt">${d(t.saveState.t)}</span></div>`,n='<div class="brand"><span class="mark" aria-hidden="true">\xA7</span><b>Dein Anspruch</b></div>',a=t.USER&&t.FAELLE.find(v=>v.id===t.FALL_ID),s=a?`<button type="button" class="acct person" data-act="persons" aria-expanded="${t.showPersons}">${g("user")}${d(Y(a))} \u25BE</button>`:"",r=t.USER?`<button type="button" class="acct" data-act="logout" title="${d(t.USER.email||"")}">Abmelden</button>`:t.GUEST?'<button type="button" class="acct" data-act="guest-register">Konto anlegen</button>':"",i=`<div class="fontsw" role="group" aria-label="Schriftgr\xF6\xDFe">${[["1","A"],["1.15","A+"],["1.3","A++"]].map(([v,y])=>`<button type="button" data-font="${v}" aria-pressed="${(t.S.font||"1")===v}" aria-label="Schrift ${y}">${y}</button>`).join("")}</div>`;if(t.S.wiz||t.RECHNER||t.S.done&&t.S.tab!=="ansprueche"){f("hero").innerHTML=`<div class="row">${n}<div class="row" style="gap:12px">${Ge()}${s}${i}${e}${r}</div></div>`;return}if(!t.S.done){f("hero").innerHTML=`<div class="row">${n}<div class="row" style="gap:12px">${Ge()}${s}${i}${e}${r}</div></div>
+     <p class="lead">Pflegegrad oder Schwerbehinderung: Wir pr\xFCfen, welche Leistungen 2026 noch offen sind, schreiben die Antr\xE4ge vor, sortieren deine Belege und erinnern an Fristen.</p>`;return}let l=Ze(),o=le(),u=o.find(v=>v.main&&!v.ok&&te(v.d)!=="ok")||o.find(v=>te(v.d)==="late"),p=o[0];f("hero").innerHTML=`<div class="row">${n}<div class="row" style="gap:12px">${Ge()}${s}${i}${e}${r}</div></div>
+   <div style="position:relative;z-index:1;display:flex;flex-direction:column;gap:4px">
+     <span class="small" style="color:var(--hero-muted)">Noch offen an Geld und Budgets pro Jahr</span>
+     <span class="figure">${h(l.cash)}</span>
+     ${l.frei?`<span class="small" style="color:var(--hero-muted)">plus ${h(l.frei)} Steuerfreibetr\xE4ge</span>`:""}
+   </div>
+   <div class="stats">
+     <span class="stat">${g("list")}<strong>${l.offen.length}</strong> offene Punkte</span>
+     <span class="stat">${g("receipt")}<strong>${t.BEL.length}</strong> Belege</span>
+     ${u?`<button type="button" class="stat alert" data-tab="termine" style="border:0;font:inherit;cursor:pointer">${g("bell")}${d(u.t)}: ${Z(u.d)}</button>`:p?`<span class="stat">${g("cal")}N\xE4chste Frist ${Z(p.d)}</span>`:""}
+     <button type="button" class="stat" data-act="edit" style="border:0;font:inherit;color:inherit;cursor:pointer">${g("user")}Angaben \xE4ndern</button>
+   </div>`}function xs(){let e=f("tabs");if(e.hidden=!t.S.done||!!t.S.wiz||!!t.RECHNER||!t.USER&&!t.GUEST||je(),e.hidden)return;let a=le().filter(r=>!r.ok&&te(r.d)!=="ok").length,s=[["ansprueche","Anspr\xFCche","list",0],["belege","Belege","receipt",0],["termine","Termine","cal",a]];e.innerHTML=s.map(([r,i,l,o])=>`<button type="button" role="tab" data-tab="${r}" aria-selected="${t.S.tab===r}">${g(l)}<span class="lbl">${i}</span>${o?`<span class="badge">${o}</span>`:""}</button>`).join("")}function Ds(){if(document.documentElement.style.setProperty("--fs",t.S.font||"1"),!t.loaded){f("main").innerHTML='<section class="panel"><p class="muted">Einen Moment, deine Daten werden geladen \u2026</p></section>';return}if(t.RECHNER){f("main").innerHTML=Ht();return}if(!t.USER&&!t.GUEST){f("main").innerHTML=Dn();return}if(t.USER&&t.showPersons){f("main").innerHTML=un();return}if(je()){f("main").innerHTML=nn();return}if(t.S.wiz&&R.find(e=>e.k===t.S.wiz.k)){f("main").innerHTML=sa();return}if(t.S.wiz=null,t.S.done)f("main").innerHTML=t.S.tab==="belege"?Qn():t.S.tab==="termine"?Zt():qn();else{let e=Ee();t.S.step>=e.length&&(t.S.step=e.length-1),f("main").innerHTML=Ls[e[t.S.step].id]()}}function pe(){let e=Ee(),n=t.S.step+1;return`<div class="stepper"><div class="meta"><span>Schritt ${n} von ${e.length}</span><span>${e[t.S.step].label}</span></div><div class="bar"><i style="width:${Math.round(n/e.length*100)}%"></i></div></div>`}function be(e=!0,n="Weiter",a="Bitte beantworte zuerst die Frage oben."){return`<p class="notice navwarn" id="navwarn" hidden>${g("alert")}<span>${d(a)}</span></p><div class="nav go">${t.S.step>0?'<button class="btn ghost" type="button" data-act="back">Zur\xFCck</button>':"<span></span>"}<button class="btn big" type="button" data-act="next" data-ok="${e?1:0}">${n}</button></div>`}var Ls={start:()=>`<section class="panel">${pe()}
+   <div class="intro">
+     <h2>Welche Hilfen stehen dir noch zu?</h2>
+     <p>Viele Familien nutzen nur das Pflegegeld. Dabei sind oft mehrere tausend Euro im Jahr zus\xE4tzlich drin, etwa f\xFCr Haushaltshilfe, Ersatzpflege oder Hilfsmittel.</p>
+     <p class="muted">Ein paar Fragen, etwa 3 Minuten. Danach siehst du deine offenen Anspr\xFCche mit fertigen Antr\xE4gen.</p>
+   </div>
+   <fieldset class="q"><legend>F\xFCr wen nutzt du die App?</legend><div class="choices">
+     ${N("rolle","selbst","F\xFCr mich selbst","ich bin pflegebed\xFCrftig oder schwerbehindert","radio",t.S.rolle==="selbst")}
+     ${N("rolle","angehoerig","F\xFCr eine angeh\xF6rige Person","ich pflege oder k\xFCmmere mich","radio",t.S.rolle==="angehoerig")}
+   </div></fieldset>
+   <fieldset class="q"><legend>Worum geht es?</legend><p class="hint">Beides ist m\xF6glich.</p><div class="choices">
+     ${N("bereich","pflege","Pflegegrad / Pflegebed\xFCrftigkeit","","checkbox",t.S.bereiche.pflege)}
+     ${N("bereich","sb","Schwerbehinderung / GdB","","checkbox",t.S.bereiche.sb)}
+   </div></fieldset>
+   ${be(t.S.rolle&&(t.S.bereiche.pflege||t.S.bereiche.sb),"Los geht's",t.S.rolle?"Bitte w\xE4hle mindestens ein Thema aus: Pflegegrad oder Schwerbehinderung.":"Bitte w\xE4hle zuerst oben aus, f\xFCr wen du die App nutzt.")}
+ </section>`,kasse:()=>`<section class="panel">${pe()}
+   <h2>Bei welcher Krankenkasse ${t.S.rolle==="angehoerig"?"ist die Person":"bist du"} versichert?</h2>
+   <p class="muted">Die Pflegekasse geh\xF6rt immer zur Krankenkasse. Dorthin gehen die Antr\xE4ge.</p>
+   <fieldset class="q"><legend class="sr">Krankenkasse</legend><div class="choices">
+     ${Object.entries(we).map(([e,n])=>N("kasse",e,n.name,"","radio",t.S.kasse===e)).join("")}
+   </div></fieldset>
+   ${t.S.kasse==="aok"?`<div class="field"><label for="aokRegion">Welche AOK?</label><select id="aokRegion"><option value="">Bitte w\xE4hlen</option>${Ft.map(e=>`<option ${t.S.aokRegion===e?"selected":""}>${e}</option>`).join("")}</select></div>`:""}
+   ${t.S.kasse==="andere"?`<div class="field"><label for="kasseAndere">Name der Kasse</label><input type="text" id="kasseAndere" value="${d(t.S.kasseAndere)}" placeholder="z. B. KNAPPSCHAFT, SBK"></div>`:""}
+   <p class="notice info">${g("info")}<span>Privat versichert? Die Leistungen der Pflegepflichtversicherung sind gleich hoch, Antr\xE4ge gehen dann an die private Pflegeversicherung. W\xE4hle \u201EAndere\u201C.</span></p>
+   ${be(!!t.S.kasse&&(t.S.kasse!=="aok"||t.S.aokRegion))}
+ </section>`,pflege:()=>`<section class="panel">${pe()}
+   <h2>Pflegegrad und Wohnsituation</h2>
+   <fieldset class="q"><legend>Welcher Pflegegrad ist festgestellt?</legend><div class="choices">
+     ${N("pg","0","Noch keiner","oder Antrag l\xE4uft","radio",t.S.pg==="0")}
+     ${[1,2,3,4,5].map(e=>N("pg",String(e),"Pflegegrad "+e,["","geringe","erhebliche","schwere","schwerste","schwerste, besondere Anforderungen"][e]+" Beeintr\xE4chtigung","radio",t.S.pg===String(e))).join("")}
+   </div></fieldset>
+   <fieldset class="q"><legend>Wo und wie wird gepflegt?</legend><div class="choices">
+     ${Object.entries(Rt).map(([e,n])=>N("wohnen",e,n.t,n.s,"radio",t.S.wohnen===e)).join("")}
+   </div></fieldset>
+   ${be(t.S.pg!==""&&(t.S.wohnen||t.S.pg==="0"))}
+ </section>`,pp:()=>`<section class="panel">${pe()}
+   <h2>Wer pflegt im Alltag?</h2>
+   <p class="muted">Pflegende Angeh\xF6rige haben eigene Anspr\xFCche, etwa Rentenpunkte und Freistellung vom Job.</p>
+   <fieldset class="q"><legend>Pflegt eine Angeh\xF6rige oder ein Angeh\xF6riger mindestens 10 Stunden pro Woche, verteilt auf mindestens 2 Tage?</legend><div class="choices">
+     ${N("stunden10","ja","Ja","","radio",t.S.pp.stunden10==="ja")}${N("stunden10","nein","Nein","","radio",t.S.pp.stunden10==="nein")}${N("stunden10","unklar","Wei\xDF nicht","","radio",t.S.pp.stunden10==="unklar")}
+   </div></fieldset>
+   <fieldset class="q"><legend>Ist die pflegende Person berufst\xE4tig?</legend><div class="choices">
+     ${N("arbeit","nein","Nein / Rente","","radio",t.S.pp.arbeit==="nein")}${N("arbeit","bis30","Ja, bis 30 Std./Woche","","radio",t.S.pp.arbeit==="bis30")}${N("arbeit","ueber30","Ja, mehr als 30 Std./Woche","","radio",t.S.pp.arbeit==="ueber30")}
+   </div></fieldset>
+   ${be(t.S.pp.stunden10&&t.S.pp.arbeit)}
+ </section>`,sb:()=>`<section class="panel">${pe()}
+   <h2>Schwerbehinderung</h2>
+   <fieldset class="q"><legend>Gibt es einen festgestellten Grad der Behinderung (GdB)?</legend><div class="choices">
+     ${N("sbstatus","ja","Ja, Bescheid oder Ausweis","","radio",t.S.sb.status==="ja")}${N("sbstatus","beantragt","Beantragt, noch kein Bescheid","","radio",t.S.sb.status==="beantragt")}${N("sbstatus","nein","Nein","","radio",t.S.sb.status==="nein")}
+   </div></fieldset>
+   ${t.S.sb.status==="ja"?`
+   <div class="field"><label for="gdb">GdB laut Bescheid</label><select id="gdb"><option value="">Bitte w\xE4hlen</option>${[20,30,40,50,60,70,80,90,100].map(e=>`<option ${String(t.S.sb.gdb)===String(e)?"selected":""}>${e}</option>`).join("")}</select></div>
+   <fieldset class="q"><legend>Merkzeichen im Ausweis</legend><p class="hint">Stehen auf der R\xFCckseite des Ausweises.</p><div class="choices">
+     ${Object.entries(Nt).map(([e,n])=>N("mz",e,n,"","checkbox",!!t.S.sb.mz[e])).join("")}
+   </div></fieldset>`:""}
+   <fieldset class="q"><legend>Weitere Angaben</legend><div class="choices">
+     ${N("sbx","arbeit","Berufst\xE4tig","","checkbox",t.S.sb.arbeit)}
+     ${N("sbx","auto","Eigenes Auto (auf die Person zugelassen)","","checkbox",t.S.sb.auto)}
+     ${N("sbx","grundsicherung","Bezieht Grundsicherung oder B\xFCrgergeld","","checkbox",t.S.sb.grundsicherung)}
+   </div></fieldset>
+   ${be(t.S.sb.status&&(t.S.sb.status!=="ja"||t.S.sb.gdb))}
+ </section>`,genutzt:()=>{let e=Et().filter(n=>!["beratung","pg_antrag","pg_hoch","sb_antrag","sb_neu","hzp","pug"].includes(n.k));return`<section class="panel">${pe()}
+   <h2>Was ${t.S.rolle==="angehoerig"?"bekommt ihr":"bekommst du"} schon?</h2>
+   <p class="muted">Kreuze an, was bereits genutzt wird. Alles andere zeigen wir als offenen Anspruch.</p>
+   ${e.length?`<div class="choices">${e.map(n=>N("genutzt",n.k,n.t,n.p,"checkbox",!!t.S.genutzt[n.k])).join("")}</div>`:`<p class="notice info">${g("info")}<span>F\xFCr diese Situation gibt es noch keine laufenden Leistungen.</span></p>`}
+   ${be(!0)}
+ </section>`},daten:()=>{let e=t.S.person,n=t.S.rolle==="angehoerig";return`<section class="panel">${pe()}
+   <h2>Angaben f\xFCr die Antr\xE4ge</h2>
+   <p class="muted">Damit f\xFCllen wir die Schreiben vor. Felder d\xFCrfen leer bleiben. Die Daten liegen nur in deinem privaten Bereich.</p>
+   <h3>${n?"Pflegebed\xFCrftige bzw. schwerbehinderte Person":"Deine Daten"}</h3>
+   <div class="grid2">
+     ${_("name","Vor- und Nachname",e.name)}${_("geb","Geburtsdatum",e.geb,"text","TT.MM.JJJJ")}
+     ${_("vnr","Versichertennummer",e.vnr,"text","steht auf der Gesundheitskarte")}${_("strasse","Stra\xDFe, Hausnr.",e.strasse)}
+     ${_("ort","PLZ, Ort",e.ort)}${n?"":_("tel","Telefon",e.tel,"tel")+_("mail","E-Mail",e.mail,"email")}
+   </div>
+   ${n?`<h3>Absender (du als Angeh\xF6rige/r)</h3><div class="grid2">
+     ${_("absender","Dein Name",e.absender)}${_("beziehung","Beziehung",e.beziehung,"text","z. B. Tochter, Ehemann")}
+     ${_("absStrasse","Stra\xDFe, Hausnr.",e.absStrasse)}${_("absOrt","PLZ, Ort",e.absOrt)}
+     ${_("tel","Telefon",e.tel,"tel")}${_("mail","E-Mail",e.mail,"email")}</div>
+     <p class="notice">${g("info")}<span>Wenn du f\xFCr eine andere Person Antr\xE4ge stellst, braucht die Kasse eine Vollmacht oder Betreuungsurkunde. Wir setzen sie automatisch auf die Checkliste.</span></p>`:""}
+   ${be(!0,"Ergebnis anzeigen")}
+ </section>`}};function _(e,n,a,s="text",r=""){return`<div class="field"><label for="p-${e}">${n}</label><input type="${s}" id="p-${e}" data-p="${e}" value="${d(a)}" placeholder="${d(r)}"></div>`}function na(){["hero","tabs","main"].forEach(e=>zs(document.getElementById(e)))}function G(e){return e.map(n=>typeof n=="string"?{v:n,t:n}:n)}var Je=["Waschen und Anziehen","Essen und Trinken","Toilette / Inkontinenz","Gehen, Aufstehen, Treppen","Medikamente","Vergesslichkeit / Orientierung","Haushalt und Einkaufen","Hilfe in der Nacht"];function O(e){return e==="jahresbetrag"?t.S.vhp:(t.S.ans=t.S.ans||{},t.S.ans[e]=t.S.ans[e]||{})}function w(e,n,a){let s=O(e)[n];return Array.isArray(s)?s.length?s.join(", "):`[${a}]`:s!=null&&String(s).trim()!==""?String(s).trim():`[${a}]`}function me(e,n,a){let s=B(O(e)[n]);return s?A(s):`[${a}]`}function ee(e,n){let a=O(e)[n];return Array.isArray(a)?a.length>0:a!=null&&String(a).trim()!==""}var Ma={k:"iban",label:"Auf welches Konto soll das Geld?",help:"Die IBAN steht auf der Bankkarte oder im Online-Banking. Sie beginnt mit DE.",ph:"DE00 0000 0000 0000 0000 00"},xe={pg_antrag:{q:[{k:"seit",label:"Seit wann wird Hilfe gebraucht?",ph:"z. B. seit M\xE4rz 2026",help:"Ungef\xE4hr reicht v\xF6llig."},{k:"was",type:"multi",label:"Wobei wird Hilfe gebraucht?",help:"Alles ankreuzen, was zutrifft.",opts:G(Je)},{k:"tel",label:"Unter welcher Telefonnummer ist jemand f\xFCr den Termin mit dem Gutachter erreichbar?",ph:"z. B. 0711 123456",type:"tel"}],ask:()=>`beantrage ich hiermit die Feststellung der Pflegebed\xFCrftigkeit und Leistungen der Pflegeversicherung nach dem SGB XI. Hilfe wird ${ee("pg_antrag","seit")?w("pg_antrag","seit")+" ":""}ben\xF6tigt, vor allem bei: ${w("pg_antrag","was","Bereiche")}.
+
+Bitte beauftragen Sie den Medizinischen Dienst mit der Begutachtung. F\xFCr die Terminabsprache bin ich erreichbar unter: ${w("pg_antrag","tel","Telefonnummer")}. Au\xDFerdem bitte ich um eine Pflegeberatung nach \xA7 7a SGB XI.`},pg_hoch:{q:[{k:"seit",label:"Seit wann ist es schlechter geworden?",ph:"z. B. seit dem Sturz im Juli"},{k:"was",type:"multi",label:"Wobei wird jetzt mehr Hilfe gebraucht?",opts:G([...Je,"Nach Sturz oder Krankenhaus"])},{k:"tel",label:"Telefonnummer f\xFCr den Gutachter-Termin",type:"tel",ph:"z. B. 0711 123456"}],ask:()=>`beantrage ich hiermit eine H\xF6herstufung des Pflegegrades. Der Hilfebedarf hat sich ${ee("pg_hoch","seit")?w("pg_hoch","seit")+" ":""}deutlich erh\xF6ht, vor allem bei: ${w("pg_hoch","was","Bereiche")}.
+
+Bitte veranlassen Sie eine erneute Begutachtung durch den Medizinischen Dienst. Erreichbar unter: ${w("pg_hoch","tel","Telefonnummer")}.`},pflegegeld:{q:[{k:"pp",label:"Wer pflegt haupts\xE4chlich?",help:"Das ist die Pflegeperson. Es k\xF6nnen auch mehrere sein.",ph:"Vor- und Nachname"},{k:"ab",type:"date",label:"Seit wann wird so gepflegt?",help:"Pflegegeld gibt es fr\xFChestens ab dem Monat, in dem der Antrag gestellt wird."},Ma],ask:()=>`beantrage ich hiermit Pflegegeld nach \xA7 37 SGB XI (bei gleichzeitiger Nutzung eines Pflegedienstes als Kombinationsleistung nach \xA7 38 SGB XI) ab dem ${me("pflegegeld","ab","Datum")}. Die Pflege \xFCbernimmt: ${w("pflegegeld","pp","Name der Pflegeperson")}.
+
+Bitte \xFCberweisen Sie das Pflegegeld auf folgendes Konto: ${w("pflegegeld","iban","IBAN")}.`},sachleistung:{q:[{k:"dienst",label:"Welcher Pflegedienst soll kommen?",ph:"Name des Pflegedienstes",help:"Noch keinen gefunden? \xDCberspringen. Die Pflegekasse schickt eine Liste."},{k:"ab",type:"date",label:"Ab wann?"},{k:"kombi",type:"choice",label:"Pflegen Angeh\xF6rige zus\xE4tzlich mit?",opts:G([{v:"ja",t:"Ja",s:"dann gibt es zus\xE4tzlich anteiliges Pflegegeld"},{v:"nein",t:"Nein"}])}],ask:()=>`beantrage ich hiermit Pflegesachleistungen nach \xA7 36 SGB XI${O("sachleistung").kombi==="ja"?" als Kombinationsleistung mit anteiligem Pflegegeld nach \xA7 38 SGB XI":""} ab dem ${me("sachleistung","ab","Datum")}. Die Versorgung \xFCbernimmt der Pflegedienst: ${w("sachleistung","dienst","Name des Pflegedienstes")}.`},entlastung:{q:[{k:"anbieter",label:"Wer hilft im Alltag?",help:"Zum Beispiel Haushaltshilfe, Nachbarschaftshilfe, Betreuungsdienst. Der Anbieter muss anerkannt sein.",ph:"Name des Anbieters"},{k:"zeitraum",label:"F\xFCr welchen Zeitraum ist die Rechnung?",ph:"z. B. September 2026"},{k:"betrag",type:"money",label:"Wie hoch ist die Rechnung?",help:"Mehrere Rechnungen einfach zusammenz\xE4hlen."},{k:"weg",type:"choice",label:"Wie soll bezahlt werden?",opts:G([{v:"erstattung",t:"Wir haben schon bezahlt",s:"die Kasse soll uns das Geld zur\xFCckzahlen"},{v:"direkt",t:"Direkt an den Anbieter",s:"der Anbieter rechnet mit der Kasse ab"}])},{...Ma,show:()=>O("entlastung").weg!=="direkt"}],ask:()=>{let e=O("entlastung");return`beantrage ich hiermit Leistungen aus dem Entlastungsbetrag nach \xA7 45b SGB XI f\xFCr Leistungen von ${w("entlastung","anbieter","Name des Anbieters")} im Zeitraum ${w("entlastung","zeitraum","Zeitraum")} in H\xF6he von ${ee("entlastung","betrag")?h(P(e.betrag),2):"[Betrag]"}. ${e.weg==="direkt"?"Bitte rechnen Sie direkt mit dem Anbieter ab. Eine Abtretungserkl\xE4rung liegt bei.":`Die Rechnung liegt bei. Bitte erstatten Sie den Betrag auf folgendes Konto: ${w("entlastung","iban","IBAN")}.`}
+
+Bitte teilen Sie mir au\xDFerdem mit, wie hoch das noch verf\xFCgbare Guthaben aus dem Vorjahr ist.`}},tagespflege:{q:[{k:"einr",label:"Welche Tagespflege soll es sein?",ph:"Name und Ort",help:"Noch keine gefunden? \xDCberspringen."},{k:"ab",type:"date",label:"Ab wann?"},{k:"tage",type:"choice",label:"An wie vielen Tagen pro Woche?",opts:G(["1","2","3","4","5"])}],ask:()=>`beantrage ich hiermit Leistungen der Tages- und Nachtpflege nach \xA7 41 SGB XI ab dem ${me("tagespflege","ab","Datum")} an ${w("tagespflege","tage","Anzahl")} Tagen pro Woche in der Einrichtung ${w("tagespflege","einr","Name der Tagespflege")}.`},verbrauch:{q:[{k:"anbieter",label:"Wer soll die Pflegehilfsmittel liefern?",help:"Apotheke, Sanit\xE4tshaus oder Versandanbieter. Noch keinen? \xDCberspringen.",ph:"Name des Anbieters"}],ask:()=>`beantrage ich hiermit die Kosten\xFCbernahme f\xFCr zum Verbrauch bestimmte Pflegehilfsmittel nach \xA7 40 Abs. 2 SGB XI (z. B. Einmalhandschuhe, Desinfektion, Bettschutzeinlagen) bis zur H\xF6he von ${ue} Euro monatlich. Die Versorgung soll erfolgen durch: ${w("verbrauch","anbieter","Anbieter")}.`},technisch:{q:[{k:"was",type:"multi",label:"Was wird gebraucht?",opts:G(["Hausnotruf","Pflegebett","Lagerungskissen","Duschstuhl","Badewannenlift","Anderes"])},{k:"anbieter",label:"Von welchem Anbieter gibt es ein Angebot?",ph:"z. B. Sanit\xE4tshaus M\xFCller",help:"Noch keins? \xDCberspringen."}],ask:()=>`beantrage ich hiermit die Versorgung mit folgenden technischen Pflegehilfsmitteln nach \xA7 40 Abs. 1 SGB XI: ${w("technisch","was","Hilfsmittel")}. ${ee("technisch","anbieter")?`Ein Kostenvoranschlag von ${w("technisch","anbieter")} liegt bei.`:""}`},wohnumfeld:{q:[{k:"was",type:"multi",label:"Was soll umgebaut werden?",opts:G(["Bodengleiche Dusche","Treppenlift","Haltegriffe","T\xFCren verbreitern","Rampe","Anderes"])},{k:"kosten",type:"money",label:"Was kostet es laut Angebot?",help:"Wichtig: Erst bauen, wenn die Kasse zugesagt hat."},{k:"miete",type:"choice",label:"Wohnung oder Haus?",opts:G([{v:"eigentum",t:"Eigentum"},{v:"miete",t:"Miete",s:"Vermieter muss zustimmen"}])}],ask:()=>`beantrage ich hiermit einen Zuschuss f\xFCr Ma\xDFnahmen zur Verbesserung des individuellen Wohnumfeldes nach \xA7 40 Abs. 4 SGB XI f\xFCr: ${w("wohnumfeld","was","Ma\xDFnahme")}. Die Kosten betragen laut Angebot ${ee("wohnumfeld","kosten")?h(P(O("wohnumfeld").kosten),2):"[Betrag]"}. Kostenvoranschl\xE4ge liegen bei.${O("wohnumfeld").miete==="miete"?" Die Zustimmung des Vermieters liegt bei.":""}`},dipa:{q:[{k:"name",label:"Welche Pflege-App soll es sein?",ph:"Name der App"}],ask:()=>`beantrage ich hiermit die Versorgung mit der digitalen Pflegeanwendung ${w("dipa","name","Name")} nach \xA7 40a SGB XI sowie erg\xE4nzende Unterst\xFCtzungsleistungen nach \xA7 39a SGB XI.`},wg:{q:[{k:"wg",label:"Wie hei\xDFt die Wohngruppe und wo ist sie?",ph:"Name, Anschrift"}],ask:()=>`beantrage ich hiermit den Wohngruppenzuschlag nach \xA7 38a SGB XI f\xFCr die ambulant betreute Wohngruppe ${w("wg","wg","Name, Anschrift")}.`},beratung:{q:[{k:"wo",type:"choice",label:"Wie soll die Beratung stattfinden?",opts:G(["Bei uns zu Hause","Telefonisch","Per Video"])},{k:"zeit",label:"Wann passt es am besten?",ph:"z. B. vormittags, nicht mittwochs"}],ask:()=>`bitte ich um einen Termin f\xFCr eine individuelle Pflegeberatung nach \xA7 7a SGB XI, gew\xFCnscht: ${w("beratung","wo","Art")}. Am besten passt: ${w("beratung","zeit","Zeit")}.`},pflegekurs:{q:[{k:"art",type:"choice",label:"Welche Art von Kurs?",opts:G(["Kurs vor Ort","Online-Kurs","Schulung bei uns zu Hause"])}],ask:()=>`bitte ich um Informationen zu kostenlosen Pflegekursen nach \xA7 45 SGB XI f\xFCr pflegende Angeh\xF6rige, gew\xFCnscht: ${w("pflegekurs","art","Kursart")}.`},rv:{q:[{k:"pp",label:"Wie hei\xDFt die pflegende Person?",ph:"Vor- und Nachname"},{k:"rvnr",label:"Wie lautet ihre Rentenversicherungsnummer?",help:"Steht auf dem Sozialversicherungsausweis oder der j\xE4hrlichen Renteninformation. Nicht zur Hand? \xDCberspringen, die Kasse fragt nach.",ph:"z. B. 12 150385 M 012"},{k:"std",type:"choice",label:"Wie viele Stunden pro Woche wird gepflegt?",opts:G(["10 bis 20 Stunden","20 bis 30 Stunden","mehr als 30 Stunden"])}],ask:()=>`beantrage ich hiermit die Zahlung von Beitr\xE4gen zur Renten- und Arbeitslosenversicherung f\xFCr die Pflegeperson ${w("rv","pp","Name")} (Rentenversicherungsnummer: ${w("rv","rvnr","Nummer")}) nach \xA7 44 SGB XI. Die Pflege umfasst ${w("rv","std","Stunden")} pro Woche, verteilt auf mindestens 2 Tage. Bitte senden Sie mir den Fragebogen zur Zahlung der Beitr\xE4ge zur sozialen Sicherung f\xFCr Pflegepersonen zu.`},pug:{q:[{k:"pp",label:"Wer nimmt frei?",ph:"Vor- und Nachname"},{k:"von",type:"date",label:"Ab wann?"},{k:"bis",type:"date",label:"Bis wann?",help:"H\xF6chstens 10 Arbeitstage im Jahr."}],ask:()=>`beantrage ich hiermit Pflegeunterst\xFCtzungsgeld nach \xA7 44a Abs. 3 SGB XI f\xFCr die kurzzeitige Arbeitsverhinderung der Pflegeperson ${w("pug","pp","Name")} vom ${me("pug","von","Datum")} bis ${me("pug","bis","Datum")}. Die \xE4rztliche Bescheinigung liegt bei.`},stationaer:{q:[{k:"heim",label:"Wie hei\xDFt das Pflegeheim?",ph:"Name und Ort"},{k:"ab",type:"date",label:"Seit wann?"}],ask:()=>`beantrage ich hiermit Leistungen der vollstation\xE4ren Pflege nach \xA7 43 SGB XI in der Einrichtung ${w("stationaer","heim","Name des Heims")} ab dem ${me("stationaer","ab","Datum")}.`},zuschlag:{q:[{k:"seit",type:"date",label:"Seit wann ist die Person im Heim?"},{k:"frueher",type:"long",label:"Gab es vorher schon Heimaufenthalte?",help:"Auch in anderen Heimen. Die Zeit z\xE4hlt mit und erh\xF6ht den Zuschuss.",ph:"z. B. 2024 Haus Sonnenschein, 5 Monate"}],ask:()=>`bitte ich um Pr\xFCfung und ggf. Neuberechnung des Leistungszuschlags nach \xA7 43c SGB XI. Der Aufenthalt in vollstation\xE4rer Pflege begann am ${me("zuschlag","seit","Datum")}. Fr\xFChere Aufenthalte: ${ee("zuschlag","frueher")?w("zuschlag","frueher"):"keine"}.`},hzp:{q:[{k:"heim",label:"In welchem Heim lebt die Person?",ph:"Name und Ort"}],ask:()=>`beantrage ich hiermit Hilfe zur Pflege nach \xA7\xA7 61 ff. SGB XII, da Einkommen und Verm\xF6gen nicht ausreichen, um die Kosten der vollstation\xE4ren Pflege in der Einrichtung ${w("hzp","heim","Name des Heims")} zu decken.`},eingliederung:{q:[{k:"einr",label:"In welcher Einrichtung lebt die Person?",ph:"Name"},{k:"tage",type:"number",label:"An wie vielen Tagen im Monat ist sie zu Hause?"}],ask:()=>`beantrage ich hiermit anteiliges Pflegegeld f\xFCr die Tage der h\xE4uslichen Pflege au\xDFerhalb der Einrichtung ${w("eingliederung","einr","Name")} (durchschnittlich ${w("eingliederung","tage","Anzahl")} Tage im Monat, Nachweis liegt bei).`},fahrten:{q:[{k:"wohin",label:"Zu welcher Behandlung muss gefahren werden?",ph:"z. B. Dialyse, Facharzt, Strahlentherapie"}],ask:()=>`beantrage ich hiermit die Genehmigung von Krankenfahrten zu ambulanten Behandlungen (${w("fahrten","wohin","Behandlung")}) nach \xA7 60 Abs. 1 SGB V. Die \xE4rztliche Verordnung liegt bei.`},sb_antrag:{q:[{k:"leiden",type:"long",label:"Welche Erkrankungen oder Einschr\xE4nkungen gibt es?",help:"Alles aufschreiben, auch Kleinigkeiten. Je vollst\xE4ndiger, desto besser.",ph:"z. B. Diabetes, Herzschw\xE4che, Arthrose im Knie, Schwerh\xF6rigkeit"},{k:"aerzte",type:"long",label:"Welche \xC4rztinnen und \xC4rzte behandeln?",ph:"z. B. Dr. Maier, Hausarzt, Stuttgart"},{k:"mz",type:"multi",label:"Welche Merkzeichen kommen in Frage?",help:"Unsicher? Lass es offen, das Amt pr\xFCft das.",opts:G(["G (Gehen ist schwer)","aG (kaum gehen m\xF6glich)","B (Begleitung n\xF6tig)","H (hilflos)","RF (Rundfunkbeitrag)"])}],ask:()=>`beantrage ich hiermit die Feststellung einer Behinderung und des Grades der Behinderung (GdB) nach \xA7 152 SGB IX sowie die Ausstellung eines Schwerbehindertenausweises.
+
+Folgende Gesundheitsst\xF6rungen liegen vor: ${w("sb_antrag","leiden","Erkrankungen")}.
+
+Behandelnde \xC4rztinnen und \xC4rzte: ${w("sb_antrag","aerzte","\xC4rzte")}.${ee("sb_antrag","mz")?`
+
+Zudem beantrage ich die Pr\xFCfung folgender Merkzeichen: ${w("sb_antrag","mz")}.`:""}`},sb_neu:{q:[{k:"leiden",type:"long",label:"Was ist neu oder schlimmer geworden?",ph:"z. B. Herzinfarkt 2026, Knie-OP, Demenz-Diagnose"},{k:"mz",type:"multi",label:"Welche Merkzeichen sollen gepr\xFCft werden?",opts:G(["G (Gehen ist schwer)","aG (kaum gehen m\xF6glich)","B (Begleitung n\xF6tig)","H (hilflos)","RF (Rundfunkbeitrag)"])}],ask:()=>`beantrage ich hiermit die Neufeststellung des Grades der Behinderung wegen Verschlimmerung bzw. hinzugekommener Gesundheitsst\xF6rungen: ${w("sb_neu","leiden","Gesundheitsst\xF6rungen")}.${ee("sb_neu","mz")?` Au\xDFerdem beantrage ich die Pr\xFCfung folgender Merkzeichen: ${w("sb_neu","mz")}.`:""} Aktuelle Befunde liegen bei.`},kfz:{q:[{k:"kz",label:"Wie lautet das Kennzeichen des Autos?",ph:"z. B. S-AB 1234"}],ask:()=>`beantrage ich hiermit die Steuerbefreiung bzw. -erm\xE4\xDFigung nach \xA7 3a Kraftfahrzeugsteuergesetz f\xFCr das Fahrzeug mit dem amtlichen Kennzeichen ${w("kfz","kz","Kennzeichen")}.`},rundfunk:{q:[{k:"nr",label:"Wie lautet die Beitragsnummer?",help:"Steht oben auf jedem Brief vom Beitragsservice (9 Ziffern).",ph:"z. B. 123 456 789"}],ask:()=>`beantrage ich hiermit die Erm\xE4\xDFigung bzw. Befreiung vom Rundfunkbeitrag nach \xA7 4 Rundfunkbeitragsstaatsvertrag. Eine Kopie des Schwerbehindertenausweises liegt bei. Beitragsnummer: ${w("rundfunk","nr","Beitragsnummer")}.`},gleich:{q:[{k:"grund",type:"long",label:"Warum ist der Arbeitsplatz in Gefahr?",ph:"z. B. viele Krankheitstage, Arbeit ist k\xF6rperlich schwer"}],ask:()=>`beantrage ich hiermit die Gleichstellung mit einem schwerbehinderten Menschen nach \xA7 2 Abs. 3 SGB IX. Der GdB betr\xE4gt ${I()||"[GdB]"}. Ohne Gleichstellung ist der Arbeitsplatz gef\xE4hrdet: ${w("gleich","grund","Begr\xFCndung")}.`},urlaub:{q:[],ask:()=>`teile ich Ihnen mit, dass bei mir eine Schwerbehinderung mit einem GdB von ${I()||"[GdB]"} festgestellt ist. Ich beantrage daher den Zusatzurlaub nach \xA7 208 SGB IX f\xFCr das laufende Kalenderjahr.`},rente:{q:[],ask:()=>`bitte ich um eine Rentenauskunft und Beratung zur Altersrente f\xFCr schwerbehinderte Menschen. Der GdB betr\xE4gt ${I()||"[GdB]"}.`},jahresbetrag:{q:[{k:"haupt",label:"Wer pflegt sonst normalerweise?",help:"Die Person, die verhindert war. Zum Beispiel du selbst oder die Ehefrau.",ph:"Vor- und Nachname"},{k:"grund",type:"choice",label:"Warum konnte sie nicht pflegen?",opts:G([{v:"urlaub",t:"Urlaub"},{v:"krank",t:"Krankheit"},{v:"kur",t:"Kur oder Reha"},{v:"termine",t:"Etwas anderes",s:"z. B. Arzttermin, Erholung, Familienfeier"}])},{k:"art",type:"choice",label:"Ganze Tage oder nur ein paar Stunden am Tag?",opts:G([{v:"tage",t:"Ganze Tage",s:"z. B. eine Woche Urlaub"},{v:"stunden",t:"Nur ein paar Stunden am Tag",s:"weniger als 8 Stunden, z. B. Arzttermin"}])},{k:"von",type:"date",label:"Ab wann?"},{k:"bis",type:"date",label:"Bis wann?",help:"War es nur ein Tag? Dann dasselbe Datum noch einmal."},{k:"ersatz",type:"choice",label:"Wer hat in dieser Zeit gepflegt?",opts:Object.entries(Tt).map(([e,n])=>({v:e,t:n.t,s:n.s}))},{k:"eName",label:()=>["dienst","heim"].includes(t.S.vhp.ersatz)?"Wie hei\xDFt der Dienst bzw. das Heim?":"Wie hei\xDFt die Person, die gepflegt hat?",ph:"Name"},{k:"eAdresse",label:()=>["dienst","heim"].includes(t.S.vhp.ersatz)?"Wo ist er?":"Wo wohnt diese Person?",ph:"Stra\xDFe, PLZ Ort"},{k:"eBez",label:"Wie ist sie mit der gepflegten Person verwandt?",ph:"z. B. Enkel, Schwester, Schwiegertochter",show:()=>t.S.vhp.ersatz==="angehoerig"},{k:"stunden",type:"number",label:"Wie viele Stunden wurde insgesamt gepflegt?",help:"Grob gesch\xE4tzt reicht. Beispiel: 2 Wochen mit je 3 Stunden am Tag sind 42 Stunden.",ph:"z. B. 42",show:()=>["angehoerig","privat"].includes(t.S.vhp.ersatz)},{k:"satz",type:"money",label:"Wie viel Euro pro Stunde wurden vereinbart?",help:"\xDCblich sind etwa 10 bis 20 Euro. Bei Angeh\xF6rigen zahlt die Kasse insgesamt h\xF6chstens das Doppelte des Pflegegeldes.",ph:"z. B. 15",show:()=>["angehoerig","privat"].includes(t.S.vhp.ersatz)},{k:"rechnung",type:"money",label:"Wie hoch ist die Rechnung?",show:()=>["dienst","heim"].includes(t.S.vhp.ersatz)},{k:"km",type:"number",label:"Wie viele Kilometer ist die Ersatzperson daf\xFCr gefahren?",help:"Alle Fahrten hin und zur\xFCck zusammenz\xE4hlen. Keine Fahrten? Einfach \xFCberspringen.",ph:"z. B. 120",show:()=>t.S.vhp.ersatz!=="heim"},{k:"verdienst",type:"money",label:"Hat die Ersatzperson daf\xFCr auf Lohn verzichtet?",help:"Nur wenn sie unbezahlt frei genommen hat. Sonst \xFCberspringen.",show:()=>t.S.vhp.ersatz==="angehoerig"},{k:"verbraucht",type:"money",label:"Wurde in diesem Jahr schon Verhinderungs- oder Kurzzeitpflege bezahlt?",help:"Wenn ja: ungef\xE4hr wie viel Euro? Wenn nein: \xFCberspringen."},{k:"auszahlung",type:"choice",label:"Wohin soll die Kasse das Geld \xFCberweisen?",opts:G([{v:"versicherte",t:"Auf unser Konto",s:"ihr bezahlt die Ersatzperson selbst"},{v:"ersatz",t:"Direkt an die Ersatzperson",s:"die meisten Kassen machen das auf Wunsch"}])},{k:"iban",label:()=>t.S.vhp.auszahlung==="ersatz"?"IBAN der Ersatzperson":"Auf welches Konto soll das Geld?",help:"Die IBAN steht auf der Bankkarte oder im Online-Banking. Sie beginnt mit DE.",ph:"DE00 0000 0000 0000 0000 00"}]}};function Ms(e,n){let a=t.S.person,s=[];return a.name||s.push("name"),(e.to===D||e.to===Q)&&!a.vnr&&s.push("vnr"),(!a.strasse||!a.ort)&&s.push("adresse"),n&&!a.absender&&s.push("absender"),n&&!a.beziehung&&s.push("beziehung"),s}function Fa(e){let n=t.S.rolle==="angehoerig";return{name:{k:"name",store:"person",label:n?"Wie hei\xDFt die Person, um die es geht?":"Wie hei\xDFt du?",ph:"Vor- und Nachname"},vnr:{k:"vnr",store:"person",label:"Wie lautet die Versichertennummer?",help:"Steht auf der Gesundheitskarte (Krankenkassenkarte). Sie beginnt mit einem Buchstaben, zum Beispiel A123456789.",ph:"z. B. A123456789"},adresse:{k:"adresse",store:"person",type:"addr",label:n?"Wo wohnt die Person?":"Wo wohnst du?"},absender:{k:"absender",store:"person",label:"Und wie hei\xDFt du?",help:"Du schreibst den Antrag f\xFCr die Person. Dein Name steht unter dem Brief.",ph:"Vor- und Nachname"},beziehung:{k:"beziehung",store:"person",type:"choice",label:"Wie bist du mit der Person verbunden?",opts:G(["Tochter","Sohn","Ehefrau","Ehemann","Enkelin","Enkel","Rechtliche Betreuung","Andere"])}}[e]}function oe(){let e=t.S.wiz,n=R.find(l=>l.k===e.k),a=e.pq||[],s=["name","beziehung"].filter(l=>a.includes(l)),r=a.filter(l=>!s.includes(l)).sort((l,o)=>["absender","adresse","vnr"].indexOf(l)-["absender","adresse","vnr"].indexOf(o)),i=[...s.map(Fa),...(n.q||[]).filter(l=>!l.show||l.show()),...r.map(Fa)];return{b:n,list:[...i,{type:"summary"},{type:"done"}]}}function $t(e){let n=R.find(a=>a.k===e);t.S.wiz={k:e,i:0,pq:Ms(n,t.S.rolle==="angehoerig")},!n.q?.length&&!t.S.wiz.pq.length&&(t.S.wiz.i=1),S(),c(),E()}function Ae(e){return e.store==="person"?t.S.person[e.k]:O(t.S.wiz.k)[e.k]}function ye(e,n){e.store==="person"?t.S.person[e.k]=n:O(t.S.wiz.k)[e.k]=n,delete t.S.texte[t.S.wiz.k],delete t.S.texte[t.S.wiz.k+"_sub"],S()}function Ra(e){return he(e.label)}function Pt(e){if(e.type==="addr")return[t.S.person.strasse,t.S.person.ort].filter(Boolean).join(", ");let n=Ae(e);if(Array.isArray(n))return n.join(", ");if(n==null||String(n).trim()==="")return"";if(e.type==="date"){let a=B(n);return a?A(a):n}if(e.type==="choice"){let a=(e.opts||[]).find(s=>s.v===n);return a?a.t:n}return e.type==="money"?h(P(n),2):String(n)}function Fs(e){let n=Ae(e),a="wq-"+e.k;if(e.type==="choice")return`<div class="choices big">${e.opts.map(l=>`<label class="choice" for="${a}-${d(l.v)}"><input type="radio" id="${a}-${d(l.v)}" name="${a}" data-wq="${e.k}" value="${d(l.v)}" ${n===l.v?"checked":""}><span>${d(l.t)}${l.s?`<small>${d(l.s)}</small>`:""}</span></label>`).join("")}</div>`;if(e.type==="multi"){let l=Array.isArray(n)?n:[];return`<div class="choices big">${e.opts.map(o=>`<label class="choice" for="${a}-${d(o.v)}"><input type="checkbox" id="${a}-${d(o.v)}" data-wqm="${e.k}" value="${d(o.v)}" ${l.includes(o.v)?"checked":""}><span>${d(o.t)}</span></label>`).join("")}</div>`}if(e.type==="addr")return`<div class="grid2"><div class="field"><label for="wq-strasse">Stra\xDFe und Hausnummer</label><input type="text" id="wq-strasse" data-wqp="strasse" value="${d(t.S.person.strasse)}" autocomplete="street-address"></div><div class="field"><label for="wq-ort">PLZ und Ort</label><input type="text" id="wq-ort" data-wqp="ort" value="${d(t.S.person.ort)}" placeholder="z. B. 70173 Stuttgart"></div></div>`;if(e.type==="long")return`<textarea id="${a}" data-wq="${e.k}" rows="4" placeholder="${d(e.ph||"")}" style="min-height:120px">${d(n||"")}</textarea>`;let s=e.type==="date"?"date":e.type==="tel"?"tel":"text",r=e.type==="money"||e.type==="number"?' inputmode="decimal"':"",i=`<input type="${s}" id="${a}" data-wq="${e.k}" value="${d(n||"")}" placeholder="${d(e.ph||"")}"${r}>`;return e.type==="money"?`<div class="euro">${i}<span>\u20AC</span></div>`:i}function sa(){let{b:e,list:n}=oe(),a=Math.min(t.S.wiz.i,n.length-1);t.S.wiz.i=a;let s=n[a],r=n.length-2,i=`<div class="wiztop"><button type="button" class="btn small ghost" data-wnav="close">\u2190 Zur \xDCbersicht</button><span class="small muted">${d(e.t)}</span></div>`;if(s.type==="summary"){let l=n.slice(0,-2),o=l.filter(u=>!Pt(u)).length;return`<section class="panel wiz">${i}${de(r+1,r+1,"Pr\xFCfen")}
+      <h2 class="wq">Stimmt alles?</h2>
+      <p class="whelp">Tippe auf \u201E\xC4ndern\u201C, wenn etwas nicht passt.${o?` ${o===1?"Eine Angabe ist":o+" Angaben sind"} noch offen. Das ist nicht schlimm: Im Antrag steht dann eine L\xFCcke, die du von Hand ausf\xFCllen kannst.`:""}</p>
+      <dl class="sum">${l.map((u,p)=>`<div><dt>${d(Ra(u))}</dt><dd>${Pt(u)?d(Pt(u)):'<span class="open">noch offen</span>'}</dd><button type="button" class="linkbtn" data-wnav="goto:${p}">\xC4ndern</button></div>`).join("")||'<p class="muted">F\xFCr diesen Antrag brauchen wir keine weiteren Angaben.</p>'}</dl>
+      ${e.k==="jahresbetrag"?Rs():""}
+      <div class="nav big go">${a>0?'<button class="btn ghost" type="button" data-wnav="back">Zur\xFCck</button>':"<span></span>"}<button class="btn" type="button" data-wnav="next">Antrag erstellen</button></div>
+    </section>`}return s.type==="done"?Ns(e):`<section class="panel wiz">${i}${de(a+1,r+1,`Frage ${a+1} von ${r}`)}
+    <h2 class="wq"><label for="wq-${s.k}">${d(Ra(s))}</label></h2>
+    ${s.help?`<p class="whelp">${g("info")}<span>${d(s.help)}</span></p>`:""}
+    ${Fs(s)}
+    <div class="nav big go">
+      ${a>0?'<button class="btn ghost" type="button" data-wnav="back">Zur\xFCck</button>':'<button class="btn ghost" type="button" data-wnav="close">Abbrechen</button>'}
+      <span class="btnrow">${Pt(s)?"":'<button class="btn ghost" type="button" data-wnav="next">Wei\xDF ich nicht</button>'}<button class="btn" type="button" data-wnav="next">Weiter</button></span>
+    </div>
+  </section>`}function de(e,n,a){return`<div class="stepper"><div class="meta"><span>${d(a)}</span><span>${Math.round(e/n*100)} %</span></div><div class="bar"><i style="width:${Math.round(e/n*100)}%"></i></div></div>`}function Rs(){let e=Xe(),n=t.S.vhp;return`<div class="calc">
+     <div><span>Noch verf\xFCgbar vom Jahresbetrag</span><b>${h(e.rest,2)}</b></div>
+     ${n.ersatz==="angehoerig"?`<div><span>H\xF6chstens f\xFCr Angeh\xF6rige (2 \xD7 Pflegegeld)</span><b>${h(e.cap,2)}</b></div>`:""}
+     ${e.pflege?`<div><span>Ersatzpflege${e.gekappt?" (auf H\xF6chstbetrag gek\xFCrzt)":""}</span><b>${h(e.pflege,2)}</b></div>`:""}
+     ${e.fahrt?`<div><span>Fahrtkosten (${h(De,2)} pro km)</span><b>${h(e.fahrt,2)}</b></div>`:""}
+     ${e.verd?`<div><span>Verdienstausfall</span><b>${h(e.verd,2)}</b></div>`:""}
+     <div class="tot"><span>Voraussichtlich bekommt ihr</span><b>${e.total?h(e.total,2):"\u2013"}</b></div></div>
+     <p class="small muted">${n.art==="stunden"?"Weil es nur stundenweise war, l\xE4uft das Pflegegeld ungek\xFCrzt weiter.":"In dieser Zeit gibt es das halbe Pflegegeld (am ersten und letzten Tag das volle)."}</p>`}function Ns(e){let n=ie(e),a=_e[e.to](),s=Be(e),r=t.S.status[e.k]||"offen",i=e.k==="jahresbetrag"&&["angehoerig","privat"].includes(t.S.vhp.ersatz);return`<section class="panel wiz">
+    <div class="wiztop"><button type="button" class="btn small ghost" data-wnav="back">\u2190 Angaben \xE4ndern</button><button type="button" class="btn small ghost" data-wnav="close">Zur \xDCbersicht</button></div>
+    <h2 class="wq">${g("check")} Dein Antrag ist fertig</h2>
+    <div class="btnrow big">
+      <button class="btn" type="button" data-pdf="${e.k}">${g("down")}Als PDF speichern</button>
+      <button class="btn soft" type="button" data-copy="${e.k}">Text kopieren</button>
+      ${a.mail?`<a class="btn ghost" href="${Jn(e,a.mail)}" target="_blank" rel="noopener">Per E-Mail \xF6ffnen</a>`:""}
+    </div>
+    <div class="paper"><p class="subj">${d(n.subject)}</p><p>${d(n.body)}</p></div>
+    ${/\[[^\]]+\]/.test(n.body)?`<p class="notice">${g("alert")}<span>Stellen in [eckigen Klammern] bitte vor dem Abschicken von Hand ausf\xFCllen oder oben unter \u201EAngaben \xE4ndern\u201C nachtragen.</span></p>`:""}
+    <h3>So schickst du ihn ab</h3>
+    <ol class="howsend">
+      <li><strong>PDF ausdrucken und unterschreiben.</strong> Oder den Text in die App oder das Online-Postfach der Kasse kopieren.</li>
+      ${s.length?`<li><strong>Diese Unterlagen beilegen:</strong><ul class="checks">${s.map((l,o)=>`<li><label><input type="checkbox" data-check="${e.k}:${o}" ${t.S.checks[e.k+":"+o]?"checked":""}><span>${d(l)}</span></label></li>`).join("")}</ul>${i?`<button class="btn small soft" type="button" data-act="vhp-quittung" style="margin-top:8px">${g("down")}${t.S.vhp.ersatz==="angehoerig"?"Best\xE4tigung":"Quittung"} zum Unterschreiben (PDF)</button>`:""}</li>`:""}
+      <li><strong>Abschicken an:</strong> ${d(a.name)}.<br><span class="small muted">${d(a.hint)}</span>${a.mail?`<br><span class="small">E-Mail: <code>${d(a.mail)}</code></span>`:""}</li>
+      <li><strong>Hier abhaken, wenn es raus ist.</strong> Wir erinnern dich in 4 Wochen, falls noch keine Antwort da ist.</li>
+    </ol>
+    ${r==="offen"?`<button class="btn big" type="button" data-act="sent" data-k="${e.k}">${g("check")}Ich habe den Antrag abgeschickt</button>`:`<p class="notice good">${g("check")}<span>Abgeschickt${t.S.sent&&t.S.sent[e.k]?" am "+A(B(t.S.sent[e.k])):""}. Status: ${d(r)}.</span></p>`}
+    <details><summary class="small">Text selbst \xE4ndern (f\xFCr Ge\xFCbte)</summary>
+      <div class="field" style="margin-top:10px"><input type="text" data-sub="${e.k}" value="${d(n.subject)}" aria-label="Betreff"><textarea data-tx="${e.k}" aria-label="Antragstext">${d(n.body)}</textarea>
+      ${t.S.texte[e.k]!=null?`<button class="btn small ghost" type="button" data-resettx="${e.k}">\xC4nderungen verwerfen</button>`:""}</div>
+    </details>
+  </section>`}function ra(){for(let[e,n]of Object.entries(xe)){let a=R.find(s=>s.k===e);a&&(a.q=n.q,n.ask&&(a.ask=n.ask))}}var Ne=[12.5,27,47.5,70,90];function lt(e){let n=0;return Ne.forEach((a,s)=>{e>=a&&(n=s+1)}),n}function xt(){let e=t.S.bescheid;if(!e)return null;let n=P(e.punkte),a=String(e.punkte||"").trim()!=="",s=Number(e.pg)||(a?lt(n):0),r=s<5?Ne[s]:null,i=a&&r!=null?Math.max(0,r-n):null,l=B(e.eingang),o=null;l&&(o=new Date(l),o.setMonth(o.getMonth()+1));let u=i!=null&&i<=7.5,p=s===0&&(a||e.art==="ablehnung");return{g:s,pts:n,hasPts:a,next:r,fehlt:i,frist:o,knapp:u,abgelehnt:p,offen:o&&fe(o)>=0}}t.ocrBusy=!1;t.ocrMsg="";async function kt(){return window.Tesseract?window.Tesseract:new Promise((e,n)=>{let a=document.createElement("script");a.src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js",a.integrity="sha256-qOKZGNCYsrBuEBK9rv+0rsBEXF1WVHCQI+C9H0QqgOg=",a.crossOrigin="anonymous",a.onload=()=>e(window.Tesseract),a.onerror=n,document.head.appendChild(a)})}var Ts=[[/pflegebett/i,"Pflegebett","technisch"],[/hausnotruf/i,"Hausnotruf","technisch"],[/rollator/i,"Rollator (\xFCber die Krankenkasse)","technisch"],[/duschstuhl|duschhocker|badewannenlift|badewannen/i,"Hilfe im Bad","technisch"],[/haltegriff|treppenlift|umbau|wohnumfeld|schwelle/i,"Wohnungsumbau","wohnumfeld"],[/tagespflege/i,"Tagespflege","tagespflege"],[/reha|rehabilitation/i,"Reha-Empfehlung","beratung"],[/pflegekurs|schulung/i,"Pflegekurs","pflegekurs"]];function Na(e){let n={},a=e.replace(/\s+/g," "),s=a.match(/Pflegegrad\s*[:\-]?\s*([1-5])\b/i);return s&&(n.pg=s[1]),s=a.match(/(gesamtpunkt\w*|gewichtete\w*\s+gesamtpunkt\w*|punktwert|gesamtpunktzahl)[^0-9]{0,30}(\d{1,3}(?:[.,]\d{1,2})?)/i),s&&(n.punkte=s[2].replace(".",",")),/abgelehnt|keine pflegebedürftigkeit|nicht pflegebedürftig/i.test(a)&&!n.pg&&(n.art="ablehnung"),s=a.match(/(?:vom|datum)\s*:?\s*(\d{1,2})\.(\d{1,2})\.(\d{4})/i),s&&(n.datum=`${s[3]}-${s[2].padStart(2,"0")}-${s[1].padStart(2,"0")}`),n.hinweise=[...new Set(Ts.filter(([r])=>r.test(a)).map(([,r,i])=>r+"|"+i))],n}async function _n(e){if(e){t.bescheidDraft={...t.S.bescheid||{},pg:t.S.bescheid?.pg||String(b()||""),file:e},t.ocrBusy=!0,t.ocrMsg="Das Dokument wird gelesen. Das dauert beim ersten Mal etwa 20 bis 40 Sekunden \u2026",c();try{let n=await kt(),{data:a}=await n.recognize(e,"deu"),s=Na(a.text||"");Object.assign(t.bescheidDraft,Object.fromEntries(Object.entries(s).filter(([r,i])=>i&&(!Array.isArray(i)||i.length)))),t.ocrMsg=s.pg||s.punkte?"Das haben wir erkannt. Bitte pr\xFCfen und bei Bedarf korrigieren.":"Wir konnten nicht alles sicher lesen. Bitte die Angaben vom Bescheid abtippen."}catch{t.ocrMsg="Lesen hat nicht geklappt. Bitte die Angaben einfach abtippen."}t.ocrBusy=!1,c()}}t.bescheidDraft=null;function zt(){if(!t.S.bereiche.pflege)return"";let e=xt();if(t.bescheidDraft)return Gs();if(!e)return`<section class="panel mini">
+     <div class="mini-head">${g("file")}<div><h3>Bescheid oder Gutachten bekommen?</h3><p class="small muted">Foto machen: Wir pr\xFCfen, ob sich ein Widerspruch lohnt, und behalten die Frist im Blick.</p></div></div>
+     <div class="btnrow"><button class="btn small" type="button" data-act="bes-cam">${g("camera")}Foto machen</button><button class="btn small ghost" type="button" data-act="bes-manual">Abtippen</button><button class="linkbtn" type="button" data-act="r-start">Pflegegrad selbst einsch\xE4tzen</button></div>
+   </section>`;let n=(e.knapp||e.abgelehnt)&&e.offen;return`<section class="panel mini ${n?"warn":""}">
+     <div class="mini-head">${g("file")}<div><h3>Dein Bescheid${t.S.bescheid.datum?` vom ${A(B(t.S.bescheid.datum))}`:""}</h3>
+       <p class="small">${e.g?`Pflegegrad ${e.g}`:"Kein Pflegegrad"}${e.hasPts?` \xB7 ${String(t.S.bescheid.punkte).replace(".",",")} Punkte`:""}${e.fehlt!=null&&e.g<5?` \xB7 noch ${String(e.fehlt.toFixed(1)).replace(".",",")} Punkte bis Pflegegrad ${e.g+1}`:""}</p></div></div>
+     ${n?`<p class="notice">${g("alert")}<span><strong>Ein Widerspruch kann sich lohnen.</strong> ${e.abgelehnt?"Der Antrag wurde abgelehnt.":"Bis zum n\xE4chsten Pflegegrad fehlen nur wenige Punkte."} Frist: <strong>${A(e.frist)}</strong> (${Z(e.frist)}).</span></p>`:e.offen?`<p class="small muted">Widerspruch m\xF6glich bis ${A(e.frist)} (${Z(e.frist)}).</p>`:e.frist?'<p class="small muted">Die Widerspruchsfrist ist abgelaufen. Wird es schlechter, geht jederzeit ein Antrag auf H\xF6herstufung.</p>':""}
+     ${(t.S.bescheid.hinweise||[]).length?`<p class="small">Im Gutachten erw\xE4hnt: ${t.S.bescheid.hinweise.map(a=>{let[s,r]=a.split("|");return`<button type="button" class="chip" data-gotoclaim="${r}">${d(s)}</button>`}).join(" ")}</p>`:""}
+     <div class="btnrow">${e.offen?`<button class="btn small ${n?"":"ghost"}" type="button" data-wopen="widerspruch">Widerspruch schreiben</button>`:""}<button class="btn small ghost" type="button" data-act="bes-edit">\xC4ndern</button></div>
+   </section>`}function Gs(){let e=t.bescheidDraft;return`<section class="panel mini">
+    <h3>Angaben aus dem Bescheid</h3>
+    ${t.ocrBusy?`<p class="notice info">${g("info")}<span>${d(t.ocrMsg)}</span></p>`:t.ocrMsg?`<p class="small muted">${d(t.ocrMsg)}</p>`:""}
+    <div class="grid2">
+      <div class="field"><label for="bd-pg">Festgestellter Pflegegrad</label><select id="bd-pg" data-bd="pg"><option value="0" ${e.pg==="0"?"selected":""}>Abgelehnt / keiner</option>${[1,2,3,4,5].map(n=>`<option value="${n}" ${String(e.pg)===String(n)?"selected":""}>Pflegegrad ${n}</option>`).join("")}</select></div>
+      <div class="field"><label for="bd-pt">Gesamtpunkte (im Gutachten)</label><input type="text" inputmode="decimal" id="bd-pt" data-bd="punkte" value="${d(e.punkte||"")}" placeholder="z. B. 44,25"></div>
+      <div class="field"><label for="bd-dat">Datum des Bescheids</label><input type="date" id="bd-dat" data-bd="datum" value="${d(e.datum||"")}"></div>
+      <div class="field"><label for="bd-ein">Wann kam er bei euch an?</label><input type="date" id="bd-ein" data-bd="eingang" value="${d(e.eingang||F(x()))}"></div>
+    </div>
+    <p class="small muted">Die Punktzahl steht im Gutachten des Medizinischen Dienstes, meist als \u201EGesamtpunkte\u201C. Fehlt das Gutachten, darfst du es bei der Pflegekasse anfordern.</p>
+    <div class="nav"><button class="btn ghost" type="button" data-act="bes-cancel">Abbrechen</button><button class="btn" type="button" data-act="bes-save" ${t.ocrBusy?"disabled":""}>Speichern</button></div>
+  </section>`}async function On(){let e=t.bescheidDraft;if(!e)return;let n=e.file;if(delete e.file,t.S.bescheid={pg:String(e.pg||""),punkte:e.punkte||"",datum:e.datum||"",eingang:e.eingang||F(x()),art:e.art||"",hinweise:e.hinweise||[]},Number(t.S.bescheid.pg)>0&&(t.S.pg=t.S.bescheid.pg),t.bescheidDraft=null,t.ocrMsg="",delete t.S.texte.widerspruch,delete t.S.texte.widerspruch_sub,S(),c(),m("Bescheid gespeichert"),n&&t.ASSETS&&t.BCOL)try{let{blob:a,type:s}=await ft(n),r=await t.ASSETS.upload(a,{type:s});await t.BCOL.add({kat:"bescheid",datum:t.S.bescheid.datum||F(x()),jahr:(B(t.S.bescheid.datum)||x()).getFullYear(),betrag:"",titel:"Pflegegrad-Bescheid",asset:r.id,ctype:r.contentType,eingereicht:!1,created:new Date().toISOString()})}catch{}}function Ta(){if(!(b()>=1&&K()))return null;let e=x(),n=e.getFullYear(),a=B(t.S.entlSeit?t.S.entlSeit+"-01":""),s=(V,ke)=>{let ae=0;if(a){if(a.getFullYear()>V)return 0;a.getFullYear()===V&&(ae=a.getMonth())}return Math.max(0,ke-ae)},r=(V,ke)=>t.BEL.filter(ae=>ae.kat==="entl"&&String(ae.jahr)===String(V)&&(!ke||(B(ae.datum)||e).getMonth()<6)).reduce((ae,et)=>ae+(Number(et.betrag)||0),0),i=U*s(n-1,12),l=Math.max(0,i-r(n-1)),o=r(n,!0),u=Math.min(l,o),p=e<=new Date(n,5,30)?l-u:0,v=U*s(n,e.getMonth()+1),y=U*s(n,12),$=r(n)-u,H=Math.max(0,v-$)+p;return{y:n,frei:H,vorjOffen:p,verfall:new Date(n,5,30),genutzt:r(n),bisHeute:v,jahr:y,belege:t.BEL.filter(V=>V.kat==="entl").length}}function Bt(){let e=Ta();if(!e)return"";let n=e.bisHeute?Math.min(100,e.genutzt/(e.bisHeute+(e.vorjOffen||0))*100):0;return`<section class="panel mini">
+    <div class="mini-head">${g("receipt")}<div><h3>Entlastungsbetrag</h3><p class="small muted">${U} \u20AC im Monat f\xFCr Haushaltshilfe, Betreuung oder Tagespflege</p></div>
+      <div class="mini-num"><span class="small muted">jetzt frei</span><b>${h(e.frei)}</b></div></div>
+    <div class="meter"><div class="track"><i style="width:${n}%"></i></div>
+      <div class="nums"><span>${e.y} genutzt: <strong>${h(e.genutzt,2)}</strong></span><span>Anspruch bis heute: <strong>${h(e.bisHeute)}</strong></span></div></div>
+    ${e.vorjOffen>0?`<p class="notice ${fe(e.verfall)<=60?"":"info"}">${g("alert")}<span><strong>${h(e.vorjOffen)} aus ${e.y-1}</strong> verfallen am 30.06.${e.y} (${Z(e.verfall)}). Jetzt Hilfe organisieren und Rechnung einreichen.</span></p>`:""}
+    ${e.belege?"":'<p class="small muted">Trag jede Rechnung als Beleg \u201EEntlastungsbetrag\u201C ein, dann rechnet die App automatisch mit.</p>'}
+    <div class="btnrow"><button class="btn small" type="button" data-act="entl-add">${g("plus")}Rechnung erfassen</button><button class="btn small ghost" type="button" data-wopen="entlastung">Erstattung beantragen</button>
+      <label class="small muted" style="display:flex;align-items:center;gap:6px">Pflegegrad seit <input type="month" id="entl-seit" value="${d(t.S.entlSeit||"")}" style="width:auto;padding:4px 8px"></label></div>
+  </section>`}function la(){R.push({k:"widerspruch",area:"Pflege",t:"Widerspruch gegen den Pflegegrad-Bescheid",p:"\xA7 84 SGG, \xA7 18 SGB XI",when:()=>!1,val:()=>null,short:"",to:D,steps:["Fristwahrend reicht ein kurzer Widerspruch. Die ausf\xFChrliche Begr\xFCndung kannst du nachreichen.","Gutachten anfordern, falls es nicht beilag, und Punkt f\xFCr Punkt pr\xFCfen, wo Hilfe zu niedrig bewertet wurde.","Pflegetagebuch \xFCber 1\u20132 Wochen f\xFChren und beilegen.","Bei der zweiten Begutachtung eine vertraute Person dabei haben."],docs:["Kopie des Bescheids","Pflegetagebuch (wenn vorhanden)","Aktuelle Arztberichte"]}),xe.widerspruch={q:[{k:"grund",type:"multi",label:"Was wurde im Gutachten zu niedrig eingesch\xE4tzt?",help:"Alles ankreuzen, was zutrifft. Unsicher? Dann \u201EWei\xDF ich nicht\u201C \u2013 der Widerspruch gilt trotzdem.",opts:G([...Je,"Der Gutachter war nur sehr kurz da","Es war ein \u201Eguter Tag\u201C, sonst ist es schlechter"])},{k:"gutachten",type:"choice",label:"Liegt euch das Gutachten vor?",opts:G([{v:"ja",t:"Ja"},{v:"nein",t:"Nein",s:"wir fordern es im Widerspruch mit an"}])},{k:"tel",type:"tel",label:"Telefonnummer f\xFCr eine neue Begutachtung",ph:"z. B. 0711 123456"}],ask:()=>{let e=t.S.bescheid||{},n=O("widerspruch");return`lege ich hiermit Widerspruch gegen den Bescheid${e.datum?` vom ${A(B(e.datum))}`:" vom [Datum]"} \xFCber die Feststellung der Pflegebed\xFCrftigkeit ein${Number(e.pg)>0?` (festgestellt: Pflegegrad ${e.pg})`:""}.
+
+Der tats\xE4chliche Hilfebedarf wurde im Gutachten nicht ausreichend ber\xFCcksichtigt${ee("widerspruch","grund")?`, insbesondere in folgenden Bereichen: ${w("widerspruch","grund")}`:""}. Eine ausf\xFChrliche Begr\xFCndung reiche ich nach.
+
+${n.gutachten==="ja"?"":"Bitte senden Sie mir das vollst\xE4ndige Gutachten des Medizinischen Dienstes zu. "}Ich beantrage eine erneute Begutachtung, m\xF6glichst durch eine andere Gutachterin oder einen anderen Gutachter. F\xFCr die Terminabsprache bin ich erreichbar unter: ${w("widerspruch","tel","Telefonnummer")}.`}},R.find(e=>e.k==="widerspruch").q=xe.widerspruch.q,R.find(e=>e.k==="widerspruch").ask=xe.widerspruch.ask}var Is=[{id:"start",label:"Start",show:()=>!0},{id:"kasse",label:"Kasse",show:()=>t.S.bereiche.pflege},{id:"pflege",label:"Pflegegrad",show:()=>t.S.bereiche.pflege},{id:"pp",label:"Pflegeperson",show:()=>t.S.bereiche.pflege&&b()>=1&&K()},{id:"sb",label:"Schwerbehinderung",show:()=>t.S.bereiche.sb},{id:"genutzt",label:"Schon genutzt",show:()=>!0},{id:"daten",label:"Deine Angaben",show:()=>!0}];function Ee(){return Is.filter(e=>e.show())}var L={apo:{t:"Zuzahlung Apotheke / Rezept",zz:!0},fahrt:{t:"Zuzahlung Fahrten",zz:!0},heil:{t:"Zuzahlung Therapie, Hilfsmittel, Klinik",zz:!0},entl:{t:"Entlastungsbetrag (Rechnungen)"},vhp:{t:"Verhinderungs- & Kurzzeitpflege"},pflhm:{t:"Pflegehilfsmittel"},beratung:{t:"Nachweis Beratungsbesuch"},bescheid:{t:"Bescheide & Schreiben"},sonst:{t:"Sonstiges"}};t.BEL=[];t.pending=null;t.delAsk=null;t.busy=!1;t.areaFilter="Alle";t.fileTarget=null;t.befJahr=String(new Date().getFullYear());function J(){let e=(t.S.belegFilter.jahre||[]).map(String).filter(Boolean);return e.length||(e=[String(new Date().getFullYear())]),[...new Set(e)].sort().reverse()}function yt(e){e=String(e);let n=t.S.bruttoJahr||{};return n[e]!=null&&n[e]!==""?n[e]:e===String(new Date().getFullYear())&&t.S.brutto||""}function At(){return t.S.chronisch?t.S.chronisch==="ja":b()>=3||I()>=60}function qe(e){let n=t.BEL.filter(r=>L[r.kat]&&L[r.kat].zz&&String(r.jahr)===String(e)).reduce((r,i)=>r+(Number(i.betrag)||0),0),a=At()?z.belastungsgrenzeChronischProzent:z.belastungsgrenzeProzent,s=P(yt(e));return{sum:n,pct:a,brutto:s,grenze:s?s*a/100:0}}function gt(){return b()>=2&&["angehoerige","gemischt","wg"].includes(t.S.wohnen)}function Ie(){let e=(t.S.termine.besuche||[]).map(a=>a.d),n=t.BEL.filter(a=>a.kat==="beratung"&&a.datum).map(a=>a.datum);return[...new Set([...e,...n])].filter(B).sort()}function Se(){let e=Dt(x()),n=Ie().map(B),a=s=>n.some(r=>r>=s.start&&r<=s.end);return{H:e,done:a(e),prev:Ye(e,-1),prevDone:a(Ye(e,-1)),next:Ye(e,1),inH:a}}function le(){let e=[],n=x(),a=n.getFullYear();if(gt()){let r=Se();if(r.done){let i=r.next.end;e.push({k:"beratung",t:`Beratungsbesuch f\xFCr das ${r.next.label}`,d:i,remind:X(r.next.start,30),s:`F\xFCr das ${r.H.label} erledigt. Der n\xE4chste Besuch muss zwischen ${A(r.next.start)} und ${A(r.next.end)} stattfinden.`,main:!0,ok:!0})}else{let i=r.H.end;e.push({k:"beratung",t:`Beratungsbesuch f\xFCr das ${r.H.label}`,d:i,remind:X(i,-45),s:`Pflicht f\xFCr Pflegegeld (\xA7 37 Abs. 3 SGB XI). Termin mit ${t.S.termine.dienst||"dem Pflegedienst"} vereinbaren und den Nachweis an die Pflegekasse schicken lassen.`,main:!0})}}{let r=xt();r&&r.offen&&e.push({k:"wid",t:"Widerspruchsfrist Pflegegrad-Bescheid",d:r.frist,remind:X(r.frist,-7),s:r.knapp||r.abgelehnt?"Ein Widerspruch kann sich lohnen. Fristwahrend reicht ein kurzes Schreiben, die App hilft dabei.":"Bis zu diesem Tag kann Widerspruch gegen den Bescheid eingelegt werden."})}if(b()>=1&&K()){let r=new Date(a,5,30),i=n<=r?r:new Date(a+1,5,30);e.push({k:"entl",t:"Entlastungsbetrag: Restguthaben verf\xE4llt",d:i,remind:X(i,-60),s:`Nicht genutzte Betr\xE4ge aus ${i.getFullYear()-1} verfallen an diesem Tag. Jetzt Haushaltshilfe oder Betreuung organisieren und Rechnungen einreichen.`})}if(b()>=2&&K()){let r=new Date(a,11,31);e.push({k:"vhp",t:`Verhinderungspflege aus ${a-1} einreichen`,d:r,remind:X(r,-45),s:`Ausschlussfrist: Kosten der Ersatzpflege aus ${a-1} m\xFCssen bis heute mit Nachweisen bei der Pflegekasse sein.`})}if(t.BEL.some(r=>L[r.kat]&&L[r.kat].zz)||b()>=3||I()>=60){let r=new Date(a+1,0,15);e.push({k:"zz",t:`Zuzahlungsbefreiung f\xFCr ${a+1} beantragen`,d:r,remind:r,s:"Die Befreiung gilt immer nur f\xFCr ein Kalenderjahr. Chronisch Kranke k\xF6nnen den Betrag auch vorab zahlen und sind dann das ganze Jahr befreit."})}let s=B(t.S.termine.wertmarke);s&&e.push({k:"wm",t:"Wertmarke l\xE4uft ab",d:s,remind:X(s,-30),s:"Neue Wertmarke rechtzeitig beim Versorgungsamt beantragen."});for(let r of t.S.termine.eigene||[]){let i=B(r.d);i&&e.push({k:"own-"+r.id,t:r.t,d:i,remind:i,s:r.n||"Eigene Erinnerung",own:r.id})}return e.sort((r,i)=>+r.d-+i.d)}function te(e){let n=fe(e);return n<0?"late":n<=60?"soon":"ok"}function Z(e){let n=fe(e);return n<0?`${-n} Tage \xFCberf\xE4llig`:n===0?"heute":n===1?"morgen":`in ${n} Tagen`}function Jt(e){let n=e.remind<x()?x():e.remind,a=F(n).replace(/-/g,""),s=F(X(n,1)).replace(/-/g,"");return`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(e.t)}&dates=${a}/${s}&details=${encodeURIComponent(e.s+" Frist: "+A(e.d)+". (Dein Anspruch)")}`}function Xt(e){let n=e.remind<x()?x():e.remind;return`https://outlook.live.com/calendar/0/deeplink/compose?path=/calendar/action/compose&rru=addevent&allday=true&subject=${encodeURIComponent(e.t)}&startdt=${F(n)}&enddt=${F(X(n,1))}&body=${encodeURIComponent(e.s+" Frist: "+A(e.d)+".")}`}var Hs={heart:"M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.5-7 10-7 10z",user:"M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8z M4 21a8 8 0 0 1 16 0",form:"M5 3h14v18H5z M9 8h6 M9 12h6 M9 16h3",building:"M5 21V5h14v16 M9 9h2 M13 9h2 M9 13h2 M13 13h2 M10 21v-4h4v4",cross:"M10 4h4v6h6v4h-6v6h-4v-6H4v-4h6z",access:"M12 5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z M6 8h12 M12 8v6 M9 21l3-7 3 7",case:"M4 8h16v11H4z M9 8V5h6v3 M4 13h16",receipt:"M6 3h12v18l-3-2-3 2-3-2-3 2z M9 8h6 M9 12h6 M9 16h3",cal:"M4 6h16v14H4z M4 10h16 M8 3v4 M16 3v4",list:"M9 6h11 M9 12h11 M9 18h11 M4 6h.01 M4 12h.01 M4 18h.01",camera:"M4 8h3l2-3h6l2 3h3v11H4z M12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z",file:"M6 3h8l4 4v14H6z M14 3v4h4",info:"M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z M12 11v5 M12 8h.01",alert:"M12 3l9 16H3z M12 10v4 M12 17h.01",check:"M5 12l4 4 10-10",down:"M12 4v11 M7 10l5 5 5-5 M5 20h14",plus:"M12 5v14 M5 12h14",bell:"M6 16V11a6 6 0 0 1 12 0v5l2 2H4z M10 21h4"};function g(e,n="i"){return`<svg class="${n}" viewBox="0 0 24 24" aria-hidden="true"><path d="${Hs[e]}"/></svg>`}var Yn={Pflege:"heart",Pflegeperson:"user",Steuer:"form",Pflegeheim:"building",Krankenkasse:"cross",Schwerbehinderung:"access",Arbeit:"case"};function x(){let e=new Date;return e.setHours(0,0,0,0),e}function F(e){return`${e.getFullYear()}-${String(e.getMonth()+1).padStart(2,"0")}-${String(e.getDate()).padStart(2,"0")}`}function B(e){if(!e||!/^\d{4}-\d{2}-\d{2}$/.test(e))return null;let[n,a,s]=e.split("-").map(Number);return new Date(n,a-1,s)}function A(e){return e.toLocaleDateString("de-DE")}function fe(e){return Math.round((+e-+x())/864e5)}function X(e,n){let a=new Date(e);return a.setDate(a.getDate()+n),a}var Yt=["Jan","Feb","M\xE4r","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"];function Dt(e){let n=e.getMonth()<6?1:2,a=e.getFullYear();return{y:a,h:n,start:new Date(a,n===1?0:6,1),end:new Date(a,n===1?5:11,n===1?30:31),label:`${n}. Halbjahr ${a}`}}function Ye(e,n){let a=e.y,s=e.h+n;for(;s>2;)s-=2,a++;for(;s<1;)s+=2,a--;return Dt(new Date(a,s===1?0:6,1))}function da(){R.push({k:"befreiung",area:"Krankenkasse",t:"Antrag auf Befreiung von Zuzahlungen",p:"\xA7 62 SGB V",when:()=>!1,val:()=>null,short:"",steps:[],docs:["Zuzahlungsbelege (siehe Beleg\xFCbersicht)","Einkommensnachweise aller Haushaltsmitglieder","ggf. Bescheinigung \xFCber die Dauerbehandlung (chronisch krank)"],to:Q,ask:()=>{let e=qe(t.befJahr);return`beantrage ich hiermit die Befreiung von Zuzahlungen bzw. die Erstattung von Zuzahlungen \xFCber der Belastungsgrenze nach \xA7 62 SGB V f\xFCr das Jahr ${t.befJahr}. Die Belastungsgrenze betr\xE4gt ${e.grenze?h(e.grenze,2):"[Betrag]"} (${e.pct} % der j\xE4hrlichen Bruttoeinnahmen zum Lebensunterhalt). Bisher wurden Zuzahlungen in H\xF6he von ${h(e.sum,2)} geleistet. Die Belege liegen in Kopie bei. Bitte erstatten Sie den Betrag, der die Belastungsgrenze \xFCbersteigt${String(t.befJahr)===String(new Date().getFullYear())?", und stellen Sie eine Befreiungsbescheinigung f\xFCr den Rest des Jahres aus":""}.`}})}var De=z.kmPauschale;function P(e){return Number(String(e??"").replace(/\s/g,"").replace(/\.(?=\d{3}(\D|$))/g,"").replace(",","."))||0}var Ga={urlaub:"Urlaub",krank:"Krankheit",kur:"Kur oder Reha",termine:"Termine, Erholung oder andere wichtige Gr\xFCnde"};function Xe(){let e=t.S.vhp,n=Math.max(0,ve-P(e.verbraucht)),a=e.ersatz==="dienst"||e.ersatz==="heim"?P(e.rechnung):P(e.stunden)*P(e.satz),s=e.ersatz==="angehoerig"?T.pflegegeld[b()]*2:n,r=a?Math.min(a,s):0,i=e.ersatz==="heim"?0:P(e.km)*De,l=e.ersatz==="angehoerig"?P(e.verdienst):0,o=Math.min(n,r+i+l);return{rest:n,basis:a,cap:s,pflege:r,fahrt:i,verd:l,total:o,gekappt:a>s}}function ga(){let e=t.S.vhp,n=[];return e.ersatz==="heim"?n.push("Rechnung der Kurzzeitpflege-Einrichtung (Zeitraum, Pflegekosten getrennt von Unterkunft/Verpflegung)"):e.ersatz==="dienst"?n.push("Rechnung des Pflegedienstes mit Zeitraum und erbrachten Leistungen"):n.push(`Unterschriebene ${e.ersatz==="angehoerig"?"Best\xE4tigung":"Quittung"} der Ersatzpflegeperson mit Zeitraum, Stunden und Betrag (Vorlage als PDF)`),e.ersatz!=="heim"&&P(e.km)&&n.push("Fahrtkosten-Aufstellung: Datum, Strecke von\u2013nach, Kilometer je Fahrt"),e.ersatz==="angehoerig"&&P(e.verdienst)&&n.push("Nachweis Verdienstausfall: Bescheinigung des Arbeitgebers \xFCber unbezahlten Urlaub oder Lohnabrechnung"),e.grund==="krank"&&n.push("Optional: Krankmeldung der Hauptpflegeperson (manche Kassen fragen danach)"),e.auszahlung==="ersatz"&&n.push("Kontoverbindung der Ersatzpflegeperson"),n}function Ia(){let e=B(t.S.vhp.von),n=B(t.S.vhp.bis);return e?n&&+n!=+e?`vom ${A(e)} bis ${A(n)}`:`am ${A(e)}`:"im Zeitraum [von \u2013 bis]"}function ha(){let e=t.S.vhp,n=Xe(),a=Ia(),s=`Bitte \xFCberweisen Sie den Erstattungsbetrag ${e.auszahlung==="ersatz"?`direkt an die Ersatzpflegeperson ${e.eName||"[Name]"}, IBAN: ${e.iban||"[IBAN]"}`:`auf folgendes Konto: ${e.iban||"[IBAN]"}`}.`;if(e.ersatz==="heim")return`beantrage ich hiermit Leistungen der Kurzzeitpflege nach \xA7 42 SGB XI aus dem gemeinsamen Jahresbetrag nach \xA7 42a SGB XI. Die Kurzzeitpflege erfolgte ${a} in der Einrichtung ${e.eName||"[Name der Einrichtung]"}${e.eAdresse?", "+e.eAdresse:""}. Die Rechnung${n.basis?` \xFCber ${h(n.basis,2)}`:""} liegt bei. Sofern die Einrichtung nicht direkt mit Ihnen abrechnet: ${s}`;let r=e.ersatz==="angehoerig"?` (${e.eBez||"[Verwandtschaftsverh\xE4ltnis, z. B. Tochter]"})`:e.ersatz==="dienst"?" (Pflegedienst)":" (nicht verwandt, nicht erwerbsm\xE4\xDFig)",i;e.ersatz==="dienst"?i=`- Rechnung des Pflegedienstes: ${n.basis?h(n.basis,2):"[Betrag]"}`:P(e.stunden)&&P(e.satz)?i=`- Ersatzpflege: ${P(e.stunden)} Stunden \xD7 ${h(P(e.satz),2)} = ${h(n.basis,2)}${n.gekappt?` (erstattungsf\xE4hig bis ${h(n.cap,2)})`:""}`:i=`- Ersatzpflege: [Stunden] \xD7 [Stundensatz] = [Betrag]${e.ersatz==="angehoerig"?` (h\xF6chstens das 2-fache Pflegegeld, ${h(T.pflegegeld[b()]*2)})`:""}`,n.fahrt&&(i+=`
+- Fahrtkosten: ${P(e.km)} km \xD7 ${h(De,2)} = ${h(n.fahrt,2)}`),n.verd&&(i+=`
+- Verdienstausfall: ${h(n.verd,2)}`),n.total&&(i+=`
+Beantragter Betrag insgesamt: ${h(n.total,2)}`);let l=e.art==="stunden"?`
+
+Die Ersatzpflege erfolgte stundenweise (Verhinderung unter 8 Stunden am Tag). Ich bitte daher um ungek\xFCrzte Weiterzahlung des Pflegegeldes.`:"";return`beantrage ich hiermit die Erstattung von Kosten der Verhinderungspflege nach \xA7 39 SGB XI aus dem gemeinsamen Jahresbetrag nach \xA7 42a SGB XI.
+
+Die Hauptpflegeperson ${e.haupt||"[Name]"} war ${a} wegen ${e.grund==="termine"?"anderer wichtiger Gr\xFCnde (z. B. Arzttermine, Erholung)":Ga[e.grund]||"[Grund]"} an der Pflege gehindert. In dieser Zeit hat die Pflege \xFCbernommen: ${e.eName||"[Name]"}, ${e.eAdresse||"[Anschrift]"}${r}.${l}
+
+Aufwendungen:
+${i}
+
+${s} Die Nachweise liegen bei.`}async function Vn(){let e=Ue();if(!e)return;let n=t.S.vhp,a=Xe(),s=n.ersatz==="angehoerig",r=25,i=160,l=30;e.setFont("helvetica","bold"),e.setFontSize(15),e.text(s?"Best\xE4tigung \xFCber Ersatzpflege":"Quittung \xFCber Ersatzpflege",r,l),l+=6,e.setFont("helvetica","normal"),e.setFontSize(9),e.text("Verhinderungspflege nach \xA7 39 SGB XI",r,l),l+=12,e.setFontSize(11);let o=[["Pflegebed\xFCrftige Person",`${t.S.person.name||""}${t.S.person.geb?", geb. "+t.S.person.geb:""}`],["Versichertennummer",t.S.person.vnr||""],["Hauptpflegeperson (verhindert)",n.haupt||""],["Grund",Ga[n.grund]||""],["Zeitraum",Ia().replace(/^vom |^am /,"")],["Art",n.art==="stunden"?"stundenweise (unter 8 Std./Tag)":"ganzt\xE4gig"],["Ersatzpflegeperson",n.eName||""],["Anschrift",n.eAdresse||""]];s&&o.push(["Verwandtschaftsverh\xE4ltnis",n.eBez||""]),o.push(["Geleistete Stunden",P(n.stunden)?String(P(n.stunden)):""],["Stundensatz",P(n.satz)?h(P(n.satz),2):""]),a.fahrt&&o.push(["Fahrtkosten",`${P(n.km)} km \xD7 ${h(De,2)} = ${h(a.fahrt,2)}`]);for(let[v,y]of o)e.setFont("helvetica","bold"),e.text(v+":",r,l),e.setFont("helvetica","normal"),e.text(y||"________________________________",r+62,l),l+=8;l+=4;let u=(a.basis||0)+(a.fahrt||0),p=s?`Ich best\xE4tige, dass ich die Pflege in dem genannten Zeitraum \xFCbernommen habe.${u?` Daf\xFCr sind mir Aufwendungen in H\xF6he von ${h(u,2)} entstanden.`:""}`:`Ich best\xE4tige, dass ich die Pflege in dem genannten Zeitraum \xFCbernommen und daf\xFCr ${u?h(u,2):"________ \u20AC"} erhalten habe.`;e.text(e.splitTextToSize(p,i),r,l),l+=24,e.line(r,l,r+60,l),e.line(r+80,l,r+160,l),e.setFontSize(8),e.text("Ort, Datum",r,l+4),e.text("Unterschrift Ersatzpflegeperson",r+80,l+4),l+=22,e.setFontSize(9),e.setTextColor(90),e.text(e.splitTextToSize("Bei Fahrtkosten bitte eine Aufstellung beilegen (Datum, Strecke, Kilometer). Bei Verdienstausfall eine Bescheinigung des Arbeitgebers.",i),r,l),await ze(s?"Bestaetigung-Ersatzpflege.pdf":"Quittung-Ersatzpflege.pdf",e.output("blob"),"PDF gespeichert")}var D="pflegekasse",Q="krankenkasse",Qe="versorgungsamt",Pe="finanzamt",R=[{k:"pg_antrag",area:"Pflege",t:"Pflegegrad beantragen",p:"\xA7 14, \xA7 18 SGB XI",when:()=>t.S.bereiche.pflege&&b()===0,val:()=>null,short:"Ohne Pflegegrad gibt es keine Leistungen der Pflegekasse. Leistungen gelten ab dem Monat der Antragstellung.",steps:["Antrag formlos bei der Pflegekasse stellen (Brief, E-Mail oder App). Das Datum z\xE4hlt ab sofort.","Pflegetagebuch \xFCber 1\u20132 Wochen f\xFChren: Was klappt nicht mehr allein?","Begutachtung durch den Medizinischen Dienst zu Hause, Angeh\xF6rige dabei sein.","Bescheid pr\xFCfen. Gegen eine zu niedrige Einstufung innerhalb eines Monats Widerspruch einlegen."],docs:["Versichertenkarte/Versichertennummer","Arztberichte, Medikamentenplan","Pflegetagebuch","Vollmacht (wenn Angeh\xF6rige den Antrag stellen)"],to:D,ask:"beantrage ich hiermit die Feststellung der Pflegebed\xFCrftigkeit und Leistungen der Pflegeversicherung nach dem SGB XI. Bitte beauftragen Sie den Medizinischen Dienst mit der Begutachtung und bieten Sie mir eine Pflegeberatung nach \xA7 7a SGB XI an."},{k:"pg_hoch",area:"Pflege",t:"H\xF6heren Pflegegrad beantragen",p:"\xA7 14, \xA7 18 SGB XI",when:()=>t.S.bereiche.pflege&&b()>=1&&b()<5,val:()=>null,opt:!0,short:()=>`Wenn der Hilfebedarf gestiegen ist. Pflegegrad ${b()+1} bringt z. B. ${h(T.pflegegeld[b()+1]-T.pflegegeld[b()])} mehr Pflegegeld im Monat.`,steps:["\xC4nderungen der letzten Monate notieren (St\xFCrze, Demenz, n\xE4chtliche Hilfe, Inkontinenz).","Antrag auf H\xF6herstufung formlos stellen.","Neue Begutachtung vorbereiten: Pflegetagebuch, aktuelle Arztberichte.","Bescheid pr\xFCfen, ggf. Widerspruch innerhalb eines Monats."],docs:["aktuelle Arztberichte","Pflegetagebuch","Bisheriger Pflegegrad-Bescheid"],to:D,ask:"beantrage ich hiermit eine H\xF6herstufung des Pflegegrades, da sich der Hilfebedarf deutlich erh\xF6ht hat. Bitte veranlassen Sie eine erneute Begutachtung durch den Medizinischen Dienst."},{k:"pflegegeld",area:"Pflege",t:"Pflegegeld",p:"\xA7 37 SGB XI",cash:!0,when:()=>b()>=2&&["angehoerige","gemischt","wg"].includes(t.S.wohnen),val:()=>T.pflegegeld[b()]*12,mon:()=>T.pflegegeld[b()],short:()=>`${h(T.pflegegeld[b()])} im Monat, frei verwendbar f\xFCr pflegende Angeh\xF6rige. Mit Pflegedienst anteilig als Kombinationsleistung (\xA7 38).`,steps:["Pflegegeld bei der Pflegekasse beantragen und Pflegeperson benennen.","Kontoverbindung angeben.","Halbj\xE4hrlichen Beratungsbesuch nach \xA7 37 Abs. 3 einplanen, sonst wird das Pflegegeld gek\xFCrzt."],docs:["Name und Anschrift der Pflegeperson(en)","IBAN"],to:D,ask:()=>"beantrage ich hiermit Pflegegeld nach \xA7 37 SGB XI (bei gleichzeitiger Nutzung eines Pflegedienstes als Kombinationsleistung nach \xA7 38 SGB XI). Die Pflege \xFCbernimmt: [Name der Pflegeperson]. Bitte \xFCberweisen Sie das Pflegegeld auf folgendes Konto: [IBAN]."},{k:"sachleistung",area:"Pflege",t:"Pflegesachleistung (Pflegedienst)",p:"\xA7 36, \xA7 38 SGB XI",when:()=>b()>=2&&K(),val:()=>null,mon:()=>T.sachleistung[b()],short:()=>`Bis ${h(T.sachleistung[b()])} im Monat f\xFCr einen zugelassenen Pflegedienst. Ungenutztes Budget wird als anteiliges Pflegegeld ausgezahlt.`,steps:["Zugelassenen Pflegedienst ausw\xE4hlen (Preisvergleichsliste der Pflegekasse).","Pflegevertrag abschlie\xDFen, der Dienst rechnet direkt mit der Kasse ab.","Bei Kombination mit Pflegegeld: Kombinationsleistung beantragen.","Bis zu 40 % des Budgets d\xFCrfen in Angebote zur Unterst\xFCtzung im Alltag umgewandelt werden (\xA7 45a Abs. 4)."],docs:["Kostenvoranschlag/Pflegevertrag des Pflegedienstes"],to:D,ask:"beantrage ich hiermit Pflegesachleistungen nach \xA7 36 SGB XI bzw. die Kombinationsleistung nach \xA7 38 SGB XI. Die Versorgung \xFCbernimmt der Pflegedienst: [Name des Pflegedienstes]."},{k:"entlastung",area:"Pflege",t:"Entlastungsbetrag",p:"\xA7 45b SGB XI",cash:!0,when:()=>b()>=1&&K(),val:()=>U*12,mon:()=>U,short:`${U} \u20AC im Monat (${h(U*12)} im Jahr) f\xFCr Haushaltshilfe, Alltagsbegleitung, Tagespflege oder Kurzzeitpflege. Wird als Erstattung gegen Rechnung gezahlt.`,steps:["Anerkannten Anbieter f\xFCr Unterst\xFCtzung im Alltag suchen (Liste bei der Pflegekasse, in BW auch Nachbarschaftshilfe).","Rechnung an die Pflegekasse schicken oder Abtretungserkl\xE4rung unterschreiben, dann rechnet der Anbieter direkt ab.","Nicht genutzte Betr\xE4ge werden ins n\xE4chste Halbjahr \xFCbertragen und verfallen am 30. Juni des Folgejahres."],docs:["Rechnungen des anerkannten Anbieters","ggf. Abtretungserkl\xE4rung"],to:D,ask:"beantrage ich hiermit die Erstattung von Aufwendungen aus dem Entlastungsbetrag nach \xA7 45b SGB XI. Die Rechnungen des anerkannten Anbieters [Name] liegen bei. Bitte teilen Sie mir au\xDFerdem mit, wie hoch das noch verf\xFCgbare Guthaben aus dem Vorjahr ist."},{k:"jahresbetrag",area:"Pflege",t:"Verhinderungs- und Kurzzeitpflege",p:"\xA7 39, \xA7 42, \xA7 42a SGB XI",cash:!0,when:()=>b()>=2&&K(),val:()=>ve,short:()=>`Gemeinsamer Jahresbetrag von ${h(ve)} f\xFCr Ersatzpflege, wenn die Hauptpflegeperson verhindert ist (Urlaub, Krankheit, Auszeit), und f\xFCr Kurzzeitpflege im Heim. Durch nahe Angeh\xF6rige bis ${h(T.pflegegeld[b()]*2)} plus nachgewiesene Kosten.`,steps:["Unten ausf\xFCllen: Wer pflegt sonst, wer war verhindert, wer hat in dieser Zeit gepflegt.","Belege sammeln (Beispiele siehe unten). F\xFCr Privatpersonen reicht eine unterschriebene Quittung, die Vorlage gibt es hier als PDF.","Antrag mit Belegen an die Pflegekasse schicken. Seit 2026 ist kein Antrag vorab n\xF6tig.","Frist: sp\xE4testens bis 31.12. des Folgejahres (Ausschlussfrist)."],docs:()=>ga(),to:D,ask:()=>ha()},{k:"tagespflege",area:"Pflege",t:"Tages- oder Nachtpflege",p:"\xA7 41 SGB XI",when:()=>b()>=2&&K(),val:()=>null,mon:()=>T.tagespflege[b()],short:()=>`Eigenes Budget bis ${h(T.tagespflege[b()])} im Monat, zus\xE4tzlich zu Pflegegeld oder Pflegedienst. Ideal, wenn Angeh\xF6rige berufst\xE4tig sind.`,steps:["Tagespflege in der N\xE4he suchen und Probetag vereinbaren.","Antrag auf teilstation\xE4re Pflege stellen.","Pflegekosten zahlt die Kasse bis zum Budget, Verpflegung und Fahrten teils selbst (daf\xFCr Entlastungsbetrag nutzbar)."],docs:["Angebot/Vertrag der Tagespflege"],to:D,ask:"beantrage ich hiermit Leistungen der Tages- und Nachtpflege nach \xA7 41 SGB XI in der Einrichtung [Name der Tagespflege] ab dem [Datum]."},{k:"verbrauch",area:"Pflege",t:"Pflegehilfsmittel zum Verbrauch",p:"\xA7 40 Abs. 2 SGB XI",cash:!0,when:()=>b()>=1&&K(),val:()=>ue*12,mon:()=>ue,short:`Bis ${ue} \u20AC im Monat f\xFCr Handschuhe, Desinfektion, Bettschutzeinlagen, Mundschutz. Viele Anbieter liefern monatlich kostenlos.`,steps:["Anbieter (Apotheke, Sanit\xE4tshaus oder Versand) w\xE4hlen.","Antrag auf Kosten\xFCbernahme unterschreiben, der Anbieter reicht ihn meist ein.","Box wird jeden Monat geliefert, keine Zuzahlung."],docs:["Antragsformular des Anbieters oder dieses Schreiben"],to:D,ask:"beantrage ich hiermit die Kosten\xFCbernahme f\xFCr zum Verbrauch bestimmte Pflegehilfsmittel nach \xA7 40 Abs. 2 SGB XI bis zur H\xF6he von 42 Euro monatlich. Die Versorgung soll erfolgen durch: [Anbieter]."},{k:"technisch",area:"Pflege",t:"Hausnotruf, Pflegebett & technische Hilfsmittel",p:"\xA7 40 Abs. 1 SGB XI",when:()=>b()>=1&&K(),val:()=>null,short:"Pflegekasse \xFCbernimmt die Kosten, Zuzahlung h\xF6chstens 10 %, maximal 25 \u20AC je Hilfsmittel. Hausnotruf wird in der Regel monatlich bezuschusst.",steps:["Bedarf kl\xE4ren: Hausnotruf, Pflegebett, Lagerungshilfen, Rollator (bei Krankheit \xFCber die Krankenkasse).","Kostenvoranschlag beim Sanit\xE4tshaus oder Hausnotruf-Anbieter holen.","Antrag mit Kostenvoranschlag einreichen. Erst nach Bewilligung bestellen."],docs:["Kostenvoranschlag","Empfehlung aus dem MD-Gutachten (falls vorhanden)"],to:D,ask:"beantrage ich hiermit die Versorgung mit folgendem technischen Pflegehilfsmittel nach \xA7 40 Abs. 1 SGB XI: [Hilfsmittel, z. B. Hausnotruf / Pflegebett]. Ein Kostenvoranschlag liegt bei."},{k:"wohnumfeld",area:"Pflege",t:"Zuschuss zum Wohnungsumbau",p:"\xA7 40 Abs. 4 SGB XI",when:()=>b()>=1&&K(),val:()=>null,once:Fe,short:`Bis ${h(Fe)} je Ma\xDFnahme, z. B. bodengleiche Dusche, Treppenlift, T\xFCrverbreiterung. Wohnen mehrere Pflegebed\xFCrftige zusammen, bis ${h(Fe*4)}.`,steps:["Umbau planen, zwei Angebote einholen.","Antrag VOR Baubeginn stellen.","Nach Bewilligung bauen lassen und Rechnung einreichen."],docs:["Kostenvoranschl\xE4ge","Fotos der Ist-Situation","Einverst\xE4ndnis des Vermieters (bei Miete)"],to:D,ask:"beantrage ich hiermit einen Zuschuss f\xFCr Ma\xDFnahmen zur Verbesserung des individuellen Wohnumfeldes nach \xA7 40 Abs. 4 SGB XI f\xFCr folgende Ma\xDFnahme: [z. B. Umbau der Badewanne zu einer bodengleichen Dusche]. Kostenvoranschl\xE4ge liegen bei."},{k:"dipa",area:"Pflege",t:"Digitale Pflegeanwendungen (DiPA)",p:"\xA7 40a, \xA7 40b SGB XI",when:()=>b()>=1&&K(),val:()=>null,mon:()=>tt+nt,short:`Bis ${tt} \u20AC im Monat f\xFCr eine zugelassene Pflege-App plus ${nt} \u20AC f\xFCr erg\xE4nzende Unterst\xFCtzung durch einen Pflegedienst.`,steps:["Zugelassene DiPA im BfArM-Verzeichnis aussuchen.","Antrag bei der Pflegekasse stellen.","Freischaltcode nach Bewilligung erhalten."],docs:["Name der DiPA"],to:D,ask:"beantrage ich hiermit die Versorgung mit der digitalen Pflegeanwendung [Name] nach \xA7 40a SGB XI sowie erg\xE4nzende Unterst\xFCtzungsleistungen nach \xA7 39a SGB XI."},{k:"wg",area:"Pflege",t:"Wohngruppenzuschlag",p:"\xA7 38a SGB XI",cash:!0,when:()=>b()>=1&&t.S.wohnen==="wg",val:()=>Re*12,mon:()=>Re,short:`${Re} \u20AC im Monat pauschal f\xFCr Bewohner ambulant betreuter Wohngruppen.`,steps:["Antrag stellen mit Nachweis \xFCber die Wohngruppe und die beauftragte Pr\xE4senzkraft."],docs:["Mietvertrag der WG","Vereinbarung mit der Pr\xE4senzkraft"],to:D,ask:"beantrage ich hiermit den Wohngruppenzuschlag nach \xA7 38a SGB XI f\xFCr die ambulant betreute Wohngruppe [Name, Anschrift]."},{k:"beratung",area:"Pflege",t:"Kostenlose Pflegeberatung",p:"\xA7 7a SGB XI",when:()=>t.S.bereiche.pflege,val:()=>null,short:"Pers\xF6nliche Beratung durch die Pflegekasse oder den Pflegest\xFCtzpunkt, auf Wunsch zu Hause. Sinnvoll, um alle Budgets zu planen.",steps:["Termin bei der Pflegekasse oder dem Pflegest\xFCtzpunkt vereinbaren.","Diese Ergebnisliste mitnehmen."],docs:["Pflegegrad-Bescheid"],to:D,ask:"bitte ich um einen Termin f\xFCr eine individuelle Pflegeberatung nach \xA7 7a SGB XI, gern bei mir zu Hause."},{k:"pflegekurs",area:"Pflege",t:"Kostenloser Pflegekurs f\xFCr Angeh\xF6rige",p:"\xA7 45 SGB XI",when:()=>t.S.bereiche.pflege&&t.S.rolle==="angehoerig",val:()=>null,short:"Kurse und h\xE4usliche Schulungen f\xFCr pflegende Angeh\xF6rige, auch online. Kostenlos.",steps:["Kursangebot bei der Pflegekasse erfragen oder online buchen."],docs:[],to:D,ask:"bitte ich um Informationen zu kostenlosen Pflegekursen bzw. einer h\xE4uslichen Schulung nach \xA7 45 SGB XI f\xFCr pflegende Angeh\xF6rige."},{k:"rv",area:"Pflegeperson",t:"Rentenbeitr\xE4ge f\xFCr die Pflegeperson",p:"\xA7 44 SGB XI",when:()=>b()>=2&&K()&&t.S.wohnen!=="pflegedienst"&&t.S.pp.stunden10==="ja"&&t.S.pp.arbeit!=="ueber30",val:()=>null,mon:()=>T.rv[b()],short:()=>`Die Pflegekasse zahlt bis ${h(T.rv[b()],2)} im Monat in die Rentenversicherung der Pflegeperson, dazu Arbeitslosen- und Unfallversicherung.`,steps:["Fragebogen zur Zahlung der Beitr\xE4ge zur sozialen Sicherung f\xFCr Pflegepersonen bei der Pflegekasse anfordern.","Pflegezeit angeben: mind. 10 Stunden an mind. 2 Tagen pro Woche, Pflegeperson arbeitet h\xF6chstens 30 Stunden.","Rentenkonto sp\xE4ter pr\xFCfen."],docs:["Angaben zur Pflegeperson (Rentenversicherungsnummer, Arbeitszeit)"],to:D,ask:"beantrage ich hiermit die Zahlung von Beitr\xE4gen zur Renten- und Arbeitslosenversicherung f\xFCr die Pflegeperson [Name, Rentenversicherungsnummer] nach \xA7 44 SGB XI. Die Pflege umfasst mindestens 10 Stunden an mindestens 2 Tagen pro Woche. Bitte senden Sie mir den entsprechenden Fragebogen zu."},{k:"pug",area:"Pflegeperson",t:"Pflegeunterst\xFCtzungsgeld bei akuter Pflegesituation",p:"\xA7 44a SGB XI, \xA7 2 PflegeZG",when:()=>t.S.bereiche.pflege&&t.S.pp.arbeit&&t.S.pp.arbeit!=="nein",val:()=>null,opt:!0,short:"Berufst\xE4tige Angeh\xF6rige k\xF6nnen bis zu 10 Arbeitstage im Jahr freinehmen und erhalten 90 % des Nettolohns von der Pflegekasse.",steps:["Arbeitgeber sofort \xFCber die Freistellung informieren.","\xC4rztliche Bescheinigung \xFCber die akute Pflegesituation holen.","Antrag bei der Pflegekasse des Pflegebed\xFCrftigen stellen."],docs:["\xE4rztliche Bescheinigung","Entgeltbescheinigung des Arbeitgebers"],to:D,ask:"beantrage ich hiermit Pflegeunterst\xFCtzungsgeld nach \xA7 44a Abs. 3 SGB XI f\xFCr die kurzzeitige Arbeitsverhinderung der Pflegeperson [Name] im Zeitraum [von \u2013 bis]. Die \xE4rztliche Bescheinigung liegt bei."},{k:"pflegepausch",area:"Steuer",t:"Pflege-Pauschbetrag in der Steuererkl\xE4rung",p:"\xA7 33b Abs. 6 EStG",when:()=>b()>=2&&K()&&t.S.rolle==="angehoerig",val:()=>null,frei:()=>T.pflegePausch[b()],short:()=>`Pflegende Angeh\xF6rige k\xF6nnen ${h(T.pflegePausch[b()])} pro Jahr steuerlich absetzen, wenn sie unentgeltlich pflegen.`,steps:["In der Einkommensteuererkl\xE4rung (Anlage Au\xDFergew\xF6hnliche Belastungen) eintragen.","Pflegegrad-Bescheid und Steuer-ID der gepflegten Person bereithalten."],docs:["Pflegegrad-Bescheid","Steuer-ID der gepflegten Person"],to:Pe},{k:"stationaer",area:"Pflegeheim",t:"Leistungsbetrag vollstation\xE4re Pflege",p:"\xA7 43 SGB XI",when:()=>b()>=1&&t.S.wohnen==="heim",val:()=>null,mon:()=>T.stationaer[b()],short:()=>`${h(T.stationaer[b()])} im Monat zahlt die Pflegekasse direkt ans Heim.`,steps:["Heimvertrag an die Pflegekasse schicken, das Heim rechnet direkt ab."],docs:["Heimvertrag"],to:D,ask:"beantrage ich hiermit Leistungen der vollstation\xE4ren Pflege nach \xA7 43 SGB XI in der Einrichtung [Name des Heims] ab dem [Datum]."},{k:"zuschlag",area:"Pflegeheim",t:"Leistungszuschlag zum Eigenanteil pr\xFCfen",p:"\xA7 43c SGB XI",when:()=>b()>=2&&t.S.wohnen==="heim",val:()=>null,short:`Die Kasse \xFCbernimmt ${z.heimZuschlag[0]} % des pflegebedingten Eigenanteils, nach 12 Monaten ${z.heimZuschlag[1]} %, nach 24 Monaten ${z.heimZuschlag[2]} %, nach 36 Monaten ${z.heimZuschlag[3]} %. Fr\xFChere Heimaufenthalte z\xE4hlen mit.`,steps:["Heimrechnung pr\xFCfen: Ist der Zuschlag abgezogen und die richtige Stufe angesetzt?","Fr\xFChere Heimzeiten (auch in anderen Heimen) der Kasse melden.","Bei Fehlern schriftlich Neuberechnung verlangen."],docs:["Heimrechnungen","Nachweise fr\xFCherer Heimaufenthalte"],to:D,ask:"bitte ich um Pr\xFCfung und ggf. Neuberechnung des Leistungszuschlags nach \xA7 43c SGB XI. Der Aufenthalt in vollstation\xE4rer Pflege begann am [Datum]. Fr\xFChere Aufenthalte: [Einrichtung, Zeitraum]."},{k:"hzp",area:"Pflegeheim",t:"Hilfe zur Pflege vom Sozialamt",p:"\xA7 61 ff. SGB XII",when:()=>t.S.bereiche.pflege&&t.S.wohnen==="heim",val:()=>null,opt:!0,short:`Reichen Rente und Verm\xF6gen nicht f\xFCr den Eigenanteil, \xFCbernimmt das Sozialamt den Rest. Kinder zahlen erst ab ${h(z.elternunterhaltGrenze)} Jahresbrutto.`,steps:["Antrag beim Sozialamt stellen, sobald das Geld knapp wird. Leistungen gibt es erst ab Antrag.","Einkommens- und Verm\xF6gensnachweise sammeln."],docs:["Rentenbescheid","Kontoausz\xFCge","Heimvertrag und Rechnungen"],to:"sozialamt",ask:"beantrage ich hiermit Hilfe zur Pflege nach \xA7\xA7 61 ff. SGB XII, da Einkommen und Verm\xF6gen nicht ausreichen, um die Kosten der vollstation\xE4ren Pflege zu decken."},{k:"eingliederung",area:"Pflege",t:"Pauschale in Einrichtungen der Eingliederungshilfe",p:"\xA7 43a SGB XI",when:()=>b()>=2&&t.S.wohnen==="eingliederung",val:()=>null,mon:()=>z.eingliederungMax,short:`Die Pflegekasse \xFCbernimmt 15 % der Verg\xFCtung, h\xF6chstens ${z.eingliederungMax} \u20AC im Monat. An Wochenenden zu Hause kann anteilig Pflegegeld flie\xDFen.`,steps:["Einrichtung fragen, ob die Pauschale abgerechnet wird.","F\xFCr Tage zu Hause anteiliges Pflegegeld beantragen."],docs:["Bescheinigung der Einrichtung \xFCber Heimfahrtstage"],to:D,ask:"beantrage ich hiermit anteiliges Pflegegeld f\xFCr die Tage der h\xE4uslichen Pflege au\xDFerhalb der Einrichtung [Name] (Nachweis liegt bei)."},{k:"fahrten",area:"Krankenkasse",t:"Fahrten zur ambulanten Behandlung",p:"\xA7 60 SGB V",when:()=>b()>=3||k("aG")||k("Bl")||k("H"),val:()=>null,short:"Bei Pflegegrad 4 oder 5 bzw. Merkzeichen aG, Bl oder H gelten Taxifahrten zu ambulanten Arztterminen als genehmigt. Bei Pflegegrad 3 mit dauerhaft eingeschr\xE4nkter Mobilit\xE4t auf Antrag.",steps:["\xC4rztin oder Arzt stellt die Verordnung einer Krankenbef\xF6rderung aus.","Bei Pflegegrad 3 vorab Genehmigung bei der Krankenkasse holen.","Zuzahlung 10 %, mind. 5 \u20AC, max. 10 \u20AC je Fahrt (auf Belastungsgrenze anrechenbar)."],docs:["Verordnung Krankenbef\xF6rderung","Pflegegrad-Bescheid oder Ausweis"],to:Q,ask:"beantrage ich hiermit die Genehmigung von Krankenfahrten zu ambulanten Behandlungen nach \xA7 60 Abs. 1 SGB V. Die \xE4rztliche Verordnung liegt bei."},{k:"chroniker",area:"Krankenkasse",t:"Zuzahlungen begrenzen (1 % statt 2 %)",p:"\xA7 62 SGB V",when:()=>b()>=3||I()>=60,val:()=>null,short:"Wer als schwerwiegend chronisch krank gilt (z. B. ab Pflegegrad 3 oder GdB 60 wegen der Erkrankung), zahlt h\xF6chstens 1 % des Bruttoeinkommens pro Jahr zu. Dar\xFCber gibt es Befreiung.",steps:["Quittungen f\xFCr Zuzahlungen (Apotheke, Fahrten, Therapie) sammeln.","\xC4rztliche Bescheinigung \xFCber die Dauerbehandlung holen.","Befreiung beantragen, sobald die Grenze erreicht ist, r\xFCckwirkend f\xFCr das Jahr."],docs:["Quittungen","Einkommensnachweise des Haushalts","Bescheinigung der Dauerbehandlung"],to:Q,ask:"beantrage ich hiermit die Befreiung von Zuzahlungen nach \xA7 62 SGB V bzw. die Anerkennung als schwerwiegend chronisch krank (Belastungsgrenze 1 %). Nachweise liegen bei."},{k:"sb_antrag",area:"Schwerbehinderung",t:"Schwerbehindertenausweis beantragen",p:"\xA7 152 SGB IX",when:()=>t.S.bereiche.sb&&t.S.sb.status==="nein",val:()=>null,short:"Ab GdB 50 gibt es den Ausweis und viele Nachteilsausgleiche. Auch GdB 20\u201340 bringt Steuervorteile. Bei Pflegegrad liegt oft ein GdB vor.",steps:["Antrag beim Versorgungsamt stellen (in Baden-W\xFCrttemberg: Landratsamt oder Stadtkreis), oft auch online.","Alle Diagnosen und behandelnden \xC4rzte angeben, Merkzeichen gleich mit beantragen.","Bescheid pr\xFCfen, Widerspruch innerhalb eines Monats m\xF6glich."],docs:["Arztberichte, Krankenhausberichte","Liste der behandelnden \xC4rzte mit Schweigepflichtentbindung","Passfoto (f\xFCr Ausweis)"],to:Qe,ask:"beantrage ich hiermit die Feststellung einer Behinderung und des Grades der Behinderung (GdB) nach \xA7 152 SGB IX sowie die Ausstellung eines Schwerbehindertenausweises. Zudem beantrage ich die Pr\xFCfung folgender Merkzeichen: [z. B. G, B, H]. Eine Liste der behandelnden \xC4rztinnen und \xC4rzte liegt bei."},{k:"sb_neu",area:"Schwerbehinderung",t:"H\xF6heren GdB oder Merkzeichen beantragen",p:"\xA7 152 SGB IX",when:()=>t.S.bereiche.sb&&t.S.sb.status==="ja"&&(I()<100||b()>=4&&!k("H")),val:()=>null,opt:!0,short:()=>b()>=4&&!k("H")?"Bei Pflegegrad 4 oder 5 lohnt sich oft der Antrag auf Merkzeichen H: kostenlose Wertmarke und Kfz-Steuerbefreiung.":"Haben sich Erkrankungen verschlechtert oder sind neue hinzugekommen, lohnt ein Neufeststellungsantrag.",steps:["Neue Diagnosen und Befunde sammeln.","Neufeststellungsantrag beim Versorgungsamt stellen.","Gew\xFCnschte Merkzeichen ausdr\xFCcklich nennen."],docs:["neue Arztberichte","bisheriger Bescheid","Pflegegrad-Bescheid"],to:Qe,ask:"beantrage ich hiermit die Neufeststellung des Grades der Behinderung wegen Verschlimmerung bzw. hinzugekommener Gesundheitsst\xF6rungen sowie die Pr\xFCfung folgender Merkzeichen: [z. B. H, G, B]. Aktuelle Befunde liegen bei."},{k:"behpausch",area:"Steuer",t:"Behinderten-Pauschbetrag",p:"\xA7 33b EStG",when:()=>I()>=20||b()>=4,val:()=>null,frei:()=>{if(k("H")||k("Bl")||k("TBl")||b()>=4)return z.behindertenPauschbetragErhoeht;let e=Math.min(100,Math.floor(I()/10)*10);return Mt[e]||0},short:()=>`Steuerfreibetrag von ${h(R.find(e=>e.k==="behpausch").frei())} pro Jahr. Kann auf Eltern oder Kinder \xFCbertragen werden, wenn die Person selbst keine Steuern zahlt.`,steps:["In der Steuererkl\xE4rung eintragen (Anlage Au\xDFergew\xF6hnliche Belastungen).",`Bescheid bzw. Ausweis bereithalten. Bei Pflegegrad 4/5 gen\xFCgt der Pflegegrad-Bescheid f\xFCr ${h(z.behindertenPauschbetragErhoeht)}.`,"R\xFCckwirkend f\xFCr noch offene Steuerjahre beantragen."],docs:["Ausweis/Bescheid oder Pflegegrad-Bescheid"],to:Pe},{k:"fahrtpausch",area:"Steuer",t:"Behinderungsbedingte Fahrtkostenpauschale",p:"\xA7 33 Abs. 2a EStG",when:()=>I()>=80||I()>=70&&k("G")||k("aG")||k("Bl")||k("TBl")||k("H")||b()>=4,val:()=>null,frei:()=>k("aG")||k("Bl")||k("TBl")||k("H")||b()>=4?4500:900,short:()=>`${h(R.find(e=>e.k==="fahrtpausch").frei())} pro Jahr zus\xE4tzlich steuerlich absetzbar, ohne Einzelnachweis.`,steps:["In der Steuererkl\xE4rung (Anlage Au\xDFergew\xF6hnliche Belastungen) eintragen."],docs:["Ausweis/Bescheid"],to:Pe},{k:"wertmarke",area:"Schwerbehinderung",t:"Freifahrt im Nahverkehr (Wertmarke)",p:"\xA7 228 SGB IX",when:()=>t.S.sb.status==="ja"&&(k("G")||k("aG")||k("Gl")||k("H")||k("Bl")),val:()=>null,short:()=>k("H")||k("Bl")||t.S.sb.grundsicherung?"Kostenlose Wertmarke: Bus, Bahn und Regionalverkehr in ganz Deutschland frei.":"Wertmarke f\xFCr 104 \u20AC im Jahr (53 \u20AC halbj\xE4hrlich): Bus, Bahn und Regionalverkehr in ganz Deutschland. Alternative zur Kfz-Steuererm\xE4\xDFigung.",steps:["Beiblatt mit Wertmarke beim Versorgungsamt beantragen.","Bei Merkzeichen H, Bl oder Bezug von Grundsicherung/B\xFCrgergeld kostenlos.","Mit Merkzeichen B f\xE4hrt eine Begleitperson immer kostenlos mit, auch im Fernverkehr der Bahn."],docs:["Ausweis","ggf. Bescheid \xFCber Grundsicherung/B\xFCrgergeld"],to:Qe,ask:"beantrage ich hiermit die Ausstellung eines Beiblatts mit Wertmarke f\xFCr die unentgeltliche Bef\xF6rderung im \xF6ffentlichen Personennahverkehr nach \xA7 228 SGB IX."},{k:"kfz",area:"Schwerbehinderung",t:"Kfz-Steuer-Befreiung oder -Erm\xE4\xDFigung",p:"\xA7 3a KraftStG",when:()=>t.S.sb.auto&&(k("aG")||k("Bl")||k("TBl")||k("H")||k("G")||k("Gl")),val:()=>null,short:()=>k("aG")||k("Bl")||k("TBl")||k("H")?"100 % Befreiung von der Kfz-Steuer, zus\xE4tzlich zur kostenlosen Wertmarke m\xF6glich.":"50 % Erm\xE4\xDFigung der Kfz-Steuer. Gilt nicht gleichzeitig mit der Wertmarke, also abw\xE4gen.",steps:["Antrag beim Hauptzollamt (zust\xE4ndig f\xFCr die Kfz-Steuer) stellen.","Fahrzeug muss auf die schwerbehinderte Person zugelassen sein."],docs:["Ausweis","Fahrzeugschein"],to:"hauptzollamt",ask:"beantrage ich hiermit die Steuerbefreiung bzw. -erm\xE4\xDFigung nach \xA7 3a Kraftfahrzeugsteuergesetz f\xFCr das Fahrzeug mit dem amtlichen Kennzeichen [Kennzeichen]."},{k:"park",area:"Schwerbehinderung",t:"Blauer EU-Parkausweis",p:"\xA7 46 StVO",when:()=>k("aG")||k("Bl")||k("TBl"),val:()=>null,short:"Parken auf Behindertenparkpl\xE4tzen und Parkerleichterungen in ganz Europa.",steps:["Antrag bei der Stra\xDFenverkehrsbeh\xF6rde bzw. dem B\xFCrgeramt stellen.","Passfoto und Ausweis mitbringen."],docs:["Ausweis","Passfoto"],to:"strassenverkehrsbehoerde",ask:"beantrage ich hiermit die Ausstellung eines Parkausweises f\xFCr Menschen mit Behinderung (blauer EU-Parkausweis)."},{k:"rundfunk",area:"Schwerbehinderung",t:"Erm\xE4\xDFigter Rundfunkbeitrag",p:"\xA7 4 RBStV",cash:!0,when:()=>k("RF")||k("TBl"),val:()=>k("TBl")?Math.round(z.rundfunkVoll*12*100)/100:Math.round((z.rundfunkVoll-z.rundfunkErmaessigt)*12*100)/100,short:()=>k("TBl")?`Taubblinde Menschen werden ganz befreit (${h(z.rundfunkVoll,2)} im Monat gespart).`:`Nur ${h(z.rundfunkErmaessigt,2)} statt ${h(z.rundfunkVoll,2)} im Monat zahlen.`,steps:["Antrag beim ARD ZDF Deutschlandradio Beitragsservice stellen (online oder per Formular).","Kopie des Ausweises mit Merkzeichen beilegen."],docs:["Ausweis (Vorder- und R\xFCckseite)"],to:"beitragsservice",ask:"beantrage ich hiermit die Erm\xE4\xDFigung bzw. Befreiung vom Rundfunkbeitrag nach \xA7 4 Rundfunkbeitragsstaatsvertrag. Eine Kopie des Schwerbehindertenausweises liegt bei. Beitragsnummer: [Beitragsnummer]."},{k:"blind",area:"Schwerbehinderung",t:"Blindengeld / Landesblindenhilfe",p:"Landesrecht, \xA7 72 SGB XII",when:()=>k("Bl")||k("TBl"),val:()=>null,short:"Monatliche Geldleistung des Bundeslandes, unabh\xE4ngig vom Einkommen. H\xF6he je nach Land.",steps:["Antrag beim Versorgungsamt bzw. Landratsamt stellen.","Teile des Pflegegeldes werden angerechnet."],docs:["Augen\xE4rztliche Befunde","Ausweis"],to:Qe,ask:"beantrage ich hiermit Blindengeld bzw. Landesblindenhilfe nach den landesrechtlichen Vorschriften."},{k:"urlaub",area:"Arbeit",t:"5 Tage Zusatzurlaub",p:"\xA7 208 SGB IX",when:()=>t.S.sb.arbeit&&I()>=50,val:()=>null,short:"Schwerbehinderte Besch\xE4ftigte haben eine Arbeitswoche mehr Urlaub im Jahr, dazu besonderen K\xFCndigungsschutz.",steps:["Arbeitgeber schriftlich \xFCber die Schwerbehinderung informieren.","Zusatzurlaub beantragen, auch r\xFCckwirkend f\xFCr das laufende Jahr."],docs:["Kopie des Ausweises"],to:"arbeitgeber",ask:"teile ich Ihnen mit, dass bei mir eine Schwerbehinderung mit einem GdB von [GdB] festgestellt ist. Ich beantrage daher den Zusatzurlaub nach \xA7 208 SGB IX f\xFCr das laufende Kalenderjahr."},{k:"gleich",area:"Arbeit",t:"Gleichstellung mit Schwerbehinderten",p:"\xA7 2 Abs. 3 SGB IX",when:()=>t.S.sb.arbeit&&I()>=30&&I()<50,val:()=>null,short:"Mit GdB 30 oder 40 sch\xFCtzt die Gleichstellung den Arbeitsplatz (K\xFCndigungsschutz, F\xF6rderung), aber ohne Zusatzurlaub.",steps:["Antrag bei der Agentur f\xFCr Arbeit stellen.","Darlegen, warum der Arbeitsplatz gef\xE4hrdet ist."],docs:["GdB-Bescheid","Arbeitsvertrag"],to:"arbeitsagentur",ask:"beantrage ich hiermit die Gleichstellung mit einem schwerbehinderten Menschen nach \xA7 2 Abs. 3 SGB IX. Der GdB betr\xE4gt [GdB]. Ohne Gleichstellung ist der Arbeitsplatz gef\xE4hrdet, weil [Begr\xFCndung]."},{k:"rente",area:"Arbeit",t:"Altersrente f\xFCr schwerbehinderte Menschen",p:"\xA7 37, \xA7 236a SGB VI",when:()=>t.S.sb.arbeit&&I()>=50,val:()=>null,opt:!0,short:"Bis zu 2 Jahre fr\xFCher abschlagsfrei in Rente (35 Versicherungsjahre n\xF6tig). Der GdB muss bei Rentenbeginn anerkannt sein.",steps:["Kostenlose Beratung bei der Deutschen Rentenversicherung buchen.","Rentenauskunft anfordern."],docs:["Ausweis","Versicherungsverlauf"],to:"rentenversicherung",ask:"bitte ich um eine Rentenauskunft und Beratung zur Altersrente f\xFCr schwerbehinderte Menschen. Der GdB betr\xE4gt [GdB]."}],_e={pflegekasse:()=>({name:ht(),hint:Le()?`E-Mail: ${Le()} (Adresse bitte pr\xFCfen). Sicherer: Upload \xFCber ${Me().app}.`:`Adresse steht auf deinem Bescheid oder der Webseite deiner Kasse. Sicher hochladen \xFCber ${Me().app}.`,mail:Le()}),krankenkasse:()=>({name:mt(),hint:Le()?`E-Mail: ${Le()} (bitte pr\xFCfen) oder ${Me().app}.`:"Adresse steht auf deiner Versichertenkarte bzw. der Webseite deiner Kasse.",mail:Le()}),versorgungsamt:()=>({name:"Versorgungsamt",hint:"In Baden-W\xFCrttemberg: Landratsamt bzw. Stadtkreis deines Wohnortes. In vielen L\xE4ndern auch online beantragbar.",mail:""}),finanzamt:()=>({name:"Finanzamt",hint:"Kein Antrag n\xF6tig: in der Einkommensteuererkl\xE4rung eintragen (z. B. \xFCber ELSTER).",mail:""}),sozialamt:()=>({name:"Sozialamt",hint:"Sozialamt der Stadt oder des Landkreises am Wohnort.",mail:""}),hauptzollamt:()=>({name:"Hauptzollamt",hint:"Das f\xFCr deinen Wohnort zust\xE4ndige Hauptzollamt (zoll.de).",mail:""}),strassenverkehrsbehoerde:()=>({name:"Stra\xDFenverkehrsbeh\xF6rde",hint:"B\xFCrgeramt bzw. Stra\xDFenverkehrsbeh\xF6rde deiner Stadt.",mail:""}),beitragsservice:()=>({name:"ARD ZDF Deutschlandradio Beitragsservice",hint:"Am einfachsten online \xFCber rundfunkbeitrag.de.",mail:""}),arbeitgeber:()=>({name:"Arbeitgeber / Personalabteilung",hint:"Direkt an die Personalabteilung.",mail:""}),arbeitsagentur:()=>({name:"Agentur f\xFCr Arbeit",hint:"Zust\xE4ndige Agentur f\xFCr Arbeit am Wohnort.",mail:""}),rentenversicherung:()=>({name:"Deutsche Rentenversicherung",hint:"Beratung kostenlos, Termine \xFCber deutsche-rentenversicherung.de.",mail:""})};function Me(){return we[t.S.kasse]||we.andere}function mt(){return t.S.kasse==="aok"?"AOK "+(t.S.aokRegion||""):t.S.kasse==="andere"?t.S.kasseAndere||"Krankenkasse":Me().name}function ht(){return t.S.kasse==="aok"?"AOK-Pflegekasse "+(t.S.aokRegion||""):t.S.kasse==="andere"?"Pflegekasse bei der "+(t.S.kasseAndere||"Krankenkasse"):Me().pk}function Le(){return t.S.kasse==="aok"||t.S.kasse==="andere"?"":Me().mail}function he(e){return typeof e=="function"?e():e}function Et(){return R.filter(e=>{try{return e.when()}catch{return!1}})}var Ha={};da();ra();la();jt();na();Hn();cn();Gn();c();dn();Object.defineProperty(globalThis,"__da",{value:Object.freeze(Object.assign({Z:t},Lt,Gt,ba,ca,pa,ia,oa,Kt,Ot,Ut,ua,aa,Xn,ea,qt,bn,Sn,xn,Kn,gn,Fn,Zn,Ct,In,Ha))});})();
+
+//# sourceMappingURL=app.js.map
