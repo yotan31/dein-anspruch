@@ -7,13 +7,17 @@ Kostenlose Web-App für Menschen mit Pflegegrad oder Schwerbehinderung und ihre 
 
 ## Aufbau
 
-| Ordner | Inhalt |
+| Ort | Inhalt |
 | --- | --- |
-| `quelle/app.html` | Oberfläche und Logik der App (Hauptquelle) |
-| `quelle/speicher.js` | Anmeldung, Datenbank, Belege-Speicher, Einwilligung, Feedback, Fehlerprotokoll |
-| `quelle/bauen.py` | baut daraus `site/index.html` und `site/app.js` |
+| `quelle/index.html` | Seitengerüst: Kopf, Sicherheitsregeln (CSP), Grundaufbau |
+| `quelle/stil.css` | Aussehen |
+| `quelle/js/01-…99-*.js` | Programm in Teilen, werden in Reihenfolge der Nummern zusammengefügt (z. B. `02-leistungen.js` = Leistungskatalog und Beträge 2026, `05-assistent.js` = Antrag-Assistent, `17-sammel-pdf.js`, `19-speicher.js` = Datenbank, `21-sicherung-und-loeschen.js`) |
+| `quelle/bauen.py` | fügt alles zu `site/index.html`, `site/app.css`, `site/app.js` zusammen |
 | `site/` | die veröffentlichte App, dazu Datenschutz, Nutzungsbedingungen, Impressum und `vendor/` (selbst gehostete Schriften, pdf.js, jsPDF) |
+| `supabase/functions/` | Server-Funktionen (z. B. `konto-loeschen`) |
 | `tests/` | automatische Tests (`app.test.mjs`) mit Test-PDF |
+
+**Beträge für ein neues Jahr** stehen in `quelle/js/01-grundlagen.js` (Stammdaten) und `quelle/js/02-leistungen.js`.
 
 ## Ablauf bei Änderungen
 

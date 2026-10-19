@@ -53,7 +53,7 @@ async function newPage({ gast = null, stub = false } = {}) {
       then(res) { return Promise.resolve({ data: st.op === "select" ? (rows[t] || []) : null, error: null }).then(res) } }; return api };
     Object.defineProperty(window, "supabase", { configurable: true, get: () => ({ createClient: () => ({
       auth: { onAuthStateChange() {}, getSession: async () => ({ data: { session: { user } } }), updateUser: async ({ data }) => { user = { ...user, user_metadata: { ...user.user_metadata, ...data } }; return { data: { user }, error: null } }, signOut: async () => {} },
-      from: q, rpc: async () => ({ data: null, error: null }), storage: { from: () => ({ createSignedUrls: async () => ({ data: [] }) }) } }) }), set() {} });
+      from: q, rpc: async () => ({ data: null, error: null }), functions: { invoke: async (n, o) => { window.__fn = [n, o && o.body]; return { data: { ok: true }, error: null } } }, storage: { from: () => ({ createSignedUrls: async () => ({ data: [] }) }) } }) }), set() {} });
   });
   const page = await ctx.newPage(); const errors = [];
   page.on("pageerror", e => errors.push(e.message));
@@ -167,6 +167,14 @@ console.log("Konto, Einwilligung und Feedback");
   const f = await page.evaluate(() => (window.__ins.find(x => x[0] === "fehler") || [])[1]);
   check("Fehler wird protokolliert", !!f);
   check("Fehlerprotokoll enthält keine E-Mail und keine langen Zahlen", !!f && !/@|\d{5,}/.test(f.meldung), f && f.meldung);
+  await page.evaluate(() => { S.done = true; S.welcomeSeen = true; S.tab = "ansprueche"; render() }); await page.waitForTimeout(150);
+  await page.locator('[data-act="wipe"]').scrollIntoViewIfNeeded(); await page.locator('[data-act="wipe"]').tap(); await page.waitForTimeout(150);
+  check("vor dem Löschen kommt die Frage „Bist du sicher?“", /Bist du sicher/.test(await page.textContent("#wipebox")));
+  await page.locator('[data-act="wipe-yes"]').tap(); await page.waitForTimeout(150);
+  check("ohne Bestätigungswort wird nichts gelöscht", await page.evaluate(() => !window.__fn && !!USER));
+  await page.fill("#wipe-word", "LÖSCHEN"); await page.locator('[data-act="wipe-yes"]').tap(); await page.waitForTimeout(500);
+  check("mit Bestätigung wird das Konto gelöscht", await page.evaluate(() => window.__fn && window.__fn[0] === "konto-loeschen" && window.__fn[1].bestaetigung === "LÖSCHEN"));
+  check("danach ist man abgemeldet", await page.evaluate(() => !USER));
   check("keine anderen Programmfehler", errors.filter(e => !/Testfehler/.test(e)).length === 0, errors.join(" | "));
 }
 

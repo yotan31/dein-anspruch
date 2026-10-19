@@ -1674,8 +1674,7 @@ function drawLetter(doc,b){
   const docs=docsFor(b); if(docs.length){ y+=14; if(y>260){doc.addPage();y=20} doc.setFontSize(10); doc.setFont("helvetica","bold"); doc.text("Anlagen",L0,y); doc.setFont("helvetica","normal"); y+=5; for(const d of docs){ if(y>282){doc.addPage();y=20} doc.text("– "+d,L0,y); y+=5 } }
 }
 async function saveFile(filename,data,okMsg){
-  const dl = await claudeUse("downloads");
-  if(!dl){toast("Download ist in dieser Ansicht nicht verfügbar.");return}
+  const dl = DL; // Datei-Download im Browser (siehe 19-speicher.js)
   try{ await dl.save({filename,data}); toast(okMsg||"Gespeichert") }
   catch(e){ if(e&&e.code==="declined") return; toast(e&&e.code==="rate_limited"?"Bitte kurz warten und erneut versuchen.":"Download nicht möglich.") }
 }
@@ -2154,8 +2153,6 @@ async function copy(text){
 }
 let tT; function toast(m){const t=$("toast");t.textContent=tr(m);t.hidden=false;clearTimeout(tT);tT=setTimeout(()=>t.hidden=true,2800)}
 
-/* ---------- Speicher (privat pro Konto) ---------- */
-
 /* ---------- Speicher: Supabase (Konto, Datenbank, Beleg-Fotos) ---------- */
 const SB_URL="https://ssamgluufgwsxvkyvaob.supabase.co";
 const SB_KEY="sb_publishable_UiXPXKzQ6uKTyQF3SqFQiw_VtjqAAbd";
@@ -2172,7 +2169,6 @@ const DL={ async save({filename,data}){
   const blob=data instanceof Blob?data:new Blob([data],{type});
   const u=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=u; a.download=filename; document.body.appendChild(a); a.click(); a.remove();
   setTimeout(()=>URL.revokeObjectURL(u),8000); return {status:"saved"} } };
-function claudeUse(n){ return Promise.resolve(n==="downloads"?DL:null) }
 const UI_KEYS=["tab","wiz","belegFilter","welcomeSeen"];
 let FAELLE=[], FALL_ID=null, MEMBERS=[], showPersons=false, inviteLink="", inviteBusy=false;
 function uiKey(){ return "da-ui-"+(USER?USER.id:"gast")+"-"+(FALL_ID||"x") }
@@ -2427,28 +2423,24 @@ async function googleLogin(){
 }
 async function logout(){ try{ await sb.auth.signOut() }catch(e){} ERI=null; eriLoaded=false; lsSet("dein-anspruch-modus",""); USER=null; GUEST=false; S=blank(); BEL=[]; URLS={}; FAELLE=[]; FALL_ID=null; showPersons=false; canSave=false; ref=null; render(); scrollTop() }
 
-let wipeAsk=false, dataBusy="";
+/* ---------- Sicherung herunterladen und wieder einspielen, Konto löschen ---------- */
+let wipeAsk=false, wipeBusy=false, dataBusy="";
 const WIPE_WORD=v=>/^l(ö|oe|o)schen$/i.test(String(v||"").trim());
 async function wipeAll(){
   const w=$("wipe-word"); if(!w || !WIPE_WORD(w.value)){ toast("Bitte zum Bestätigen das Wort LÖSCHEN eintippen."); if(w) w.focus(); return }
-  wipeAsk=false;
-  if(!USER){ lsSet("dein-anspruch-gast",null); S=blank(); BEL=[]; render(); toast("Alle Angaben auf diesem Gerät wurden gelöscht."); return }
-  try{
-    for(const f of FAELLE){
-      if(f.rolle==="besitzer"){
-        const {data:bl}=await sb.from("belege").select("pfad").eq("fall_id",f.id);
-        const paths=(bl||[]).map(b=>b.pfad).filter(Boolean); if(paths.length) await sb.storage.from("belege").remove(paths);
-        await sb.from("fall").delete().eq("id",f.id);
-      } else await sb.from("mitglied").delete().eq("fall_id",f.id).eq("user_id",USER.id);
-    }
-    await sb.from("faelle").delete().eq("user_id",USER.id);
-    lsSet("dein-anspruch-gast",null);
-    toast("Alle deine Daten wurden gelöscht.");
-  }catch(e){ toast("Löschen hat nicht vollständig geklappt. Bitte erneut versuchen."); return }
+  if(wipeBusy) return;
+  if(!USER){ wipeAsk=false; lsSet("dein-anspruch-gast",null); S=blank(); BEL=[]; render(); toast("Alle Angaben auf diesem Gerät wurden gelöscht."); return }
+  wipeBusy=true; render();
+  let ok=false;
+  try{ const {data,error}=await sb.functions.invoke("konto-loeschen",{body:{bestaetigung:"LÖSCHEN"}}); ok=!error && data && data.ok }catch(e){}
+  wipeBusy=false;
+  if(!ok){ toast("Löschen hat nicht geklappt. Es wurde nichts gelöscht. Bitte später noch einmal versuchen."); return render() }
+  wipeAsk=false; lsSet("dein-anspruch-gast",null); lsSet("dein-anspruch-mail",null);
+  try{ for(const k of Object.keys(localStorage)) if(/^da-(ui|fall)-/.test(k)) localStorage.removeItem(k) }catch(e){}
   await logout();
+  toast("Dein Konto und alle Daten wurden gelöscht.");
 }
 
-/* ---------- Sicherung herunterladen und wieder einspielen ---------- */
 const blobToDataUrl=b=>new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsDataURL(b) });
 function cleanData(d){ const x=JSON.parse(JSON.stringify(d||{})); delete x.wiz; delete x.updated; return x }
 async function backupData(){
@@ -2510,10 +2502,11 @@ function datenBox(){
     <h3>Deine Daten</h3>
     <p class="small muted">Lade ab und zu eine Sicherung herunter. Mit der Datei kannst du alles wiederherstellen, auch nach dem Löschen.</p>
     <div class="btnrow"><button class="btn small soft" type="button" data-act="backup" ${dataBusy?"disabled":""}>${ic("down")}${dataBusy==="backup"?"Sicherung wird erstellt …":"Sicherung herunterladen"}</button><button class="btn small ghost" type="button" data-act="restore" ${dataBusy?"disabled":""}>${dataBusy==="restore"?"Wird eingespielt …":"Sicherung einspielen"}</button></div>
-    ${wipeAsk?`<div class="notice bad">${ic("alert")}<span><strong>Wirklich alles löschen?</strong> Alle Angaben, Belege und Fotos werden für immer gelöscht${USER&&MEMBERS.length>1?", auch für eingeladene Familienmitglieder":""}. Lade vorher eine Sicherung herunter.
+    ${wipeAsk?`<div class="notice bad" id="wipebox">${ic("alert")}<span><strong>Bist du sicher?</strong> ${USER?`Dein Konto und alle Angaben, Belege und Fotos werden für immer gelöscht${MEMBERS.length>1?". Eingeladene Familienmitglieder verlieren den Zugriff auf die gemeinsamen Angaben":""}.`:"Alle Angaben auf diesem Gerät werden gelöscht."} Das kann nicht rückgängig gemacht werden. Lade vorher am besten eine Sicherung herunter.
+      <span class="btnrow" style="margin-top:10px"><button class="btn small soft" type="button" data-act="backup" ${dataBusy?"disabled":""}>${ic("down")}Erst Sicherung herunterladen</button></span>
       <span class="field" style="margin-top:10px"><label for="wipe-word">Zum Bestätigen <strong>LÖSCHEN</strong> eintippen</label><input type="text" id="wipe-word" autocomplete="off" autocapitalize="characters" spellcheck="false"></span>
-      <span class="btnrow" style="margin-top:10px"><button class="btn small danger" type="button" data-act="wipe-yes">Endgültig löschen</button><button class="btn small ghost" type="button" data-act="wipe-no">Abbrechen</button></span></span></div>`
-    :`<button class="linkbtn danger" type="button" data-act="wipe" style="align-self:flex-start">Meine Daten endgültig löschen</button>`}
+      <span class="btnrow" style="margin-top:10px"><button class="btn small danger" type="button" data-act="wipe-yes" ${wipeBusy?"disabled":""}>${wipeBusy?"Wird gelöscht …":"Ja, endgültig löschen"}</button><button class="btn small ghost" type="button" data-act="wipe-no" ${wipeBusy?"disabled":""}>Abbrechen</button></span></span></div>`
+    :`<button class="linkbtn danger" type="button" data-act="wipe" style="align-self:flex-start">${USER?"Konto und alle Daten löschen":"Alle Angaben auf diesem Gerät löschen"}</button>`}
   </section>`;
 }
 
@@ -2539,7 +2532,7 @@ function eriCard(){
 }
 
 /* ---------- Fehlerprotokoll (ohne persönliche Daten), Feedback, Weiterempfehlen ---------- */
-const APP_VERSION="dda65ccd"; let errN=0;
+const APP_VERSION="fb5c584a"; let errN=0;
 function reportError(msg,stack){
   if(!sb||errN>=5) return; errN++;
   const clean=s=>String(s||"").replace(/[\w.+-]+@[\w-]+\.[\w.]+/g,"[mail]").replace(/\d{5,}/g,"[zahl]");
