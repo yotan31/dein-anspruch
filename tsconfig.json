@@ -5,12 +5,21 @@
     "checkJs": true,
     "noEmit": true,
     "target": "ES2022",
-    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "lib": [
+      "ES2023",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "strict": false,
     "noUnusedLocals": true,
     "noFallthroughCasesInSwitch": true,
     "skipLibCheck": true,
-    "types": []
+    "types": [],
+    "module": "ESNext",
+    "moduleResolution": "bundler"
   },
-  "include": ["quelle/js/*.js", "quelle/typen.d.ts"]
+  "include": [
+    "quelle/js/*.js",
+    "quelle/typen.d.ts"
+  ]
 }

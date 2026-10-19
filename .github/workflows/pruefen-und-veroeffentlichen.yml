@@ -20,19 +20,21 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: App bauen
-        run: python3 quelle/bauen.py
+      - name: Werkzeuge und Bibliotheken installieren
+        run: npm install --no-audit --no-fund
+      - name: Code prüfen (TypeScript)
+        run: npm run pruefen
+      - name: App bauen (esbuild)
+        run: npm run bauen
       - name: Berechnungen prüfen
-        run: node --test tests/rechnungen.test.mjs
+        run: npm run test:rechnungen
       - name: Testbrowser installieren
-        run: |
-          npm install --no-save --no-audit --no-fund playwright@1.48.2
-          npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium
       - name: Oberfläche im Browser prüfen
         shell: bash
         run: |
           set -o pipefail
-          node tests/oberflaeche.mjs 2>&1 | tee testlauf.txt
+          npm run test:oberflaeche 2>&1 | tee testlauf.txt
       - name: Fehler der Tests anzeigen
         if: failure()
         shell: bash

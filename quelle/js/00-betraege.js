@@ -1,10 +1,8 @@
-"use strict";
-
 /* ---------- Beträge und Grenzen (jedes Jahr im Dezember prüfen!) ----------
    Alle Geldbeträge und Prozentsätze, die sich durch Gesetz oder Verordnung ändern, stehen nur hier.
    Bei Änderungen: Werte anpassen, "stand" setzen, dann `node --test tests/` laufen lassen
    (tests/rechnungen.test.mjs enthält die erwarteten Werte und muss mit angepasst werden). */
-const BETRAEGE = Object.freeze({
+export const BETRAEGE = Object.freeze({
   jahr: 2026,
   stand: "Leistungsübersicht des Bundesgesundheitsministeriums, Stand 01.01.2026",
 

@@ -1,5 +1,11 @@
+import { Z } from "./zustand.js";
+import { esc, mz, pg } from "./01-grundlagen.js";
+import { kassePK } from "./02-leistungen.js";
+import { MON, TODAY, deD, ic, isoD, parseIso } from "./03-hilfsmittel.js";
+import { beratungRelevant, beratungStatus, besuche, deadlines, gcal, ocal, urg, urgTxt } from "./10-fragebogen-und-fristen.js";
+import { eriCard } from "./22-erinnerungen.js";
 /* ---------- Reiter: Termine ---------- */
-function viewTermine(){
+export function viewTermine(){
   const dl=deadlines(); const rel=beratungRelevant(); const st=beratungStatus();
   const halves=[st.prev,st.H,st.next];
   return `
@@ -9,8 +15,8 @@ function viewTermine(){
     <p class="muted small">Wer Pflegegeld bekommt, muss einmal in jedem Kalenderhalbjahr (Januar–Juni und Juli–Dezember) einen Beratungsbesuch durch einen Pflegedienst oder eine anerkannte Beratungsstelle nachweisen. Fehlt der Nachweis, kürzt die Pflegekasse das Pflegegeld, im Wiederholungsfall wird es gestrichen. Der Besuch ist kostenlos, jeder zweite darf per Video sein.</p>
     <div class="halves">${halves.map((h,i)=>{const done=st.inH(h);const cls=done?"done":i===0?"miss":i===1?"open":"";return `<div class="half ${cls}"><b>${h.label}</b><span>${done?"erledigt":i===0?"kein Besuch eingetragen":i===1?`offen · bis ${deD(h.end)}`:`ab ${deD(h.start)}`}</span></div>`}).join("")}</div>
     <div class="grid2">
-      <div class="field"><label for="tdienst">Pflegedienst / Beratungsstelle</label><input type="text" id="tdienst" value="${esc(S.termine.dienst)}" placeholder="Name"></div>
-      <div class="field"><label for="ttel">Telefon</label><input type="tel" id="ttel" value="${esc(S.termine.tel)}"></div>
+      <div class="field"><label for="tdienst">Pflegedienst / Beratungsstelle</label><input type="text" id="tdienst" value="${esc(Z.S.termine.dienst)}" placeholder="Name"></div>
+      <div class="field"><label for="ttel">Telefon</label><input type="tel" id="ttel" value="${esc(Z.S.termine.tel)}"></div>
     </div>
     <div class="grid2" style="align-items:end">
       <div class="field"><label for="tbesuch">Besuch hat stattgefunden am</label><input type="date" id="tbesuch" max="${isoD(TODAY())}"></div>
@@ -33,11 +39,11 @@ function viewTermine(){
       <div class="field"><label for="ownd">Wann?</label><input type="date" id="ownd"></div>
     </div>
     <div><button class="btn soft" type="button" data-act="addown">${ic("plus")}Hinzufügen</button></div>
-    ${S.sb.status==="ja"&&(mz("G")||mz("aG")||mz("Gl")||mz("H")||mz("Bl"))?`<div class="field" style="max-width:260px"><label for="twm">Wertmarke gültig bis</label><input type="date" id="twm" value="${esc(S.termine.wertmarke)}"></div>`:""}
+    ${Z.S.sb.status==="ja"&&(mz("G")||mz("aG")||mz("Gl")||mz("H")||mz("Bl"))?`<div class="field" style="max-width:260px"><label for="twm">Wertmarke gültig bis</label><input type="date" id="twm" value="${esc(Z.S.termine.wertmarke)}"></div>`:""}
   </section>`;
 }
-function pdText(){
-  const st=beratungStatus(); const H=st.done?st.next:st.H; const p=S.person;
+export function pdText(){
+  const st=beratungStatus(); const H=st.done?st.next:st.H; const p=Z.S.person;
   return `Guten Tag, ich möchte einen Beratungsbesuch nach § 37 Abs. 3 SGB XI für ${p.name||"[Name]"}${pg()?` (Pflegegrad ${pg()})`:""} vereinbaren. Der Besuch muss im ${H.label} stattfinden, also bis spätestens ${deD(H.end)}. Bitte schicken Sie den Nachweis anschließend direkt an die ${kassePK()} und mir eine Kopie. Vielen Dank!`;
 }
 function dueHTML(x){

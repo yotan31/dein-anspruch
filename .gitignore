@@ -1,0 +1,7 @@
+node_modules/
+# werden von quelle/bauen.mjs erzeugt
+site/index.html
+site/app.js
+site/app.js.map
+site/app.css
+site/vendor/supabase.js

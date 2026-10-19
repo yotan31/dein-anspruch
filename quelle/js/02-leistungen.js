@@ -1,19 +1,23 @@
+import { Z } from "./zustand.js";
+import { BETRAEGE } from "./00-betraege.js";
+import { BEHPAUSCH, DIPA, DIPA_UL, ENTLASTUNG, JAHRESBETRAG, KASSEN, PG, VERBRAUCH, WG, WOHNUMFELD, eur, gdb, isHome, mz, pg } from "./01-grundlagen.js";
+import { vhpAsk, vhpDocs } from "./04-verhinderungspflege.js";
 /* ---------- Leistungskatalog ---------- */
-const PK="pflegekasse", KK="krankenkasse", VA="versorgungsamt", FA="finanzamt";
-const B = [
+export const PK="pflegekasse", KK="krankenkasse", VA="versorgungsamt", FA="finanzamt";
+export const B = [
  {k:"pg_antrag", area:"Pflege", t:"Pflegegrad beantragen", p:"§ 14, § 18 SGB XI",
-  when:()=>S.bereiche.pflege && pg()===0, val:()=>null, short:"Ohne Pflegegrad gibt es keine Leistungen der Pflegekasse. Leistungen gelten ab dem Monat der Antragstellung.",
+  when:()=>Z.S.bereiche.pflege && pg()===0, val:()=>null, short:"Ohne Pflegegrad gibt es keine Leistungen der Pflegekasse. Leistungen gelten ab dem Monat der Antragstellung.",
   steps:["Antrag formlos bei der Pflegekasse stellen (Brief, E-Mail oder App). Das Datum zählt ab sofort.","Pflegetagebuch über 1–2 Wochen führen: Was klappt nicht mehr allein?","Begutachtung durch den Medizinischen Dienst zu Hause, Angehörige dabei sein.","Bescheid prüfen. Gegen eine zu niedrige Einstufung innerhalb eines Monats Widerspruch einlegen."],
   docs:["Versichertenkarte/Versichertennummer","Arztberichte, Medikamentenplan","Pflegetagebuch","Vollmacht (wenn Angehörige den Antrag stellen)"],
   to:PK, ask:"beantrage ich hiermit die Feststellung der Pflegebedürftigkeit und Leistungen der Pflegeversicherung nach dem SGB XI. Bitte beauftragen Sie den Medizinischen Dienst mit der Begutachtung und bieten Sie mir eine Pflegeberatung nach § 7a SGB XI an."},
  {k:"pg_hoch", area:"Pflege", t:"Höheren Pflegegrad beantragen", p:"§ 14, § 18 SGB XI",
-  when:()=>S.bereiche.pflege && pg()>=1 && pg()<5, val:()=>null, opt:true,
+  when:()=>Z.S.bereiche.pflege && pg()>=1 && pg()<5, val:()=>null, opt:true,
   short:()=>`Wenn der Hilfebedarf gestiegen ist. Pflegegrad ${pg()+1} bringt z. B. ${eur(PG.pflegegeld[pg()+1]-PG.pflegegeld[pg()])} mehr Pflegegeld im Monat.`,
   steps:["Änderungen der letzten Monate notieren (Stürze, Demenz, nächtliche Hilfe, Inkontinenz).","Antrag auf Höherstufung formlos stellen.","Neue Begutachtung vorbereiten: Pflegetagebuch, aktuelle Arztberichte.","Bescheid prüfen, ggf. Widerspruch innerhalb eines Monats."],
   docs:["aktuelle Arztberichte","Pflegetagebuch","Bisheriger Pflegegrad-Bescheid"],
   to:PK, ask:"beantrage ich hiermit eine Höherstufung des Pflegegrades, da sich der Hilfebedarf deutlich erhöht hat. Bitte veranlassen Sie eine erneute Begutachtung durch den Medizinischen Dienst."},
  {k:"pflegegeld", area:"Pflege", t:"Pflegegeld", p:"§ 37 SGB XI", cash:true,
-  when:()=>pg()>=2 && ["angehoerige","gemischt","wg"].includes(S.wohnen),
+  when:()=>pg()>=2 && ["angehoerige","gemischt","wg"].includes(Z.S.wohnen),
   val:()=>PG.pflegegeld[pg()]*12, mon:()=>PG.pflegegeld[pg()],
   short:()=>`${eur(PG.pflegegeld[pg()])} im Monat, frei verwendbar für pflegende Angehörige. Mit Pflegedienst anteilig als Kombinationsleistung (§ 38).`,
   steps:["Pflegegeld bei der Pflegekasse beantragen und Pflegeperson benennen.","Kontoverbindung angeben.","Halbjährlichen Beratungsbesuch nach § 37 Abs. 3 einplanen, sonst wird das Pflegegeld gekürzt."],
@@ -67,57 +71,57 @@ const B = [
   steps:["Zugelassene DiPA im BfArM-Verzeichnis aussuchen.","Antrag bei der Pflegekasse stellen.","Freischaltcode nach Bewilligung erhalten."],
   docs:["Name der DiPA"], to:PK, ask:"beantrage ich hiermit die Versorgung mit der digitalen Pflegeanwendung [Name] nach § 40a SGB XI sowie ergänzende Unterstützungsleistungen nach § 39a SGB XI."},
  {k:"wg", area:"Pflege", t:"Wohngruppenzuschlag", p:"§ 38a SGB XI", cash:true,
-  when:()=>pg()>=1 && S.wohnen==="wg", val:()=>WG*12, mon:()=>WG,
+  when:()=>pg()>=1 && Z.S.wohnen==="wg", val:()=>WG*12, mon:()=>WG,
   short:`${WG} € im Monat pauschal für Bewohner ambulant betreuter Wohngruppen.`,
   steps:["Antrag stellen mit Nachweis über die Wohngruppe und die beauftragte Präsenzkraft."],
   docs:["Mietvertrag der WG","Vereinbarung mit der Präsenzkraft"], to:PK, ask:"beantrage ich hiermit den Wohngruppenzuschlag nach § 38a SGB XI für die ambulant betreute Wohngruppe [Name, Anschrift]."},
  {k:"beratung", area:"Pflege", t:"Kostenlose Pflegeberatung", p:"§ 7a SGB XI",
-  when:()=>S.bereiche.pflege, val:()=>null,
+  when:()=>Z.S.bereiche.pflege, val:()=>null,
   short:"Persönliche Beratung durch die Pflegekasse oder den Pflegestützpunkt, auf Wunsch zu Hause. Sinnvoll, um alle Budgets zu planen.",
   steps:["Termin bei der Pflegekasse oder dem Pflegestützpunkt vereinbaren.","Diese Ergebnisliste mitnehmen."], docs:["Pflegegrad-Bescheid"],
   to:PK, ask:"bitte ich um einen Termin für eine individuelle Pflegeberatung nach § 7a SGB XI, gern bei mir zu Hause."},
  {k:"pflegekurs", area:"Pflege", t:"Kostenloser Pflegekurs für Angehörige", p:"§ 45 SGB XI",
-  when:()=>S.bereiche.pflege && S.rolle==="angehoerig", val:()=>null,
+  when:()=>Z.S.bereiche.pflege && Z.S.rolle==="angehoerig", val:()=>null,
   short:"Kurse und häusliche Schulungen für pflegende Angehörige, auch online. Kostenlos.",
   steps:["Kursangebot bei der Pflegekasse erfragen oder online buchen."], docs:[],
   to:PK, ask:"bitte ich um Informationen zu kostenlosen Pflegekursen bzw. einer häuslichen Schulung nach § 45 SGB XI für pflegende Angehörige."},
  {k:"rv", area:"Pflegeperson", t:"Rentenbeiträge für die Pflegeperson", p:"§ 44 SGB XI",
-  when:()=>pg()>=2 && isHome() && S.wohnen!=="pflegedienst" && S.pp.stunden10==="ja" && S.pp.arbeit!=="ueber30",
+  when:()=>pg()>=2 && isHome() && Z.S.wohnen!=="pflegedienst" && Z.S.pp.stunden10==="ja" && Z.S.pp.arbeit!=="ueber30",
   val:()=>null, mon:()=>PG.rv[pg()],
   short:()=>`Die Pflegekasse zahlt bis ${eur(PG.rv[pg()],2)} im Monat in die Rentenversicherung der Pflegeperson, dazu Arbeitslosen- und Unfallversicherung.`,
   steps:["Fragebogen zur Zahlung der Beiträge zur sozialen Sicherung für Pflegepersonen bei der Pflegekasse anfordern.","Pflegezeit angeben: mind. 10 Stunden an mind. 2 Tagen pro Woche, Pflegeperson arbeitet höchstens 30 Stunden.","Rentenkonto später prüfen."],
   docs:["Angaben zur Pflegeperson (Rentenversicherungsnummer, Arbeitszeit)"],
   to:PK, ask:"beantrage ich hiermit die Zahlung von Beiträgen zur Renten- und Arbeitslosenversicherung für die Pflegeperson [Name, Rentenversicherungsnummer] nach § 44 SGB XI. Die Pflege umfasst mindestens 10 Stunden an mindestens 2 Tagen pro Woche. Bitte senden Sie mir den entsprechenden Fragebogen zu."},
  {k:"pug", area:"Pflegeperson", t:"Pflegeunterstützungsgeld bei akuter Pflegesituation", p:"§ 44a SGB XI, § 2 PflegeZG",
-  when:()=>S.bereiche.pflege && S.pp.arbeit && S.pp.arbeit!=="nein", val:()=>null, opt:true,
+  when:()=>Z.S.bereiche.pflege && Z.S.pp.arbeit && Z.S.pp.arbeit!=="nein", val:()=>null, opt:true,
   short:"Berufstätige Angehörige können bis zu 10 Arbeitstage im Jahr freinehmen und erhalten 90 % des Nettolohns von der Pflegekasse.",
   steps:["Arbeitgeber sofort über die Freistellung informieren.","Ärztliche Bescheinigung über die akute Pflegesituation holen.","Antrag bei der Pflegekasse des Pflegebedürftigen stellen."],
   docs:["ärztliche Bescheinigung","Entgeltbescheinigung des Arbeitgebers"],
   to:PK, ask:"beantrage ich hiermit Pflegeunterstützungsgeld nach § 44a Abs. 3 SGB XI für die kurzzeitige Arbeitsverhinderung der Pflegeperson [Name] im Zeitraum [von – bis]. Die ärztliche Bescheinigung liegt bei."},
  {k:"pflegepausch", area:"Steuer", t:"Pflege-Pauschbetrag in der Steuererklärung", p:"§ 33b Abs. 6 EStG",
-  when:()=>pg()>=2 && isHome() && S.rolle==="angehoerig", val:()=>null, frei:()=>PG.pflegePausch[pg()],
+  when:()=>pg()>=2 && isHome() && Z.S.rolle==="angehoerig", val:()=>null, frei:()=>PG.pflegePausch[pg()],
   short:()=>`Pflegende Angehörige können ${eur(PG.pflegePausch[pg()])} pro Jahr steuerlich absetzen, wenn sie unentgeltlich pflegen.`,
   steps:["In der Einkommensteuererklärung (Anlage Außergewöhnliche Belastungen) eintragen.","Pflegegrad-Bescheid und Steuer-ID der gepflegten Person bereithalten."],
   docs:["Pflegegrad-Bescheid","Steuer-ID der gepflegten Person"], to:FA},
  {k:"stationaer", area:"Pflegeheim", t:"Leistungsbetrag vollstationäre Pflege", p:"§ 43 SGB XI",
-  when:()=>pg()>=1 && S.wohnen==="heim", val:()=>null, mon:()=>PG.stationaer[pg()],
+  when:()=>pg()>=1 && Z.S.wohnen==="heim", val:()=>null, mon:()=>PG.stationaer[pg()],
   short:()=>`${eur(PG.stationaer[pg()])} im Monat zahlt die Pflegekasse direkt ans Heim.`,
   steps:["Heimvertrag an die Pflegekasse schicken, das Heim rechnet direkt ab."], docs:["Heimvertrag"],
   to:PK, ask:"beantrage ich hiermit Leistungen der vollstationären Pflege nach § 43 SGB XI in der Einrichtung [Name des Heims] ab dem [Datum]."},
  {k:"zuschlag", area:"Pflegeheim", t:"Leistungszuschlag zum Eigenanteil prüfen", p:"§ 43c SGB XI",
-  when:()=>pg()>=2 && S.wohnen==="heim", val:()=>null,
+  when:()=>pg()>=2 && Z.S.wohnen==="heim", val:()=>null,
   short:`Die Kasse übernimmt ${BETRAEGE.heimZuschlag[0]} % des pflegebedingten Eigenanteils, nach 12 Monaten ${BETRAEGE.heimZuschlag[1]} %, nach 24 Monaten ${BETRAEGE.heimZuschlag[2]} %, nach 36 Monaten ${BETRAEGE.heimZuschlag[3]} %. Frühere Heimaufenthalte zählen mit.`,
   steps:["Heimrechnung prüfen: Ist der Zuschlag abgezogen und die richtige Stufe angesetzt?","Frühere Heimzeiten (auch in anderen Heimen) der Kasse melden.","Bei Fehlern schriftlich Neuberechnung verlangen."],
   docs:["Heimrechnungen","Nachweise früherer Heimaufenthalte"],
   to:PK, ask:"bitte ich um Prüfung und ggf. Neuberechnung des Leistungszuschlags nach § 43c SGB XI. Der Aufenthalt in vollstationärer Pflege begann am [Datum]. Frühere Aufenthalte: [Einrichtung, Zeitraum]."},
  {k:"hzp", area:"Pflegeheim", t:"Hilfe zur Pflege vom Sozialamt", p:"§ 61 ff. SGB XII",
-  when:()=>S.bereiche.pflege && (S.wohnen==="heim"), val:()=>null, opt:true,
+  when:()=>Z.S.bereiche.pflege && (Z.S.wohnen==="heim"), val:()=>null, opt:true,
   short:`Reichen Rente und Vermögen nicht für den Eigenanteil, übernimmt das Sozialamt den Rest. Kinder zahlen erst ab ${eur(BETRAEGE.elternunterhaltGrenze)} Jahresbrutto.`,
   steps:["Antrag beim Sozialamt stellen, sobald das Geld knapp wird. Leistungen gibt es erst ab Antrag.","Einkommens- und Vermögensnachweise sammeln."],
   docs:["Rentenbescheid","Kontoauszüge","Heimvertrag und Rechnungen"], to:"sozialamt",
   ask:"beantrage ich hiermit Hilfe zur Pflege nach §§ 61 ff. SGB XII, da Einkommen und Vermögen nicht ausreichen, um die Kosten der vollstationären Pflege zu decken."},
  {k:"eingliederung", area:"Pflege", t:"Pauschale in Einrichtungen der Eingliederungshilfe", p:"§ 43a SGB XI",
-  when:()=>pg()>=2 && S.wohnen==="eingliederung", val:()=>null, mon:()=>BETRAEGE.eingliederungMax,
+  when:()=>pg()>=2 && Z.S.wohnen==="eingliederung", val:()=>null, mon:()=>BETRAEGE.eingliederungMax,
   short:`Die Pflegekasse übernimmt 15 % der Vergütung, höchstens ${BETRAEGE.eingliederungMax} € im Monat. An Wochenenden zu Hause kann anteilig Pflegegeld fließen.`,
   steps:["Einrichtung fragen, ob die Pauschale abgerechnet wird.","Für Tage zu Hause anteiliges Pflegegeld beantragen."], docs:["Bescheinigung der Einrichtung über Heimfahrtstage"],
   to:PK, ask:"beantrage ich hiermit anteiliges Pflegegeld für die Tage der häuslichen Pflege außerhalb der Einrichtung [Name] (Nachweis liegt bei)."},
@@ -135,13 +139,13 @@ const B = [
   to:KK, ask:"beantrage ich hiermit die Befreiung von Zuzahlungen nach § 62 SGB V bzw. die Anerkennung als schwerwiegend chronisch krank (Belastungsgrenze 1 %). Nachweise liegen bei."},
  /* Schwerbehinderung */
  {k:"sb_antrag", area:"Schwerbehinderung", t:"Schwerbehindertenausweis beantragen", p:"§ 152 SGB IX",
-  when:()=>S.bereiche.sb && S.sb.status==="nein", val:()=>null,
+  when:()=>Z.S.bereiche.sb && Z.S.sb.status==="nein", val:()=>null,
   short:"Ab GdB 50 gibt es den Ausweis und viele Nachteilsausgleiche. Auch GdB 20–40 bringt Steuervorteile. Bei Pflegegrad liegt oft ein GdB vor.",
   steps:["Antrag beim Versorgungsamt stellen (in Baden-Württemberg: Landratsamt oder Stadtkreis), oft auch online.","Alle Diagnosen und behandelnden Ärzte angeben, Merkzeichen gleich mit beantragen.","Bescheid prüfen, Widerspruch innerhalb eines Monats möglich."],
   docs:["Arztberichte, Krankenhausberichte","Liste der behandelnden Ärzte mit Schweigepflichtentbindung","Passfoto (für Ausweis)"],
   to:VA, ask:"beantrage ich hiermit die Feststellung einer Behinderung und des Grades der Behinderung (GdB) nach § 152 SGB IX sowie die Ausstellung eines Schwerbehindertenausweises. Zudem beantrage ich die Prüfung folgender Merkzeichen: [z. B. G, B, H]. Eine Liste der behandelnden Ärztinnen und Ärzte liegt bei."},
  {k:"sb_neu", area:"Schwerbehinderung", t:"Höheren GdB oder Merkzeichen beantragen", p:"§ 152 SGB IX",
-  when:()=>S.bereiche.sb && S.sb.status==="ja" && (gdb()<100 || (pg()>=4 && !mz("H"))), val:()=>null, opt:true,
+  when:()=>Z.S.bereiche.sb && Z.S.sb.status==="ja" && (gdb()<100 || (pg()>=4 && !mz("H"))), val:()=>null, opt:true,
   short:()=> (pg()>=4 && !mz("H")) ? "Bei Pflegegrad 4 oder 5 lohnt sich oft der Antrag auf Merkzeichen H: kostenlose Wertmarke und Kfz-Steuerbefreiung." : "Haben sich Erkrankungen verschlechtert oder sind neue hinzugekommen, lohnt ein Neufeststellungsantrag.",
   steps:["Neue Diagnosen und Befunde sammeln.","Neufeststellungsantrag beim Versorgungsamt stellen.","Gewünschte Merkzeichen ausdrücklich nennen."],
   docs:["neue Arztberichte","bisheriger Bescheid","Pflegegrad-Bescheid"],
@@ -158,13 +162,13 @@ const B = [
   short:()=>`${eur(B.find(x=>x.k==="fahrtpausch").frei())} pro Jahr zusätzlich steuerlich absetzbar, ohne Einzelnachweis.`,
   steps:["In der Steuererklärung (Anlage Außergewöhnliche Belastungen) eintragen."], docs:["Ausweis/Bescheid"], to:FA},
  {k:"wertmarke", area:"Schwerbehinderung", t:"Freifahrt im Nahverkehr (Wertmarke)", p:"§ 228 SGB IX",
-  when:()=>S.sb.status==="ja" && (mz("G")||mz("aG")||mz("Gl")||mz("H")||mz("Bl")), val:()=>null,
-  short:()=> (mz("H")||mz("Bl")||S.sb.grundsicherung) ? "Kostenlose Wertmarke: Bus, Bahn und Regionalverkehr in ganz Deutschland frei." : "Wertmarke für 104 € im Jahr (53 € halbjährlich): Bus, Bahn und Regionalverkehr in ganz Deutschland. Alternative zur Kfz-Steuerermäßigung.",
+  when:()=>Z.S.sb.status==="ja" && (mz("G")||mz("aG")||mz("Gl")||mz("H")||mz("Bl")), val:()=>null,
+  short:()=> (mz("H")||mz("Bl")||Z.S.sb.grundsicherung) ? "Kostenlose Wertmarke: Bus, Bahn und Regionalverkehr in ganz Deutschland frei." : "Wertmarke für 104 € im Jahr (53 € halbjährlich): Bus, Bahn und Regionalverkehr in ganz Deutschland. Alternative zur Kfz-Steuerermäßigung.",
   steps:["Beiblatt mit Wertmarke beim Versorgungsamt beantragen.","Bei Merkzeichen H, Bl oder Bezug von Grundsicherung/Bürgergeld kostenlos.","Mit Merkzeichen B fährt eine Begleitperson immer kostenlos mit, auch im Fernverkehr der Bahn."],
   docs:["Ausweis","ggf. Bescheid über Grundsicherung/Bürgergeld"],
   to:VA, ask:"beantrage ich hiermit die Ausstellung eines Beiblatts mit Wertmarke für die unentgeltliche Beförderung im öffentlichen Personennahverkehr nach § 228 SGB IX."},
  {k:"kfz", area:"Schwerbehinderung", t:"Kfz-Steuer-Befreiung oder -Ermäßigung", p:"§ 3a KraftStG",
-  when:()=>S.sb.auto && (mz("aG")||mz("Bl")||mz("TBl")||mz("H")||mz("G")||mz("Gl")), val:()=>null,
+  when:()=>Z.S.sb.auto && (mz("aG")||mz("Bl")||mz("TBl")||mz("H")||mz("G")||mz("Gl")), val:()=>null,
   short:()=> (mz("aG")||mz("Bl")||mz("TBl")||mz("H")) ? "100 % Befreiung von der Kfz-Steuer, zusätzlich zur kostenlosen Wertmarke möglich." : "50 % Ermäßigung der Kfz-Steuer. Gilt nicht gleichzeitig mit der Wertmarke, also abwägen.",
   steps:["Antrag beim Hauptzollamt (zuständig für die Kfz-Steuer) stellen.","Fahrzeug muss auf die schwerbehinderte Person zugelassen sein."],
   docs:["Ausweis","Fahrzeugschein"], to:"hauptzollamt",
@@ -185,23 +189,23 @@ const B = [
   steps:["Antrag beim Versorgungsamt bzw. Landratsamt stellen.","Teile des Pflegegeldes werden angerechnet."], docs:["Augenärztliche Befunde","Ausweis"], to:VA,
   ask:"beantrage ich hiermit Blindengeld bzw. Landesblindenhilfe nach den landesrechtlichen Vorschriften."},
  {k:"urlaub", area:"Arbeit", t:"5 Tage Zusatzurlaub", p:"§ 208 SGB IX",
-  when:()=>S.sb.arbeit && gdb()>=50, val:()=>null,
+  when:()=>Z.S.sb.arbeit && gdb()>=50, val:()=>null,
   short:"Schwerbehinderte Beschäftigte haben eine Arbeitswoche mehr Urlaub im Jahr, dazu besonderen Kündigungsschutz.",
   steps:["Arbeitgeber schriftlich über die Schwerbehinderung informieren.","Zusatzurlaub beantragen, auch rückwirkend für das laufende Jahr."], docs:["Kopie des Ausweises"], to:"arbeitgeber",
   ask:"teile ich Ihnen mit, dass bei mir eine Schwerbehinderung mit einem GdB von [GdB] festgestellt ist. Ich beantrage daher den Zusatzurlaub nach § 208 SGB IX für das laufende Kalenderjahr."},
  {k:"gleich", area:"Arbeit", t:"Gleichstellung mit Schwerbehinderten", p:"§ 2 Abs. 3 SGB IX",
-  when:()=>S.sb.arbeit && gdb()>=30 && gdb()<50, val:()=>null,
+  when:()=>Z.S.sb.arbeit && gdb()>=30 && gdb()<50, val:()=>null,
   short:"Mit GdB 30 oder 40 schützt die Gleichstellung den Arbeitsplatz (Kündigungsschutz, Förderung), aber ohne Zusatzurlaub.",
   steps:["Antrag bei der Agentur für Arbeit stellen.","Darlegen, warum der Arbeitsplatz gefährdet ist."], docs:["GdB-Bescheid","Arbeitsvertrag"], to:"arbeitsagentur",
   ask:"beantrage ich hiermit die Gleichstellung mit einem schwerbehinderten Menschen nach § 2 Abs. 3 SGB IX. Der GdB beträgt [GdB]. Ohne Gleichstellung ist der Arbeitsplatz gefährdet, weil [Begründung]."},
  {k:"rente", area:"Arbeit", t:"Altersrente für schwerbehinderte Menschen", p:"§ 37, § 236a SGB VI",
-  when:()=>S.sb.arbeit && gdb()>=50, val:()=>null, opt:true,
+  when:()=>Z.S.sb.arbeit && gdb()>=50, val:()=>null, opt:true,
   short:"Bis zu 2 Jahre früher abschlagsfrei in Rente (35 Versicherungsjahre nötig). Der GdB muss bei Rentenbeginn anerkannt sein.",
   steps:["Kostenlose Beratung bei der Deutschen Rentenversicherung buchen.","Rentenauskunft anfordern."], docs:["Ausweis","Versicherungsverlauf"], to:"rentenversicherung",
   ask:"bitte ich um eine Rentenauskunft und Beratung zur Altersrente für schwerbehinderte Menschen. Der GdB beträgt [GdB]."},
 ];
 
-const RECIP = {
+export const RECIP = {
   pflegekasse:()=>({name: kassePK(), hint: kasseMail()?`E-Mail: ${kasseMail()} (Adresse bitte prüfen). Sicherer: Upload über ${kasseInfo().app}.`:`Adresse steht auf deinem Bescheid oder der Webseite deiner Kasse. Sicher hochladen über ${kasseInfo().app}.`, mail:kasseMail()}),
   krankenkasse:()=>({name: kasseName(), hint: kasseMail()?`E-Mail: ${kasseMail()} (bitte prüfen) oder ${kasseInfo().app}.`:`Adresse steht auf deiner Versichertenkarte bzw. der Webseite deiner Kasse.`, mail:kasseMail()}),
   versorgungsamt:()=>({name:"Versorgungsamt", hint:"In Baden-Württemberg: Landratsamt bzw. Stadtkreis deines Wohnortes. In vielen Ländern auch online beantragbar.", mail:""}),
@@ -214,12 +218,12 @@ const RECIP = {
   arbeitsagentur:()=>({name:"Agentur für Arbeit", hint:"Zuständige Agentur für Arbeit am Wohnort.", mail:""}),
   rentenversicherung:()=>({name:"Deutsche Rentenversicherung", hint:"Beratung kostenlos, Termine über deutsche-rentenversicherung.de.", mail:""}),
 };
-function kasseInfo(){return KASSEN[S.kasse]||KASSEN.andere}
-function kasseName(){ if(S.kasse==="aok") return "AOK "+(S.aokRegion||""); if(S.kasse==="andere") return S.kasseAndere||"Krankenkasse"; return kasseInfo().name }
-function kassePK(){ if(S.kasse==="aok") return "AOK-Pflegekasse "+(S.aokRegion||""); if(S.kasse==="andere") return "Pflegekasse bei der "+(S.kasseAndere||"Krankenkasse"); return kasseInfo().pk }
-function kasseMail(){ return S.kasse==="aok"||S.kasse==="andere" ? "" : kasseInfo().mail }
+function kasseInfo(){return KASSEN[Z.S.kasse]||KASSEN.andere}
+export function kasseName(){ if(Z.S.kasse==="aok") return "AOK "+(Z.S.aokRegion||""); if(Z.S.kasse==="andere") return Z.S.kasseAndere||"Krankenkasse"; return kasseInfo().name }
+export function kassePK(){ if(Z.S.kasse==="aok") return "AOK-Pflegekasse "+(Z.S.aokRegion||""); if(Z.S.kasse==="andere") return "Pflegekasse bei der "+(Z.S.kasseAndere||"Krankenkasse"); return kasseInfo().pk }
+function kasseMail(){ return Z.S.kasse==="aok"||Z.S.kasse==="andere" ? "" : kasseInfo().mail }
 
-const txt = (v)=> typeof v==="function"?v():v;
-function applicable(){ return B.filter(b=>{ try{return b.when()}catch(e){return false} }) }
+export function txt(v) { return typeof v==="function"?v():v; }
+export function applicable(){ return B.filter(b=>{ try{return b.when()}catch(e){return false} }) }
 
 

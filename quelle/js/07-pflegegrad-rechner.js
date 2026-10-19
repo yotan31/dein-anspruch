@@ -1,8 +1,14 @@
+import { Z } from "./zustand.js";
+import { ENTLASTUNG, esc, pg } from "./01-grundlagen.js";
+import { ic } from "./03-hilfsmittel.js";
+import { bar } from "./05-assistent.js";
+import { PG_GRENZEN, pgAusPunkten } from "./06-bescheid-entlastung.js";
+import { render, scrollTop } from "./11-darstellung.js";
 /* ---------- Pflegegrad-Rechner (Selbsteinschätzung nach dem Begutachtungsinstrument) ---------- */
 const SELB=[["0","Selbstständig","schafft es allein"],["1","Überwiegend selbstständig","braucht ab und zu etwas Hilfe"],["2","Überwiegend unselbstständig","schafft nur einen kleinen Teil allein"],["3","Unselbstständig","schafft es nicht allein"]];
 const FAEH=[["0","Ja, ohne Probleme",""],["1","Meistens",""],["2","Nur selten",""],["3","Nein, gar nicht",""]];
 const HAEUF=[["0","Nie",""],["1","Selten","1- bis 3-mal im Monat"],["3","Oft","mehrmals pro Woche"],["5","Täglich",""]];
-const RQ=[
+export const RQ=[
  {m:1,q:"Im Bett die Lage wechseln (umdrehen, aufsetzen)",o:SELB},
  {m:1,q:"Sicher sitzen, ohne zur Seite zu kippen",o:SELB},
  {m:1,q:"Aufstehen vom Stuhl oder Bett und sich umsetzen",o:SELB},
@@ -29,8 +35,8 @@ const RQ=[
  {m:6,q:"Kontakt zu Familie, Nachbarn, Freunden halten",o:SELB},
 ];
 const MOD={1:{n:"Mobilität",max:15,t:[[2,2.5],[4,5],[6,7.5],[10,10]]},2:{n:"Verstehen und Erinnern",max:33,t:[[2,3.75],[6,7.5],[11,11.25],[17,15]]},3:{n:"Verhalten und Psyche",t:[[1,3.75],[3,7.5],[5,11.25],[7,15]]},4:{n:"Selbstversorgung",max:54,t:[[3,10],[8,20],[19,30],[37,40]]},5:{n:"Krankheitsbedingte Hilfe",t:[[1,5],[2,10],[4,15],[6,20]]},6:{n:"Alltag und Kontakte",max:18,t:[[1,3.75],[4,7.5],[7,11.25],[12,15]]}};
-let RECHNER=null; // {i, a:[]}
-function rechnerErgebnis(a){
+Z.RECHNER = null; // {i, a:[]}
+export function rechnerErgebnis(a){
   const roh={1:0,2:0,3:0,4:0,5:0,6:0}, mx={1:0,2:0,3:0,4:0,5:0,6:0};
   RQ.forEach((q,i)=>{ const v=Number(a[i]||0)*(q.w||1); roh[q.m]+=v; mx[q.m]+=Number(q.o[q.o.length-1][0])*(q.w||1) });
   const gew={};
@@ -42,11 +48,11 @@ function rechnerErgebnis(a){
   const summe=gew[1]+m23+gew[4]+gew[5]+gew[6];
   return {summe,grad:pgAusPunkten(summe),gew,m23};
 }
-function startRechner(){ RECHNER={i:0,a:[]}; render(); scrollTop() }
-function viewRechner(){
-  const R=RECHNER, n=RQ.length;
+export function startRechner(){ Z.RECHNER={i:0,a:[]}; render(); scrollTop() }
+export function viewRechner(){
+  const R=Z.RECHNER, n=RQ.length;
   if(R.i>=n){
-    const e=rechnerErgebnis(R.a); const hat=(typeof USER!=='undefined'&&USER)||(typeof GUEST!=='undefined'&&GUEST); const aktuell=pg();
+    const e=rechnerErgebnis(R.a); const hat=(typeof Z.USER!=='undefined'&&Z.USER)||(typeof Z.GUEST!=='undefined'&&Z.GUEST); const aktuell=pg();
     const next=e.grad<5?PG_GRENZEN[e.grad]:null;
     const bars=[[1,"Mobilität",10,e.gew[1]],[23,"Verstehen / Verhalten",15,e.m23],[4,"Selbstversorgung",40,e.gew[4]],[5,"Krankheitsbedingte Hilfe",20,e.gew[5]],[6,"Alltag und Kontakte",15,e.gew[6]]];
     return `<section class="panel wiz">

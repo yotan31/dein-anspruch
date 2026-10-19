@@ -1,3 +1,7 @@
+import { Z } from "./zustand.js";
+import { eur } from "./01-grundlagen.js";
+import { B, KK } from "./02-leistungen.js";
+import { zuz } from "./10-fragebogen-und-fristen.js";
 /* ---------- Icons ---------- */
 const ICON={
  heart:"M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.5-7 10-7 10z",
@@ -19,21 +23,24 @@ const ICON={
  plus:"M12 5v14 M5 12h14",
  bell:"M6 16V11a6 6 0 0 1 12 0v5l2 2H4z M10 21h4",
 };
-const ic=(n,c="i")=>`<svg class="${c}" viewBox="0 0 24 24" aria-hidden="true"><path d="${ICON[n]}"/></svg>`;
-const AREA_ICON={Pflege:"heart",Pflegeperson:"user",Steuer:"form",Pflegeheim:"building",Krankenkasse:"cross",Schwerbehinderung:"access",Arbeit:"case"};
+export function ic(n, c="i") { return `<svg class="${c}" viewBox="0 0 24 24" aria-hidden="true"><path d="${ICON[n]}"/></svg>`; }
+export const AREA_ICON={Pflege:"heart",Pflegeperson:"user",Steuer:"form",Pflegeheim:"building",Krankenkasse:"cross",Schwerbehinderung:"access",Arbeit:"case"};
 
 /* ---------- Datum ---------- */
-const TODAY=()=>{const d=new Date();d.setHours(0,0,0,0);return d};
-const isoD=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
-const parseIso=s=>{if(!s||!/^\d{4}-\d{2}-\d{2}$/.test(s))return null;const [y,m,d]=s.split("-").map(Number);return new Date(y,m-1,d)};
-const deD=d=>d.toLocaleDateString("de-DE");
-const daysUntil=d=>Math.round((+d - +TODAY())/864e5);
-const addDays=(d,n)=>{const x=new Date(d);x.setDate(x.getDate()+n);return x};
-const MON=["Jan","Feb","Mär","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"];
-function halfOf(d){const h=d.getMonth()<6?1:2;const y=d.getFullYear();return {y,h,start:new Date(y,h===1?0:6,1),end:new Date(y,h===1?5:11,h===1?30:31),label:`${h}. Halbjahr ${y}`}}
-function shiftHalf(H,n){let y=H.y,h=H.h+n;while(h>2){h-=2;y++}while(h<1){h+=2;y--}return halfOf(new Date(y,h===1?0:6,1))}
+export function TODAY() {const d=new Date();d.setHours(0,0,0,0);return d}
+export function isoD(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }
+export function parseIso(s) {if(!s||!/^\d{4}-\d{2}-\d{2}$/.test(s))return null;const [y,m,d]=s.split("-").map(Number);return new Date(y,m-1,d)}
+export function deD(d) { return d.toLocaleDateString("de-DE"); }
+export function daysUntil(d) { return Math.round((+d - +TODAY())/864e5); }
+export function addDays(d, n) {const x=new Date(d);x.setDate(x.getDate()+n);return x}
+export const MON=["Jan","Feb","Mär","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"];
+export function halfOf(d){const h=d.getMonth()<6?1:2;const y=d.getFullYear();return {y,h,start:new Date(y,h===1?0:6,1),end:new Date(y,h===1?5:11,h===1?30:31),label:`${h}. Halbjahr ${y}`}}
+export function shiftHalf(H,n){let y=H.y,h=H.h+n;while(h>2){h-=2;y++}while(h<1){h+=2;y--}return halfOf(new Date(y,h===1?0:6,1))}
+
+/** Wird beim Start der App einmal aufgerufen (siehe 99-start.js). */
+export function start03() {
 
 /* ---------- Befreiungs-Antrag (nur aus Belegen) ---------- */
 B.push({k:"befreiung", area:"Krankenkasse", t:"Antrag auf Befreiung von Zuzahlungen", p:"§ 62 SGB V", when:()=>false, val:()=>null, short:"", steps:[],
-  docs:["Zuzahlungsbelege (siehe Belegübersicht)","Einkommensnachweise aller Haushaltsmitglieder","ggf. Bescheinigung über die Dauerbehandlung (chronisch krank)"], to:KK, ask:()=>{const z=zuz(befJahr);return `beantrage ich hiermit die Befreiung von Zuzahlungen bzw. die Erstattung von Zuzahlungen über der Belastungsgrenze nach § 62 SGB V für das Jahr ${befJahr}. Die Belastungsgrenze beträgt ${z.grenze?eur(z.grenze,2):"[Betrag]"} (${z.pct} % der jährlichen Bruttoeinnahmen zum Lebensunterhalt). Bisher wurden Zuzahlungen in Höhe von ${eur(z.sum,2)} geleistet. Die Belege liegen in Kopie bei. Bitte erstatten Sie den Betrag, der die Belastungsgrenze übersteigt${String(befJahr)===String(new Date().getFullYear())?", und stellen Sie eine Befreiungsbescheinigung für den Rest des Jahres aus":""}.`}});
-
+  docs:["Zuzahlungsbelege (siehe Belegübersicht)","Einkommensnachweise aller Haushaltsmitglieder","ggf. Bescheinigung über die Dauerbehandlung (chronisch krank)"], to:KK, ask:()=>{const z=zuz(Z.befJahr);return `beantrage ich hiermit die Befreiung von Zuzahlungen bzw. die Erstattung von Zuzahlungen über der Belastungsgrenze nach § 62 SGB V für das Jahr ${Z.befJahr}. Die Belastungsgrenze beträgt ${z.grenze?eur(z.grenze,2):"[Betrag]"} (${z.pct} % der jährlichen Bruttoeinnahmen zum Lebensunterhalt). Bisher wurden Zuzahlungen in Höhe von ${eur(z.sum,2)} geleistet. Die Belege liegen in Kopie bei. Bitte erstatten Sie den Betrag, der die Belastungsgrenze übersteigt${String(Z.befJahr)===String(new Date().getFullYear())?", und stellen Sie eine Befreiungsbescheinigung für den Rest des Jahres aus":""}.`}});
+}

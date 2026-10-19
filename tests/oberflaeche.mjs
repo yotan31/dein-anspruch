@@ -61,13 +61,23 @@ async function newPage({ gast = null, stub = false } = {}) {
 }
 // wartet, bis fn() im Browser true liefert (ohne waitForFunction, das die Sicherheitsregeln der Seite blockieren)
 async function waitFor(page, fn, ms = 60000) { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (await page.evaluate(fn)) return true; await page.waitForTimeout(250) } throw new Error("Zeitüberschreitung beim Warten") }
+// Seite öffnen und die Programmteile für die Tests unter ihren Namen erreichbar machen
+// (die App legt sie unter window.__da ab, z. B. __da.Z.S für die Angaben oder __da.render)
+async function gehe(page, url, ms = 600) {
+  await page.goto(url); await page.waitForTimeout(ms);
+  await page.evaluate(() => {
+    const d = window.__da; if (!d) throw new Error("window.__da fehlt");
+    for (const k of Object.keys(d.Z)) { try { Object.defineProperty(window, k, { configurable: true, get() { return d.Z[k] }, set(v) { d.Z[k] = v } }) } catch (e) { } }
+    for (const k of Object.keys(d)) { if (k === "Z" || k in window) continue; try { Object.defineProperty(window, k, { configurable: true, get() { return d[k] } }) } catch (e) { } }
+  });
+}
 const GAST = { done: true, welcomeSeen: true, bereiche: { pflege: true, sb: false }, pg: "3", kasse: "aok", aokRegion: "bw", wohnen: "angehoerige", rolle: "angehoerig", step: 6, tab: "ansprueche", genutzt: { pflegegeld: true }, person: { name: "Testperson", ort: "70173 Stuttgart" } };
 
 // ---------- 1. Fragebogen von vorn ----------
 console.log("Fragebogen");
 {
   const { page, errors, extern } = await newPage({ gast: { } });
-  await page.goto(BASE); await page.waitForTimeout(600);
+  await gehe(page, BASE, 600);
   for (let i = 0; i < 12; i++) {
     const c = page.locator("#main .choice"); if (await c.count()) { await c.first().tap(); await page.waitForTimeout(120) }
     const nx = page.locator('[data-act="next"]'); if (!(await nx.count())) break; await nx.tap(); await page.waitForTimeout(300);
@@ -81,7 +91,7 @@ console.log("Fragebogen");
 console.log("Ansprüche und Antrag-Assistent");
 {
   const { page, errors } = await newPage({ gast: GAST });
-  await page.goto(BASE); await page.waitForTimeout(600);
+  await gehe(page, BASE, 600);
   check("Betrag oben wird angezeigt", /\d.*€/.test(await page.textContent("#hero .figure")));
   await page.evaluate(() => { window.__h = document.querySelector("#main .item .head") });
   await page.tap(".item .head"); await page.waitForTimeout(350);
@@ -105,7 +115,7 @@ console.log("Ansprüche und Antrag-Assistent");
 console.log("Pflegegrad-Rechner");
 {
   const { page, errors } = await newPage({ gast: GAST });
-  await page.goto(BASE + "?rechner"); await page.waitForTimeout(600);
+  await gehe(page, BASE + "?rechner", 600);
   let n = 0; while (await page.locator("[data-rq]").count() && n < 30) { await page.locator(".choice").nth(1).tap(); await page.waitForTimeout(450); n++ }
   check("alle 24 Fragen beantwortbar", n === 24, "beantwortet: " + n);
   check("Ergebnis wird angezeigt", /Pflegegrad/.test(await page.textContent("h2.wq")));
@@ -117,7 +127,7 @@ console.log("Pflegegrad-Rechner");
 console.log("Sammel-PDF mit mehreren Rechnungen");
 {
   const { page, errors } = await newPage({ gast: { ...GAST, tab: "belege" } });
-  await page.goto(BASE); await page.waitForTimeout(600);
+  await gehe(page, BASE, 600);
   await page.evaluate(() => { window.__up = []; ASSETS = { upload: async (b, { type }) => { window.__up.push(type); return { id: "f/" + window.__up.length, contentType: type } }, delete: async () => {} }; render() });
   await page.setInputFiles("#fileAny", PDF);
   await waitFor(page, () => bulk && bulk.phase !== "lesen");
@@ -135,7 +145,7 @@ console.log("Sammel-PDF mit mehreren Rechnungen");
 console.log("Sicherung und Löschen");
 {
   const { page, errors } = await newPage({ gast: GAST });
-  await page.goto(BASE); await page.waitForTimeout(600);
+  await gehe(page, BASE, 600);
   const [dl] = await Promise.all([page.waitForEvent("download"), page.evaluate(() => backupData())]);
   const file = await dl.path();
   check("Sicherung wird heruntergeladen", /dein-anspruch-sicherung/.test(dl.suggestedFilename()));
@@ -153,7 +163,7 @@ console.log("Sicherung und Löschen");
 console.log("Konto, Einwilligung und Feedback");
 {
   const { page, errors } = await newPage({ stub: true });
-  await page.goto(BASE); await page.waitForTimeout(800);
+  await gehe(page, BASE, 800);
   check("Einwilligung wird vor allem anderen abgefragt", (await page.textContent("#main h2")) === "Bevor es losgeht");
   check("vor der Einwilligung wird nichts gespeichert", await page.evaluate(() => window.__ins.length) === 0);
   await page.tap('[data-act="cs-yes"]'); await page.waitForTimeout(150);

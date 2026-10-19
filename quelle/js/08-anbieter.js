@@ -1,3 +1,5 @@
+import { Z } from "./zustand.js";
+import { esc } from "./01-grundlagen.js";
 /* ---------- Anbieter vor Ort finden ---------- */
 const LOTSE="https://www.pflegelotse.de/";
 const FINDER={
@@ -12,8 +14,8 @@ const FINDER={
  stationaer:[["Pflegeheime vergleichen (Pflegelotse)",LOTSE]],
  pflegekurs:[["Pflegekurse in der Nähe","Pflegekurs Angehörige"]],
 };
-function plz(){ const m=String(S.person.ort||"").match(/\b\d{5}\b/); return m?m[0]:(S.plz||"") }
-function finderHTML(k){
+function plz(){ const m=String(Z.S.person.ort||"").match(/\b\d{5}\b/); return m?m[0]:(Z.S.plz||"") }
+export function finderHTML(k){
   const L=FINDER[k]; if(!L) return "";
   const p=plz();
   return `<div><h4>In der Nähe finden</h4>

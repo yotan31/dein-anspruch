@@ -1,0 +1,21 @@
+{
+  "name": "dein-anspruch",
+  "private": true,
+  "type": "module",
+  "description": "Web-App für Menschen mit Pflegegrad oder Schwerbehinderung und ihre Angehörigen",
+  "scripts": {
+    "bauen": "node quelle/bauen.mjs",
+    "pruefen": "tsc -p tsconfig.json",
+    "test:rechnungen": "node --test tests/rechnungen.test.mjs",
+    "test:oberflaeche": "node tests/oberflaeche.mjs",
+    "test": "npm run pruefen && npm run bauen && npm run test:rechnungen && npm run test:oberflaeche"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.45.4"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "playwright": "1.48.2",
+    "typescript": "6.0.3"
+  }
+}

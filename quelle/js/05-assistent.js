@@ -1,13 +1,21 @@
+import { Z } from "./zustand.js";
+import { VERBRAUCH, VHP_ERSATZ, esc, eur, gdb } from "./01-grundlagen.js";
+import { B, KK, PK, RECIP, txt } from "./02-leistungen.js";
+import { deD, ic, parseIso } from "./03-hilfsmittel.js";
+import { KM_SATZ, numDE, vhpCalc } from "./04-verhinderungspflege.js";
+import { render, scrollTop } from "./11-darstellung.js";
+import { curLetter, docsFor, mailto } from "./12-reiter-ansprueche.js";
+import { save } from "./19-speicher.js";
 /* ---------- Antrags-Assistent: Fragen je Anspruch ---------- */
-const OPT=a=>a.map(x=>typeof x==="string"?{v:x,t:x}:x);
-const HILFE=["Waschen und Anziehen","Essen und Trinken","Toilette / Inkontinenz","Gehen, Aufstehen, Treppen","Medikamente","Vergesslichkeit / Orientierung","Haushalt und Einkaufen","Hilfe in der Nacht"];
-function ansObj(k){ if(k==="jahresbetrag") return S.vhp; S.ans=S.ans||{}; return (S.ans[k]=S.ans[k]||{}) }
-function av(k,f,ph){ const v=ansObj(k)[f]; if(Array.isArray(v)) return v.length?v.join(", "):`[${ph}]`; return (v!=null&&String(v).trim()!=="")?String(v).trim():`[${ph}]` }
+export function OPT(a) { return a.map(x=>typeof x==="string"?{v:x,t:x}:x); }
+export const HILFE=["Waschen und Anziehen","Essen und Trinken","Toilette / Inkontinenz","Gehen, Aufstehen, Treppen","Medikamente","Vergesslichkeit / Orientierung","Haushalt und Einkaufen","Hilfe in der Nacht"];
+export function ansObj(k){ if(k==="jahresbetrag") return Z.S.vhp; Z.S.ans=Z.S.ans||{}; return (Z.S.ans[k]=Z.S.ans[k]||{}) }
+export function av(k,f,ph){ const v=ansObj(k)[f]; if(Array.isArray(v)) return v.length?v.join(", "):`[${ph}]`; return (v!=null&&String(v).trim()!=="")?String(v).trim():`[${ph}]` }
 function ad(k,f,ph){ const d=parseIso(ansObj(k)[f]); return d?deD(d):`[${ph}]` }
-function has(k,f){ const v=ansObj(k)[f]; return Array.isArray(v)?v.length>0:(v!=null&&String(v).trim()!=="") }
+export function has(k,f){ const v=ansObj(k)[f]; return Array.isArray(v)?v.length>0:(v!=null&&String(v).trim()!=="") }
 const IBAN_Q={k:"iban",label:"Auf welches Konto soll das Geld?",help:"Die IBAN steht auf der Bankkarte oder im Online-Banking. Sie beginnt mit DE.",ph:"DE00 0000 0000 0000 0000 00"};
 
-const ASSIST={
+export const ASSIST={
  pg_antrag:{q:[
    {k:"seit",label:"Seit wann wird Hilfe gebraucht?",ph:"z. B. seit März 2026",help:"Ungefähr reicht völlig."},
    {k:"was",type:"multi",label:"Wobei wird Hilfe gebraucht?",help:"Alles ankreuzen, was zutrifft.",opts:OPT(HILFE)},
@@ -102,23 +110,22 @@ const ASSIST={
    {k:"von",type:"date",label:"Ab wann?"},
    {k:"bis",type:"date",label:"Bis wann?",help:"War es nur ein Tag? Dann dasselbe Datum noch einmal."},
    {k:"ersatz",type:"choice",label:"Wer hat in dieser Zeit gepflegt?",opts:Object.entries(VHP_ERSATZ).map(([v,o])=>({v,t:o.t,s:o.s}))},
-   {k:"eName",label:()=>["dienst","heim"].includes(S.vhp.ersatz)?"Wie heißt der Dienst bzw. das Heim?":"Wie heißt die Person, die gepflegt hat?",ph:"Name"},
-   {k:"eAdresse",label:()=>["dienst","heim"].includes(S.vhp.ersatz)?"Wo ist er?":"Wo wohnt diese Person?",ph:"Straße, PLZ Ort"},
-   {k:"eBez",label:"Wie ist sie mit der gepflegten Person verwandt?",ph:"z. B. Enkel, Schwester, Schwiegertochter",show:()=>S.vhp.ersatz==="angehoerig"},
-   {k:"stunden",type:"number",label:"Wie viele Stunden wurde insgesamt gepflegt?",help:"Grob geschätzt reicht. Beispiel: 2 Wochen mit je 3 Stunden am Tag sind 42 Stunden.",ph:"z. B. 42",show:()=>["angehoerig","privat"].includes(S.vhp.ersatz)},
-   {k:"satz",type:"money",label:"Wie viel Euro pro Stunde wurden vereinbart?",help:"Üblich sind etwa 10 bis 20 Euro. Bei Angehörigen zahlt die Kasse insgesamt höchstens das Doppelte des Pflegegeldes.",ph:"z. B. 15",show:()=>["angehoerig","privat"].includes(S.vhp.ersatz)},
-   {k:"rechnung",type:"money",label:"Wie hoch ist die Rechnung?",show:()=>["dienst","heim"].includes(S.vhp.ersatz)},
-   {k:"km",type:"number",label:"Wie viele Kilometer ist die Ersatzperson dafür gefahren?",help:"Alle Fahrten hin und zurück zusammenzählen. Keine Fahrten? Einfach überspringen.",ph:"z. B. 120",show:()=>S.vhp.ersatz!=="heim"},
-   {k:"verdienst",type:"money",label:"Hat die Ersatzperson dafür auf Lohn verzichtet?",help:"Nur wenn sie unbezahlt frei genommen hat. Sonst überspringen.",show:()=>S.vhp.ersatz==="angehoerig"},
+   {k:"eName",label:()=>["dienst","heim"].includes(Z.S.vhp.ersatz)?"Wie heißt der Dienst bzw. das Heim?":"Wie heißt die Person, die gepflegt hat?",ph:"Name"},
+   {k:"eAdresse",label:()=>["dienst","heim"].includes(Z.S.vhp.ersatz)?"Wo ist er?":"Wo wohnt diese Person?",ph:"Straße, PLZ Ort"},
+   {k:"eBez",label:"Wie ist sie mit der gepflegten Person verwandt?",ph:"z. B. Enkel, Schwester, Schwiegertochter",show:()=>Z.S.vhp.ersatz==="angehoerig"},
+   {k:"stunden",type:"number",label:"Wie viele Stunden wurde insgesamt gepflegt?",help:"Grob geschätzt reicht. Beispiel: 2 Wochen mit je 3 Stunden am Tag sind 42 Stunden.",ph:"z. B. 42",show:()=>["angehoerig","privat"].includes(Z.S.vhp.ersatz)},
+   {k:"satz",type:"money",label:"Wie viel Euro pro Stunde wurden vereinbart?",help:"Üblich sind etwa 10 bis 20 Euro. Bei Angehörigen zahlt die Kasse insgesamt höchstens das Doppelte des Pflegegeldes.",ph:"z. B. 15",show:()=>["angehoerig","privat"].includes(Z.S.vhp.ersatz)},
+   {k:"rechnung",type:"money",label:"Wie hoch ist die Rechnung?",show:()=>["dienst","heim"].includes(Z.S.vhp.ersatz)},
+   {k:"km",type:"number",label:"Wie viele Kilometer ist die Ersatzperson dafür gefahren?",help:"Alle Fahrten hin und zurück zusammenzählen. Keine Fahrten? Einfach überspringen.",ph:"z. B. 120",show:()=>Z.S.vhp.ersatz!=="heim"},
+   {k:"verdienst",type:"money",label:"Hat die Ersatzperson dafür auf Lohn verzichtet?",help:"Nur wenn sie unbezahlt frei genommen hat. Sonst überspringen.",show:()=>Z.S.vhp.ersatz==="angehoerig"},
    {k:"verbraucht",type:"money",label:"Wurde in diesem Jahr schon Verhinderungs- oder Kurzzeitpflege bezahlt?",help:"Wenn ja: ungefähr wie viel Euro? Wenn nein: überspringen."},
    {k:"auszahlung",type:"choice",label:"Wohin soll die Kasse das Geld überweisen?",opts:OPT([{v:"versicherte",t:"Auf unser Konto",s:"ihr bezahlt die Ersatzperson selbst"},{v:"ersatz",t:"Direkt an die Ersatzperson",s:"die meisten Kassen machen das auf Wunsch"}])},
-   {k:"iban",label:()=>S.vhp.auszahlung==="ersatz"?"IBAN der Ersatzperson":"Auf welches Konto soll das Geld?",help:"Die IBAN steht auf der Bankkarte oder im Online-Banking. Sie beginnt mit DE.",ph:"DE00 0000 0000 0000 0000 00"}]},
+   {k:"iban",label:()=>Z.S.vhp.auszahlung==="ersatz"?"IBAN der Ersatzperson":"Auf welches Konto soll das Geld?",help:"Die IBAN steht auf der Bankkarte oder im Online-Banking. Sie beginnt mit DE.",ph:"DE00 0000 0000 0000 0000 00"}]},
 };
-for(const [k,a] of Object.entries(ASSIST)){ const b=B.find(x=>x.k===k); if(!b) continue; b.q=a.q; if(a.ask) b.ask=a.ask }
 
 /* ---------- Assistent: Ablauf ---------- */
 function personQs(b,a){
-  const p=S.person, L=[];
+  const p=Z.S.person, L=[];
   if(!p.name) L.push("name");
   if((b.to===PK||b.to===KK) && !p.vnr) L.push("vnr");
   if(!p.strasse||!p.ort) L.push("adresse");
@@ -127,7 +134,7 @@ function personQs(b,a){
   return L;
 }
 function personQ(k){
-  const a=S.rolle==="angehoerig";
+  const a=Z.S.rolle==="angehoerig";
   return ({
     name:{k:"name",store:"person",label:a?"Wie heißt die Person, um die es geht?":"Wie heißt du?",ph:"Vor- und Nachname"},
     vnr:{k:"vnr",store:"person",label:"Wie lautet die Versichertennummer?",help:"Steht auf der Gesundheitskarte (Krankenkassenkarte). Sie beginnt mit einem Buchstaben, zum Beispiel A123456789.",ph:"z. B. A123456789"},
@@ -136,24 +143,24 @@ function personQ(k){
     beziehung:{k:"beziehung",store:"person",type:"choice",label:"Wie bist du mit der Person verbunden?",opts:OPT(["Tochter","Sohn","Ehefrau","Ehemann","Enkelin","Enkel","Rechtliche Betreuung","Andere"])},
   })[k];
 }
-function wizSteps(){
-  const w=S.wiz, b=B.find(x=>x.k===w.k);
+export function wizSteps(){
+  const w=Z.S.wiz, b=B.find(x=>x.k===w.k);
   // leichte Fragen zuerst, Adresse und Versichertennummer am Ende
   const pq=w.pq||[], early=["name","beziehung"].filter(k=>pq.includes(k)), late=pq.filter(k=>!early.includes(k)).sort((x,y)=>["absender","adresse","vnr"].indexOf(x)-["absender","adresse","vnr"].indexOf(y));
   const qs=[...early.map(personQ), ...(b.q||[]).filter(q=>!q.show||q.show()), ...late.map(personQ)];
   return {b, list:[...qs,{type:"summary"},{type:"done"}]};
 }
-function startWiz(k){
+export function startWiz(k){
   const b=B.find(x=>x.k===k);
-  S.wiz={k,i:0,pq:personQs(b,S.rolle==="angehoerig")};
-  if(!b.q?.length && !S.wiz.pq.length) S.wiz.i=1; // direkt zur Prüfung
+  Z.S.wiz={k,i:0,pq:personQs(b,Z.S.rolle==="angehoerig")};
+  if(!b.q?.length && !Z.S.wiz.pq.length) Z.S.wiz.i=1; // direkt zur Prüfung
   save(); render(); scrollTop();
 }
-function getQ(q){ if(q.store==="person") return S.person[q.k]; return ansObj(S.wiz.k)[q.k] }
-function setQ(q,v){ if(q.store==="person") S.person[q.k]=v; else ansObj(S.wiz.k)[q.k]=v; delete S.texte[S.wiz.k]; delete S.texte[S.wiz.k+"_sub"]; save() }
-const lab=q=>txt(q.label);
+export function getQ(q){ if(q.store==="person") return Z.S.person[q.k]; return ansObj(Z.S.wiz.k)[q.k] }
+export function setQ(q,v){ if(q.store==="person") Z.S.person[q.k]=v; else ansObj(Z.S.wiz.k)[q.k]=v; delete Z.S.texte[Z.S.wiz.k]; delete Z.S.texte[Z.S.wiz.k+"_sub"]; save() }
+function lab(q) { return txt(q.label); }
 function showVal(q){
-  if(q.type==="addr") return [S.person.strasse,S.person.ort].filter(Boolean).join(", ");
+  if(q.type==="addr") return [Z.S.person.strasse,Z.S.person.ort].filter(Boolean).join(", ");
   const v=getQ(q); if(Array.isArray(v)) return v.join(", ");
   if(v==null||String(v).trim()==="") return "";
   if(q.type==="date"){const d=parseIso(v);return d?deD(d):v}
@@ -165,15 +172,15 @@ function qInput(q){
   const v=getQ(q), id="wq-"+q.k;
   if(q.type==="choice") return `<div class="choices big">${q.opts.map(o=>`<label class="choice" for="${id}-${esc(o.v)}"><input type="radio" id="${id}-${esc(o.v)}" name="${id}" data-wq="${q.k}" value="${esc(o.v)}" ${v===o.v?"checked":""}><span>${esc(o.t)}${o.s?`<small>${esc(o.s)}</small>`:""}</span></label>`).join("")}</div>`;
   if(q.type==="multi"){ const arr=Array.isArray(v)?v:[]; return `<div class="choices big">${q.opts.map(o=>`<label class="choice" for="${id}-${esc(o.v)}"><input type="checkbox" id="${id}-${esc(o.v)}" data-wqm="${q.k}" value="${esc(o.v)}" ${arr.includes(o.v)?"checked":""}><span>${esc(o.t)}</span></label>`).join("")}</div>` }
-  if(q.type==="addr") return `<div class="grid2"><div class="field"><label for="wq-strasse">Straße und Hausnummer</label><input type="text" id="wq-strasse" data-wqp="strasse" value="${esc(S.person.strasse)}" autocomplete="street-address"></div><div class="field"><label for="wq-ort">PLZ und Ort</label><input type="text" id="wq-ort" data-wqp="ort" value="${esc(S.person.ort)}" placeholder="z. B. 70173 Stuttgart"></div></div>`;
+  if(q.type==="addr") return `<div class="grid2"><div class="field"><label for="wq-strasse">Straße und Hausnummer</label><input type="text" id="wq-strasse" data-wqp="strasse" value="${esc(Z.S.person.strasse)}" autocomplete="street-address"></div><div class="field"><label for="wq-ort">PLZ und Ort</label><input type="text" id="wq-ort" data-wqp="ort" value="${esc(Z.S.person.ort)}" placeholder="z. B. 70173 Stuttgart"></div></div>`;
   if(q.type==="long") return `<textarea id="${id}" data-wq="${q.k}" rows="4" placeholder="${esc(q.ph||"")}" style="min-height:120px">${esc(v||"")}</textarea>`;
   const t = q.type==="date"?"date":q.type==="tel"?"tel":"text";
   const im = q.type==="money"||q.type==="number"?' inputmode="decimal"':"";
   const inp=`<input type="${t}" id="${id}" data-wq="${q.k}" value="${esc(v||"")}" placeholder="${esc(q.ph||"")}"${im}>`;
   return q.type==="money"?`<div class="euro">${inp}<span>€</span></div>`:inp;
 }
-function viewWizard(){
-  const {b,list}=wizSteps(); let i=Math.min(S.wiz.i,list.length-1); S.wiz.i=i;
+export function viewWizard(){
+  const {b,list}=wizSteps(); let i=Math.min(Z.S.wiz.i,list.length-1); Z.S.wiz.i=i;
   const step=list[i], nQ=list.length-2;
   const top=`<div class="wiztop"><button type="button" class="btn small ghost" data-wnav="close">← Zur Übersicht</button><span class="small muted">${esc(b.t)}</span></div>`;
   if(step.type==="summary"){
@@ -198,9 +205,9 @@ function viewWizard(){
     </div>
   </section>`;
 }
-function bar(n,of,label){return `<div class="stepper"><div class="meta"><span>${esc(label)}</span><span>${Math.round(n/of*100)} %</span></div><div class="bar"><i style="width:${Math.round(n/of*100)}%"></i></div></div>`}
+export function bar(n,of,label){return `<div class="stepper"><div class="meta"><span>${esc(label)}</span><span>${Math.round(n/of*100)} %</span></div><div class="bar"><i style="width:${Math.round(n/of*100)}%"></i></div></div>`}
 function vhpSummary(){
-  const c=vhpCalc(), v=S.vhp;
+  const c=vhpCalc(), v=Z.S.vhp;
   return `<div class="calc">
      <div><span>Noch verfügbar vom Jahresbetrag</span><b>${eur(c.rest,2)}</b></div>
      ${v.ersatz==="angehoerig"?`<div><span>Höchstens für Angehörige (2 × Pflegegeld)</span><b>${eur(c.cap,2)}</b></div>`:""}
@@ -211,8 +218,8 @@ function vhpSummary(){
      <p class="small muted">${v.art==="stunden"?"Weil es nur stundenweise war, läuft das Pflegegeld ungekürzt weiter.":"In dieser Zeit gibt es das halbe Pflegegeld (am ersten und letzten Tag das volle)."}</p>`;
 }
 function viewDone(b){
-  const L=curLetter(b), r=RECIP[b.to](), docs=docsFor(b), st=S.status[b.k]||"offen";
-  const priv=b.k==="jahresbetrag"&&["angehoerig","privat"].includes(S.vhp.ersatz);
+  const L=curLetter(b), r=RECIP[b.to](), docs=docsFor(b), st=Z.S.status[b.k]||"offen";
+  const priv=b.k==="jahresbetrag"&&["angehoerig","privat"].includes(Z.S.vhp.ersatz);
   return `<section class="panel wiz">
     <div class="wiztop"><button type="button" class="btn small ghost" data-wnav="back">← Angaben ändern</button><button type="button" class="btn small ghost" data-wnav="close">Zur Übersicht</button></div>
     <h2 class="wq">${ic("check")} Dein Antrag ist fertig</h2>
@@ -226,16 +233,19 @@ function viewDone(b){
     <h3>So schickst du ihn ab</h3>
     <ol class="howsend">
       <li><strong>PDF ausdrucken und unterschreiben.</strong> Oder den Text in die App oder das Online-Postfach der Kasse kopieren.</li>
-      ${docs.length?`<li><strong>Diese Unterlagen beilegen:</strong><ul class="checks">${docs.map((c,j)=>`<li><label><input type="checkbox" data-check="${b.k}:${j}" ${S.checks[b.k+":"+j]?"checked":""}><span>${esc(c)}</span></label></li>`).join("")}</ul>${priv?`<button class="btn small soft" type="button" data-act="vhp-quittung" style="margin-top:8px">${ic("down")}${S.vhp.ersatz==="angehoerig"?"Bestätigung":"Quittung"} zum Unterschreiben (PDF)</button>`:""}</li>`:""}
+      ${docs.length?`<li><strong>Diese Unterlagen beilegen:</strong><ul class="checks">${docs.map((c,j)=>`<li><label><input type="checkbox" data-check="${b.k}:${j}" ${Z.S.checks[b.k+":"+j]?"checked":""}><span>${esc(c)}</span></label></li>`).join("")}</ul>${priv?`<button class="btn small soft" type="button" data-act="vhp-quittung" style="margin-top:8px">${ic("down")}${Z.S.vhp.ersatz==="angehoerig"?"Bestätigung":"Quittung"} zum Unterschreiben (PDF)</button>`:""}</li>`:""}
       <li><strong>Abschicken an:</strong> ${esc(r.name)}.<br><span class="small muted">${esc(r.hint)}</span>${r.mail?`<br><span class="small">E-Mail: <code>${esc(r.mail)}</code></span>`:""}</li>
       <li><strong>Hier abhaken, wenn es raus ist.</strong> Wir erinnern dich in 4 Wochen, falls noch keine Antwort da ist.</li>
     </ol>
-    ${st==="offen"?`<button class="btn big" type="button" data-act="sent" data-k="${b.k}">${ic("check")}Ich habe den Antrag abgeschickt</button>`:`<p class="notice good">${ic("check")}<span>Abgeschickt${S.sent&&S.sent[b.k]?" am "+deD(parseIso(S.sent[b.k])):""}. Status: ${esc(st)}.</span></p>`}
+    ${st==="offen"?`<button class="btn big" type="button" data-act="sent" data-k="${b.k}">${ic("check")}Ich habe den Antrag abgeschickt</button>`:`<p class="notice good">${ic("check")}<span>Abgeschickt${Z.S.sent&&Z.S.sent[b.k]?" am "+deD(parseIso(Z.S.sent[b.k])):""}. Status: ${esc(st)}.</span></p>`}
     <details><summary class="small">Text selbst ändern (für Geübte)</summary>
       <div class="field" style="margin-top:10px"><input type="text" data-sub="${b.k}" value="${esc(L.subject)}" aria-label="Betreff"><textarea data-tx="${b.k}" aria-label="Antragstext">${esc(L.body)}</textarea>
-      ${S.texte[b.k]!=null?`<button class="btn small ghost" type="button" data-resettx="${b.k}">Änderungen verwerfen</button>`:""}</div>
+      ${Z.S.texte[b.k]!=null?`<button class="btn small ghost" type="button" data-resettx="${b.k}">Änderungen verwerfen</button>`:""}</div>
     </details>
   </section>`;
 }
 
-
+/** Wird beim Start der App einmal aufgerufen (siehe 99-start.js). */
+export function start05() {
+for(const [k,a] of Object.entries(ASSIST)){ const b=B.find(x=>x.k===k); if(!b) continue; b.q=a.q; if(a.ask) b.ask=a.ask }
+}

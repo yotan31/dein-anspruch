@@ -1,17 +1,23 @@
+import { Z } from "./zustand.js";
+import { esc, eur } from "./01-grundlagen.js";
+import { deD, ic, parseIso } from "./03-hilfsmittel.js";
+import { KATS, bruttoOf, chronisch, selYears, zuz } from "./10-fragebogen-und-fristen.js";
+import { bulkView } from "./17-sammel-pdf.js";
+import { blobUrl } from "./19-speicher.js";
 /* ---------- Reiter: Belege ---------- */
-function belegYears(){ const y=new Date().getFullYear(); const ys=new Set([y,y-1,y-2,y-3].map(String)); BEL.forEach(b=>b.jahr&&ys.add(String(b.jahr))); return [...ys].sort().reverse() }
-function viewBelege(){
-  const years=selYears(); const kf=S.belegFilter.kat||"";
-  const inYears=BEL.filter(b=>years.includes(String(b.jahr)));
+function belegYears(){ const y=new Date().getFullYear(); const ys=new Set([y,y-1,y-2,y-3].map(String)); Z.BEL.forEach(b=>b.jahr&&ys.add(String(b.jahr))); return [...ys].sort().reverse() }
+export function viewBelege(){
+  const years=selYears(); const kf=Z.S.belegFilter.kat||"";
+  const inYears=Z.BEL.filter(b=>years.includes(String(b.jahr)));
   const shown=inYears.filter(b=>!kf||b.kat===kf).sort((a,b)=>(b.datum||"").localeCompare(a.datum||""));
-  const canFiles=!!ASSETS;
+  const canFiles=!!Z.ASSETS;
   const label = years.length===1?years[0]:years.slice().reverse().join(", ");
   const byYear={}; for(const b of shown){ const y=String(b.jahr); (byYear[y]=byYear[y]||{}); (byYear[y][b.kat]=byYear[y][b.kat]||[]).push(b) }
   return `
   <section class="panel">
     <h2>Belege</h2>
     <div class="yearchips"><span class="small muted">Jahre anzeigen:</span>${belegYears().map(y=>`<button type="button" class="chip" data-year="${y}" aria-pressed="${years.includes(y)}">${y}</button>`).join("")}</div>
-    ${bulk?bulkView():pending?pendingForm():`
+    ${Z.bulk?bulkView():Z.pending?pendingForm():`
     <div class="drop" id="drop">
       ${ic("camera")}
       <p><strong>Rezept, Quittung oder Rechnung erfassen</strong><br><span class="small muted">Fotografieren oder Datei (Bild/PDF) wählen. Auch ältere Belege, z. B. aus ${new Date().getFullYear()-2}: einfach das Datum vom Beleg eintragen.</span>${canFiles?`<br><span class="small"><strong>Neu:</strong> Eine PDF mit vielen Rechnungen? Die App erkennt jede Rechnung und sortiert sie nach Jahr.</span>`:""}</p>
@@ -26,7 +32,7 @@ function viewBelege(){
   <section class="panel">
     <div class="section-title"><h3>Zuzahlungen und Belastungsgrenze</h3><span class="small muted">§ 62 SGB V</span></div>
     <p class="small muted">Pro Jahr zahlt man höchstens 2 % der Bruttoeinnahmen des Haushalts zu, chronisch Kranke 1 %. Für Ehepartner und Kinder zieht die Kasse Freibeträge ab. Zuviel Gezahltes kann meist bis zu 4 Jahre rückwirkend erstattet werden, für jedes Jahr mit eigenem Antrag.</p>
-    <div class="field" style="max-width:320px"><label for="chron">Schwerwiegend chronisch krank?</label><select id="chron"><option value="" ${!S.chronisch?"selected":""}>Automatisch (${chronisch()?"ja":"nein"})</option><option value="ja" ${S.chronisch==="ja"?"selected":""}>Ja, 1 %</option><option value="nein" ${S.chronisch==="nein"?"selected":""}>Nein, 2 %</option></select></div>
+    <div class="field" style="max-width:320px"><label for="chron">Schwerwiegend chronisch krank?</label><select id="chron"><option value="" ${!Z.S.chronisch?"selected":""}>Automatisch (${chronisch()?"ja":"nein"})</option><option value="ja" ${Z.S.chronisch==="ja"?"selected":""}>Ja, 1 %</option><option value="nein" ${Z.S.chronisch==="nein"?"selected":""}>Nein, 2 %</option></select></div>
     ${years.map(j=>{const z=zuz(j); const p=z.grenze?Math.min(100,z.sum/z.grenze*100):0; const reached=z.grenze&&z.sum>=z.grenze;
       return `<div class="meter" style="border-top:1px solid var(--line);padding-top:12px">
         <div class="section-title"><strong>${j}</strong><div class="field" style="flex-direction:row;align-items:center;gap:8px"><label for="brutto-${j}" class="small">Brutto ${j} (€)</label><input type="text" inputmode="decimal" id="brutto-${j}" data-brutto="${j}" value="${esc(bruttoOf(j))}" placeholder="z. B. 24000" style="width:130px"></div></div>
@@ -52,12 +58,12 @@ function belegRow(b){
   return `<div class="beleg">${thumb}
     <div style="min-width:0"><div class="b-t">${esc(b.titel||(KATS[b.kat]||KATS.sonst).t)}</div><div class="b-m">${d?deD(d):"ohne Datum"}${b.eingereicht?' · <span style="color:var(--money);font-weight:700">eingereicht</span>':''}</div></div>
     <div class="b-v">${b.betrag!==""&&b.betrag!=null?eur(Number(b.betrag),2):"–"}</div>
-    <div class="b-a">${delAsk===b.id?`<span class="small">Wirklich löschen?</span><button type="button" class="linkbtn danger" data-delyes="${b.id}">Ja, löschen</button><button type="button" class="linkbtn" data-delno="1">Abbrechen</button>`:
+    <div class="b-a">${Z.delAsk===b.id?`<span class="small">Wirklich löschen?</span><button type="button" class="linkbtn danger" data-delyes="${b.id}">Ja, löschen</button><button type="button" class="linkbtn" data-delno="1">Abbrechen</button>`:
       `<button type="button" class="linkbtn" data-edit="${b.id}">Bearbeiten</button><button type="button" class="linkbtn" data-sub-toggle="${b.id}">${b.eingereicht?"Als offen markieren":"Als eingereicht markieren"}</button><button type="button" class="linkbtn danger" data-del="${b.id}">Löschen</button>`}</div>
   </div>`;
 }
 function pendingForm(){
-  const p=pending; const canFiles=!!ASSETS;
+  const p=Z.pending; const canFiles=!!Z.ASSETS;
   return `<div class="pending">
     <h3>${p.editId?"Beleg bearbeiten":"Neuer Beleg"}</h3>
     <div class="preview">
@@ -70,6 +76,6 @@ function pendingForm(){
       <div class="field"><label for="pb">Betrag</label><div class="euro"><input type="text" inputmode="decimal" id="pb" data-pend="betrag" value="${esc(p.betrag)}" placeholder="z. B. 5,00"><span>€</span></div></div>
     </div>
     <div class="field"><label for="pt">Kurze Beschreibung (freiwillig)</label><input type="text" id="pt" data-pend="titel" value="${esc(p.titel)}" placeholder="z. B. Apotheke am Markt"></div>
-    <div class="nav big go"><button class="btn ghost" type="button" data-act="cancelbeleg" ${busy?"disabled":""}>Abbrechen</button><button class="btn" type="button" data-act="savebeleg" ${busy?"disabled":""}>${busy?"Speichert …":p.editId?"Änderungen speichern":"Beleg speichern"}</button></div>
+    <div class="nav big go"><button class="btn ghost" type="button" data-act="cancelbeleg" ${Z.busy?"disabled":""}>Abbrechen</button><button class="btn" type="button" data-act="savebeleg" ${Z.busy?"disabled":""}>${Z.busy?"Speichert …":p.editId?"Änderungen speichern":"Beleg speichern"}</button></div>
   </div>`;
 }
