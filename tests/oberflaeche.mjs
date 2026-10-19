@@ -207,6 +207,28 @@ console.log("Passwort zurücksetzen");
   check("keine Programmfehler", errors.length === 0, errors.join(" | "));
 }
 
+// ---------- 8. Ohne Internet und als App installieren ----------
+console.log("Ohne Internet und als App");
+{
+  const { page, ctx, errors } = await newPage({ gast: GAST });
+  await gehe(page, BASE, 800);
+  const bereit = await page.evaluate(() => navigator.serviceWorker ? Promise.race([navigator.serviceWorker.ready.then(() => true), new Promise(r => setTimeout(() => r(false), 10000))]) : false);
+  check("Offline-Speicher (Service Worker) ist aktiv", bereit === true);
+  await page.waitForTimeout(500);
+  await ctx.setOffline(true);
+  await page.reload(); await page.waitForTimeout(1000);
+  check("App öffnet sich ohne Internet", (await page.locator("#hero .figure").count()) === 1 && /Ansprüche/.test(await page.textContent("#tabs")));
+  check("Hinweis „Keine Internetverbindung“ erscheint", (await page.locator("#offlinebanner").count()) === 1);
+  await ctx.setOffline(false); await page.waitForTimeout(300);
+  check("Hinweis verschwindet wieder, wenn das Internet zurück ist", (await page.locator("#offlinebanner").count()) === 0);
+  await page.evaluate(() => { const e = new Event("beforeinstallprompt"); e.prompt = async () => { window.__prompted = 1 }; e.userChoice = Promise.resolve({ outcome: "accepted" }); window.dispatchEvent(e) });
+  await page.waitForTimeout(200);
+  check("Karte „Als App auf den Startbildschirm“ erscheint, wenn das Handy es anbietet", (await page.locator('[data-act="inst-ja"]').count()) === 1);
+  await page.tap('[data-act="inst-ja"]'); await page.waitForTimeout(200);
+  check("„Jetzt installieren“ öffnet die Installation", await page.evaluate(() => window.__prompted === 1));
+  check("keine Programmfehler", errors.length === 0, errors.join(" | "));
+}
+
 await browser.close(); server.close();
 console.log(`\n${passed} bestanden, ${failed} fehlgeschlagen`);
 process.exit(failed ? 1 : 0);

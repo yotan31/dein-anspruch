@@ -1,3 +1,4 @@
+import { installWeg, installieren } from "./24-app-installieren.js";
 import { Z } from "./zustand.js";
 import { blank, pg } from "./01-grundlagen.js";
 import { B } from "./02-leistungen.js";
@@ -87,6 +88,8 @@ document.addEventListener("click", e=>{
     case "au-mode": Z.authMode=t.dataset.mode; Z.authMsg=""; render(); break;
     case "au-show": { const p=$("au-pw"), p2=$("au-pw2"); if(p){ p.type=p.type==="password"?"text":"password"; if(p2) p2.type=p.type; t.textContent=p.type==="password"?"Zeigen":"Verbergen" } break }
     case "au-newpw-abbruch": Z.RECOVERY=false; Z.authMsg=""; try{ history.replaceState(null,"",location.pathname) }catch(e){} render(); scrollTop(); break;
+    case "inst-ja": installieren(); break;
+    case "inst-weg": installWeg(); break;
     case "pw-aendern": Z.RECOVERY=true; Z.authMsg=""; render(); scrollTop(); break;
     case "au-guest": lsSet("dein-anspruch-modus","gast"); startGuest(); scrollTop(); break;
     case "guest-register": Z.GUEST=false; Z.authMode="register"; Z.authMsg=""; lsSet("dein-anspruch-modus",""); render(); scrollTop(); break;

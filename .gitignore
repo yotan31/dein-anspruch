@@ -5,3 +5,4 @@ site/app.js
 site/app.js.map
 site/app.css
 site/vendor/supabase.js
+site/sw.js

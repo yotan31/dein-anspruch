@@ -7,6 +7,7 @@ import { start11 } from "./11-darstellung.js";
 import { start18 } from "./18-bedienung.js";
 import { start19 } from "./19-speicher.js";
 import { start23 } from "./23-feedback-und-fehler.js";
+import { start24 } from "./24-app-installieren.js";
 import { render } from "./11-darstellung.js";
 import { initStore } from "./19-speicher.js";
 
@@ -18,5 +19,6 @@ start11();
 start18();
 start19();
 start23();
+start24();
 render();
 initStore();

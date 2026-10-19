@@ -1,3 +1,4 @@
+import { installKarte } from "./24-app-installieren.js";
 import { Z } from "./zustand.js";
 import { esc, eur, pg } from "./01-grundlagen.js";
 import { FA, KK, PK, txt } from "./02-leistungen.js";
@@ -18,6 +19,7 @@ export function viewAnsprueche(){
     .sort((a,b)=>(Number(!!a.opt)-Number(!!b.opt)) || ((b.val()||0)-(a.val()||0)) || ((b.mon?b.mon():0)-(a.mon?a.mon():0)));
   const dl=deadlines().filter(x=>!x.ok && urg(x.d)!=="ok").slice(0,2);
   return `
+   ${installKarte()}
    ${dl.map(x=>`<p class="notice ${urg(x.d)==="late"?"bad":""}">${ic("bell")}<span><strong>${esc(x.t)}</strong> – Frist ${deD(x.d)} (${urgTxt(x.d)}). <button type="button" class="linkbtn" data-tab="termine">Zu den Terminen</button></span></p>`).join("")}
    ${!Z.S.welcomeSeen?`<section class="panel" style="gap:12px">
      <div class="section-title"><h2>Fertig! So geht's weiter</h2><button type="button" class="linkbtn" data-act="welcome-ok">Ausblenden</button></div>
