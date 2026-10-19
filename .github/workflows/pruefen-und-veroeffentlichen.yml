@@ -1,0 +1,49 @@
+# Bei jeder Änderung: App bauen, automatisch testen und nur wenn alles grün ist veröffentlichen.
+#   Branch "main" -> echte App:   https://yotan31.github.io/dein-anspruch/
+#   Branch "test" -> Testversion: https://yotan31.github.io/dein-anspruch/test/
+name: Prüfen und veröffentlichen
+on:
+  push:
+    branches: [main, test]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: veroeffentlichen
+  cancel-in-progress: false
+jobs:
+  pruefen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: App bauen
+        run: python3 quelle/bauen.py
+      - name: Testbrowser installieren
+        run: |
+          npm install --no-save --no-audit --no-fund playwright@1.48.2
+          npx playwright install --with-deps chromium
+      - name: Automatische Tests
+        run: node tests/app.test.mjs
+      - name: Veröffentlichen
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin gh-pages
+          git worktree add ../pages origin/gh-pages
+          if [ "${GITHUB_REF_NAME}" = "main" ]; then
+            rsync -a --delete --exclude ".git" --exclude "test/" site/ ../pages/
+            ZIEL="echte App"
+          else
+            mkdir -p ../pages/test
+            rsync -a --delete site/ ../pages/test/
+            ZIEL="Testversion"
+          fi
+          cd ../pages
+          git add -A
+          if git diff --cached --quiet; then echo "Nichts zu veröffentlichen."; exit 0; fi
+          git commit -m "Veröffentlicht ($ZIEL): ${GITHUB_SHA::7}"
+          git push origin HEAD:gh-pages

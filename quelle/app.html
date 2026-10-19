@@ -1,6 +1,325 @@
+<title>Dein Anspruch</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+/* Layout: eine ruhige Spalte. Oben ein dunkles „Akten-Deckblatt“ mit der Summe, darunter Reiter wie bei einem Ordner: Ansprüche · Belege · Termine. */
+:root{
+  --bg:#edf1f0; --paper:#ffffff; --paper-2:#f6f8f8; --ink:#13233a; --muted:#566578; --line:#d6dee2;
+  --accent:#0d6876; --accent-ink:#ffffff; --accent-soft:#e2f0f1;
+  --money:#1c7a4c; --money-soft:#e1f2e8; --warn:#9d5600; --warn-soft:#fff0d9; --danger:#b3261e; --danger-soft:#fde7e5;
+  --hero:#13233a; --hero-fg:#eef3f6; --hero-muted:#a9b8c9; --hero-money:#8fe0b4; --tab:#ffffff;
+  --shadow:0 1px 2px rgba(19,35,58,.06),0 4px 14px rgba(19,35,58,.06);
+  --f-display:"Source Serif 4", Georgia, "Times New Roman", serif;
+  --f-body:"Atkinson Hyperlegible", "Segoe UI", Arial, sans-serif;
+  --r:14px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0d141e; --paper:#162130; --paper-2:#1b2738; --ink:#e6edf5; --muted:#9dabbd; --line:#2a384b;
+  --accent:#5cc0cc; --accent-ink:#06222a; --accent-soft:#16323a;
+  --money:#6dd3a0; --money-soft:#143225; --warn:#f2b45c; --warn-soft:#372812; --danger:#ff8a80; --danger-soft:#3a1714;
+  --hero:#1d2d45; --hero-fg:#eef3f6; --hero-muted:#a9b8c9; --hero-money:#8fe0b4; --tab:#162130;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 14px rgba(0,0,0,.25); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0d141e; --paper:#162130; --paper-2:#1b2738; --ink:#e6edf5; --muted:#9dabbd; --line:#2a384b;
+  --accent:#5cc0cc; --accent-ink:#06222a; --accent-soft:#16323a;
+  --money:#6dd3a0; --money-soft:#143225; --warn:#f2b45c; --warn-soft:#372812; --danger:#ff8a80; --danger-soft:#3a1714;
+  --hero:#1d2d45; --hero-fg:#eef3f6; --hero-muted:#a9b8c9; --hero-money:#8fe0b4; --tab:#162130;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 14px rgba(0,0,0,.25); color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{font-size:calc(100% * var(--fs,1))}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:1.0625rem;line-height:1.55;padding-inline:16px;padding-block:16px 64px}
+.wrap{max-width:780px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+h1,h2,h3{font-family:var(--f-display);line-height:1.18;text-wrap:balance;margin:0;font-weight:600}
+h2{font-size:1.5rem}h3{font-size:1.15rem}
+p{margin:0}
+.muted{color:var(--muted)}.small{font-size:.88rem}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+svg.i{width:20px;height:20px;flex:none;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+
+/* Deckblatt */
+.hero{background:var(--hero);color:var(--hero-fg);border-radius:20px;padding:22px 22px 20px;display:flex;flex-direction:column;gap:14px;position:relative;overflow:hidden}
+.hero::after{content:"";position:absolute;right:-60px;top:-60px;width:220px;height:220px;border-radius:50%;border:28px solid rgba(255,255,255,.05)}
+.hero .row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;position:relative;z-index:1}
+.brand{display:flex;align-items:center;gap:10px}
+.brand .mark{width:34px;height:34px;border-radius:10px;background:var(--hero-money);color:var(--hero);display:grid;place-items:center;font-family:var(--f-display);font-weight:700;font-size:1.1rem}
+.brand b{font-family:var(--f-display);font-size:1.3rem;font-weight:600}
+.savestate{font-size:.82rem;color:var(--hero-muted);display:flex;align-items:center;gap:6px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--hero-muted)}
+.dot.ok{background:var(--hero-money)}.dot.warn{background:#f2b45c}
+.hero .figure{font-family:var(--f-display);font-size:clamp(2.2rem,8vw,3.2rem);line-height:1;color:var(--hero-money);font-variant-numeric:tabular-nums;font-weight:600}
+.hero .lead{color:var(--hero-muted);font-size:.95rem;max-width:52ch;position:relative;z-index:1}
+.stats{display:flex;gap:8px;flex-wrap:wrap;position:relative;z-index:1}
+.stat{background:rgba(255,255,255,.08);border-radius:999px;padding:5px 12px;font-size:.85rem;display:flex;gap:6px;align-items:center}
+.stat strong{font-variant-numeric:tabular-nums}
+button.stat{font-size:.85rem}
+.stat.alert{background:#f2b45c;color:#2a1a00}
+
+/* Reiter */
+.tabs{display:flex;gap:6px;background:var(--paper);border:1px solid var(--line);border-radius:999px;padding:5px;position:sticky;top:env(safe-area-inset-top,0px);z-index:5;box-shadow:var(--shadow)}
+.tabs button{flex:1;border:0;background:transparent;color:var(--muted);font:inherit;font-weight:700;font-size:.95rem;padding:9px 8px;border-radius:999px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;min-width:0}
+.tabs button[aria-selected="true"]{background:var(--accent);color:var(--accent-ink)}
+.tabs .badge{background:var(--warn);color:#fff;border-radius:999px;font-size:.72rem;padding:0 6px;line-height:1.5}
+@media (max-width:460px){.tabs button span.lbl{font-size:.82rem}.tabs svg.i{display:none}}
+
+/* Panels & Formulare */
+.panel{background:var(--paper);border:1px solid var(--line);border-radius:var(--r);padding:22px;display:flex;flex-direction:column;gap:18px;box-shadow:var(--shadow)}
+.stepper{display:flex;flex-direction:column;gap:8px}
+.stepper .bar{height:6px;background:var(--line);border-radius:6px;overflow:hidden}
+.stepper .bar i{display:block;height:100%;background:var(--accent);border-radius:6px;transition:width .3s}
+.stepper .meta{display:flex;justify-content:space-between;font-size:.85rem;color:var(--muted)}
+.q{display:flex;flex-direction:column;gap:10px;border:0;padding:0;margin:0;min-width:0}
+.q legend{font-weight:700;padding:0;margin-bottom:6px}
+.hint{font-size:.9rem;color:var(--muted)}
+.choices{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px}
+.choice{display:flex;gap:10px;align-items:flex-start;border:1.5px solid var(--line);border-radius:12px;padding:11px 13px;cursor:pointer;background:var(--paper);transition:border-color .15s,background .15s}
+.choice:hover{border-color:var(--accent)}
+.choice:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}
+.choice input{margin-top:4px;accent-color:var(--accent);width:18px;height:18px;flex:none}
+.choice span{display:flex;flex-direction:column;min-width:0}
+.choice small{color:var(--muted);font-size:.85rem}
+input[type=text],input[type=email],input[type=tel],input[type=number],input[type=date],select,textarea{font:inherit;color:var(--ink);background:var(--paper);border:1.5px solid var(--line);border-radius:10px;padding:9px 11px;width:100%;min-width:0}
+textarea{min-height:260px;line-height:1.5;font-size:.95rem}
+:focus-visible{outline:3px solid #f2b134;outline-offset:2px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.field label{font-weight:700;font-size:.92rem}
+.nav{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.btn{font:inherit;font-weight:700;border-radius:10px;padding:10px 18px;cursor:pointer;border:1.5px solid var(--accent);background:var(--accent);color:var(--accent-ink);display:inline-flex;align-items:center;gap:8px;text-decoration:none;justify-content:center}
+.btn.ghost{background:transparent;color:var(--accent)}
+.btn.soft{background:var(--accent-soft);color:var(--accent);border-color:transparent}
+.btn.small{padding:6px 12px;font-size:.9rem}
+.btn.danger{background:transparent;color:var(--danger);border-color:var(--danger)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btnrow{display:flex;gap:8px;flex-wrap:wrap}
+.intro{display:flex;flex-direction:column;gap:14px}
+.howto{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+.howto div{background:var(--paper-2);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:6px;font-size:.93rem}
+.howto b{display:flex;align-items:center;gap:8px;color:var(--accent)}
+.howbtn{all:unset;box-sizing:border-box;cursor:pointer;background:var(--paper-2);border:1.5px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:6px;font-size:.93rem}
+.howbtn:hover{border-color:var(--accent)}.howbtn:focus-visible{outline:3px solid #f2b134}
+.howbtn b{display:flex;align-items:center;gap:8px;color:var(--accent)}
+.vhp{display:flex;flex-direction:column;gap:12px;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:14px}
+.vhp h4{margin-top:6px}
+.calc{border:1px solid var(--line);border-radius:10px;overflow:hidden;font-size:.93rem}
+.calc div{display:flex;justify-content:space-between;gap:10px;padding:7px 12px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+.calc div:last-child{border-bottom:0}.calc .tot{background:var(--money-soft);color:var(--money);font-weight:700}
+.fontsw{display:flex;background:rgba(255,255,255,.08);border-radius:999px;padding:3px}
+.fontsw button{border:0;background:transparent;color:var(--hero-muted);font:inherit;font-weight:700;padding:3px 9px;border-radius:999px;cursor:pointer;font-size:.85rem}
+.fontsw button[aria-pressed="true"]{background:var(--hero-fg);color:var(--hero)}
+.btn{min-height:44px}
+.btn.big{font-size:1.1rem;padding:14px 22px;min-height:54px}
+.startbox{display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+.wiz{gap:20px}
+.wiztop{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+h2.wq{font-size:1.6rem;line-height:1.25}
+h2.wq label{cursor:default}
+.whelp{display:flex;gap:10px;align-items:flex-start;background:var(--accent-soft);border-radius:12px;padding:12px 14px;font-size:1rem}
+.whelp svg{color:var(--accent);margin-top:3px}
+.wiz input[type=text],.wiz input[type=date],.wiz input[type=tel],.wiz textarea{font-size:1.15rem;padding:14px 14px;border-width:2px}
+.choices.big{grid-template-columns:1fr}
+.choices.big .choice{padding:14px 16px;font-size:1.08rem}
+.choices.big .choice input{width:22px;height:22px;margin-top:3px}
+.nav.big .btn{min-height:54px;font-size:1.08rem;padding:12px 22px}
+.euro{display:flex;align-items:center;gap:8px}.euro input{flex:1}.euro span{font-weight:700;font-size:1.1rem}
+dl.sum{margin:0;display:flex;flex-direction:column;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+dl.sum>div{display:grid;grid-template-columns:1fr auto;gap:2px 12px;padding:10px 14px;border-bottom:1px solid var(--line);align-items:center}
+dl.sum>div:last-child{border-bottom:0}
+dl.sum dt{font-size:.85rem;color:var(--muted);grid-column:1}
+dl.sum dd{margin:0;font-weight:700;grid-column:1;overflow-wrap:anywhere}
+dl.sum button{grid-column:2;grid-row:1/span 2}
+dl.sum .open{color:var(--warn);font-weight:400}
+.paper{background:#fff;color:#1a1a1a;border:1px solid var(--line);border-radius:6px;padding:22px;font-family:var(--f-display);font-size:1rem;line-height:1.6;white-space:pre-wrap;box-shadow:var(--shadow);overflow-wrap:anywhere}
+.paper .subj{font-weight:700;margin-bottom:12px}
+ol.howsend{margin:0;padding-left:1.4em;display:flex;flex-direction:column;gap:12px}
+.btnrow.big .btn{min-height:52px}
+.pending{display:flex;flex-direction:column;gap:14px}
+.thumb.big{width:110px;height:140px}
+.minis{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
+.panel.mini{padding:16px;gap:12px}
+.panel.mini.warn{border-color:var(--warn)}
+.mini-head{display:flex;gap:12px;align-items:flex-start}
+.mini-head>svg{width:24px;height:24px;color:var(--accent);margin-top:2px}
+.mini-head>div{flex:1;min-width:0}
+.mini-num{text-align:right;flex:none!important}
+.mini-num b{display:block;font-family:var(--f-display);font-size:1.6rem;color:var(--money);font-variant-numeric:tabular-nums;line-height:1.1}
+.rbars{display:flex;flex-direction:column;gap:8px}
+.rbars>div{display:grid;grid-template-columns:minmax(0,11em) 1fr 3em;gap:10px;align-items:center;font-size:.93rem}
+.rbars .track{height:10px;border-radius:10px;background:var(--line);overflow:hidden}
+.rbars .track i{display:block;height:100%;background:var(--accent)}
+.rbars b{text-align:right;font-variant-numeric:tabular-nums}
+.langsel{width:auto;background:rgba(255,255,255,.08);color:var(--hero-fg);border:0;border-radius:999px;padding:4px 10px;font-size:.82rem;font-weight:700}
+.langsel option{color:#13233a}
+[dir="rtl"] .item .val{text-align:left}
+.yearchips{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.notice{border-radius:12px;padding:12px 14px;font-size:.93rem;background:var(--warn-soft);color:var(--ink);display:flex;gap:10px;align-items:flex-start}
+.notice svg{color:var(--warn);margin-top:2px}
+.notice.info{background:var(--accent-soft)}.notice.info svg{color:var(--accent)}
+.notice.bad{background:var(--danger-soft)}.notice.bad svg{color:var(--danger)}
+.notice.good{background:var(--money-soft)}.notice.good svg{color:var(--money)}
+
+/* Ansprüche */
+.section-title{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+.filters{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1.5px solid var(--line);background:var(--paper);color:var(--muted);border-radius:999px;padding:4px 12px;font:inherit;font-size:.85rem;cursor:pointer}
+.chip[aria-pressed="true"]{border-color:var(--accent);color:var(--accent);background:var(--accent-soft);font-weight:700}
+.list{display:flex;flex-direction:column;gap:10px}
+.item{border:1px solid var(--line);border-radius:var(--r);background:var(--paper);display:flex;flex-direction:column;box-shadow:var(--shadow);overflow:hidden}
+.item>button.head{all:unset;cursor:pointer;display:grid;grid-template-columns:auto 1fr auto;gap:4px 12px;padding:14px 16px;align-items:start}
+.item>button.head:focus-visible{outline:3px solid #f2b134;outline-offset:-3px}
+.ico{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);grid-row:span 2}
+.ico.a-Steuer{background:var(--warn-soft);color:var(--warn)}
+.ico.a-Krankenkasse{background:var(--money-soft);color:var(--money)}
+.ico.a-Schwerbehinderung,.ico.a-Arbeit{background:var(--paper-2);color:var(--ink)}
+.item .ttl{font-weight:700;font-size:1.04rem;min-width:0}
+.item .para{display:block;font-size:.8rem;color:var(--muted);font-weight:400}
+.item .val{font-weight:700;color:var(--money);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;font-size:.95rem}
+.item .val.neutral{color:var(--muted);font-weight:400;font-size:.85rem}
+.item .short{grid-column:2/-1;color:var(--muted);font-size:.93rem}
+.tags{grid-column:2/-1;display:flex;gap:6px;flex-wrap:wrap}
+.tag{font-size:.72rem;letter-spacing:.05em;text-transform:uppercase;border-radius:999px;padding:2px 9px;background:var(--paper-2);color:var(--muted);font-weight:700}
+.tag.st-beantragt{background:var(--warn-soft);color:var(--warn)}
+.tag.st-bewilligt{background:var(--money-soft);color:var(--money)}
+.detail{border-top:1px solid var(--line);padding:16px;display:flex;flex-direction:column;gap:16px;background:var(--paper-2)}
+.detail h4{margin:0 0 6px;font-size:.78rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.detail ol,.detail ul{margin:0;padding-left:1.25em;display:flex;flex-direction:column;gap:4px}
+.checks{list-style:none;padding:0!important}
+.checks label{display:flex;gap:10px;align-items:flex-start;cursor:pointer}
+.checks input{width:18px;height:18px;margin-top:4px;accent-color:var(--money);flex:none}
+.checks input:checked+span{text-decoration:line-through;color:var(--muted)}
+.recip{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:.93rem;display:flex;flex-direction:column;gap:4px}
+.recip code{font-family:inherit;font-weight:700;user-select:all;word-break:break-all}
+.status{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.status select{width:auto}
+details.used summary{cursor:pointer;font-weight:700;padding:6px 0}
+
+/* Belege */
+.meter{display:flex;flex-direction:column;gap:8px}
+.meter .track{height:12px;border-radius:12px;background:var(--line);overflow:hidden}
+.meter .track i{display:block;height:100%;background:var(--money);border-radius:12px}
+.meter .track i.over{background:var(--warn)}
+.meter .nums{display:flex;justify-content:space-between;font-variant-numeric:tabular-nums;font-size:.9rem;gap:8px;flex-wrap:wrap}
+.drop{border:2px dashed var(--line);border-radius:var(--r);padding:18px;display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center;background:var(--paper-2)}
+.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.preview{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap}
+.preview .thumb{width:110px;height:140px}
+.thumb{width:56px;height:68px;border-radius:8px;background:var(--paper-2);border:1px solid var(--line);object-fit:cover;display:grid;place-items:center;color:var(--muted);flex:none;overflow:hidden}
+.thumb img{width:100%;height:100%;object-fit:cover}
+.beleg{display:grid;grid-template-columns:auto 1fr auto;gap:4px 12px;align-items:center;padding:10px 12px;border-bottom:1px solid var(--line)}
+.beleg:last-child{border-bottom:0}
+.beleg .b-t{font-weight:700;min-width:0;overflow-wrap:anywhere}
+.beleg .b-m{font-size:.85rem;color:var(--muted)}
+.beleg .b-v{font-weight:700;font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.beleg .b-a{grid-column:2/-1;display:flex;gap:6px;flex-wrap:wrap}
+.group{border:1px solid var(--line);border-radius:var(--r);background:var(--paper);overflow:hidden}
+.group>header{display:flex;justify-content:space-between;gap:8px;padding:10px 14px;background:var(--paper-2);font-weight:700;flex-wrap:wrap}
+.group>header span:last-child{font-variant-numeric:tabular-nums}
+.linkbtn{all:unset;cursor:pointer;color:var(--accent);font-size:.85rem;font-weight:700}
+.linkbtn.danger{color:var(--danger)}
+.lightbox{position:fixed;inset:0;background:rgba(8,14,24,.85);display:grid;place-items:center;z-index:20;padding:20px}
+.lightbox img{max-height:85vh;max-width:100%;border-radius:8px}
+.lightbox button{position:absolute;top:calc(14px + env(safe-area-inset-top,0px));right:14px}
+
+/* Termine */
+.due{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;padding:14px 16px;border:1px solid var(--line);border-radius:var(--r);background:var(--paper);box-shadow:var(--shadow);align-items:start}
+.due .cal{width:54px;border-radius:10px;overflow:hidden;text-align:center;border:1px solid var(--line);grid-row:span 3;background:var(--paper)}
+.due .cal b{display:block;background:var(--accent);color:var(--accent-ink);font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;padding:2px 0}
+.due .cal span{display:block;font-family:var(--f-display);font-size:1.4rem;font-weight:600;padding:2px 0 4px;font-variant-numeric:tabular-nums}
+.due.late .cal b{background:var(--danger)}.due.soon .cal b{background:var(--warn)}.due.ok .cal b{background:var(--money)}
+.due .d-t{font-weight:700}
+.due .d-s{color:var(--muted);font-size:.92rem}
+.due .btnrow{margin-top:6px}
+.pill{display:inline-block;border-radius:999px;padding:1px 10px;font-size:.78rem;font-weight:700;margin-left:6px;vertical-align:2px}
+.pill.late{background:var(--danger-soft);color:var(--danger)}.pill.soon{background:var(--warn-soft);color:var(--warn)}.pill.ok{background:var(--money-soft);color:var(--money)}
+.halves{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+.half{border:1.5px solid var(--line);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:2px;font-size:.9rem}
+.half b{font-size:.95rem}
+.half.done{border-color:var(--money);background:var(--money-soft)}
+.half.open{border-color:var(--warn);background:var(--warn-soft)}
+.half.miss{border-color:var(--danger);background:var(--danger-soft)}
+
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:10px;font-size:.95rem;max-width:calc(100% - 32px);z-index:30}
+footer{font-size:.83rem;color:var(--muted);padding-top:6px;display:flex;flex-direction:column;gap:6px}
+/* Feedback-Fenster */
+.overlay{position:fixed;inset:0;background:rgba(10,20,32,.45);z-index:40;display:flex;align-items:flex-end;justify-content:center;padding:16px}
+.overlay .sheet{background:var(--paper);color:var(--ink);border-radius:18px;padding:20px;max-width:520px;width:100%;display:flex;flex-direction:column;gap:12px;box-shadow:0 10px 40px rgba(0,0,0,.25);margin-bottom:env(safe-area-inset-bottom,0px)}
+.overlay .sheet h3{margin:0}
+.overlay textarea{width:100%;font:inherit;padding:10px;border:1.5px solid var(--line);border-radius:10px;background:var(--paper);color:var(--ink);box-sizing:border-box}
+@media (min-width:701px){.overlay{align-items:center}}
+.consent ul{margin:0;padding-left:1.2em;display:flex;flex-direction:column;gap:2px}
+/* Sammel-PDF */
+.bulklist{display:flex;flex-direction:column;gap:12px}
+.bulkitem{display:grid;grid-template-columns:96px 1fr;gap:12px;border:1.5px solid var(--line);border-radius:12px;padding:12px;background:var(--paper);transition:opacity .2s,border-color .2s}
+.bulkitem .bion{grid-column:1/-1;display:flex;align-items:center;gap:8px;font-weight:700;cursor:pointer}
+.bulkitem .bion input{width:22px;height:22px;accent-color:var(--accent)}
+.bulkitem.off{opacity:.5}
+.bulkitem .bthumb{width:96px;border:1px solid var(--line);border-radius:6px;background:#fff;align-self:start}
+.bulkitem .bfields{display:flex;flex-direction:column;gap:10px;min-width:0}
+.bulkitem .field select{width:100%}
+.bulkitem .miss{color:var(--danger);font-weight:700;font-size:.8rem}
+@media (max-width:460px){.bulkitem{grid-template-columns:64px 1fr}.bulkitem .bthumb{width:64px}.bulkitem .grid2{grid-template-columns:1fr}}
+/* Gefühl einer App: Rückmeldung beim Tippen, sanfte Wechsel */
+html{-webkit-tap-highlight-color:transparent}
+button,.btn,.choice,a,select,label{touch-action:manipulation}
+.item{scroll-margin-top:84px}
+@media (prefers-reduced-motion:no-preference){
+  .item,.due{animation:in .25s ease-out}@keyframes in{from{transform:translateY(4px);opacity:.6}to{transform:none;opacity:1}}
+  .btn,.choice,.tabs button,.chip,button.stat,.acct,.fontsw button,.item .head{transition:transform .12s ease,background-color .18s,border-color .18s,color .18s,box-shadow .18s}
+  .btn:active:not(:disabled),.tabs button:active,.chip:active,button.stat:active,.acct:active,.fontsw button:active{transform:scale(.96)}
+  .choice:active{transform:scale(.985)}
+  .item .head:active{background:var(--paper-2)}
+  .choice input:checked{animation:pop .28s ease-out}@keyframes pop{45%{transform:scale(1.3)}}
+  .detail{animation:open .3s ease-out}@keyframes open{from{opacity:0;transform:translateY(-8px)}}
+  .go-f{animation:goF .3s cubic-bezier(.2,.8,.2,1)}@keyframes goF{from{opacity:0;transform:translateX(32px)}}
+  .go-b{animation:goB .3s cubic-bezier(.2,.8,.2,1)}@keyframes goB{from{opacity:0;transform:translateX(-32px)}}
+  .go-fade{animation:goFade .25s ease-out}@keyframes goFade{from{opacity:0;transform:translateY(8px)}}
+  .bar i,.track i,.stepper .bar i{transition:width .4s cubic-bezier(.2,.8,.2,1)}
+  .toast:not([hidden]){animation:toastIn .25s ease-out}@keyframes toastIn{from{opacity:0;transform:translate(-50%,12px)}}
+  .figure.flash{animation:flash .9s ease-out}@keyframes flash{30%{transform:scale(1.06);text-shadow:0 0 18px rgba(143,224,180,.55)}}
+  .figure{display:inline-block;transform-origin:left center}
+}
+/* Handy: Reiter unten wie in einer App, Weiter-Knopf immer erreichbar */
+@media (max-width:700px){
+  body{padding-bottom:calc(96px + env(safe-area-inset-bottom,0px))}
+  .tabs{position:fixed;top:auto;left:0;right:0;bottom:0;border-radius:18px 18px 0 0;border:0;border-top:1px solid var(--line);padding:6px 10px calc(6px + env(safe-area-inset-bottom,0px));gap:4px;box-shadow:0 -6px 20px rgba(19,35,58,.10);z-index:20}
+  .tabs button{flex-direction:column;gap:2px;padding:7px 4px 6px;border-radius:14px;font-size:.8rem;position:relative}
+  .tabs svg.i{display:block!important;width:24px;height:24px}
+  .tabs button span.lbl{font-size:.8rem}
+  .tabs button[aria-selected="true"]{background:var(--accent-soft);color:var(--accent)}
+  .tabs .badge{position:absolute;top:2px;left:calc(50% + 8px)}
+  .item{scroll-margin-top:12px}
+  body:has(#tabs:not([hidden])) .nav.go{bottom:calc(72px + env(safe-area-inset-bottom,0px))}
+  body:has(#tabs:not([hidden])) .toast{bottom:calc(92px + env(safe-area-inset-bottom,0px))}
+  .nav.go{position:sticky;bottom:0;z-index:6;display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 -22px;padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));background:var(--paper);border-top:1px solid var(--line);border-radius:0 0 var(--r) var(--r);box-shadow:0 -6px 16px rgba(19,35,58,.06)}
+  .nav.go:last-child{margin-bottom:-22px}
+  .nav.go>.btnrow{display:contents}
+  .nav.go>span:empty{display:none}
+  .nav.go .btn{width:100%}
+  .nav.go .btn:not(.ghost){grid-column:1/-1;order:-1}
+  .nav.go .btn.ghost{min-height:46px;font-size:1rem;padding:8px 10px}
+}
+</style>
+
+<div class="wrap">
+  <section class="hero" id="hero"></section>
+  <div class="tabs" id="tabs" role="tablist" hidden></div>
+  <main id="main" style="display:flex;flex-direction:column;gap:16px"></main>
+  <footer>
+    <p>Beträge nach der Leistungsübersicht des Bundesgesundheitsministeriums für 2026 (Stand 04.11.2025) und den Änderungen durch das BEEP-Gesetz ab 01.01.2026. Schwerbehinderten-Nachteilsausgleiche nach SGB IX und EStG, Stand 2026.</p>
+    <p>Diese App ersetzt keine Rechtsberatung. Kostenlose, unabhängige Hilfe gibt es bei den Pflegestützpunkten, der Pflegeberatung deiner Pflegekasse (§ 7a SGB XI) und der EUTB-Teilhabeberatung.</p>
+  </footer>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+<div class="lightbox" id="lightbox" hidden><button class="btn small" type="button" id="lbclose">Schließen</button><img id="lbimg" alt="Beleg"></div>
+<input type="file" id="fileCam" accept="image/*" capture="environment" hidden>
+<input type="file" id="fileAny" accept="image/*,application/pdf" hidden>
+<input type="file" id="fileJson" accept="application/json,.json" hidden>
+
+<script>
+
 "use strict";
-
-
 /* ---------- Stammdaten 2026 ---------- */
 const PG = {
   pflegegeld:[0,0,347,599,800,990],
@@ -1285,19 +1604,16 @@ function sums(){
 function renderHero(){
   const save=`<div class="savestate"><span class="dot ${saveState.c}" id="savedot"></span><span id="savetxt">${esc(saveState.t)}</span></div>`;
   const brand=`<div class="brand"><span class="mark" aria-hidden="true">§</span><b>Dein Anspruch</b></div>`;
-  const curF = USER && FAELLE.find(f=>f.id===FALL_ID);
-  const personBtn = curF ? `<button type="button" class="acct person" data-act="persons" aria-expanded="${showPersons}">${ic("user")}${esc(fallName(curF))} ▾</button>` : "";
-  const acct = USER?`<button type="button" class="acct" data-act="logout" title="${esc(USER.email||"")}">Abmelden</button>`:GUEST?`<button type="button" class="acct" data-act="guest-register">Konto anlegen</button>`:"";
   const fontsw=`<div class="fontsw" role="group" aria-label="Schriftgröße">${[["1","A"],["1.15","A+"],["1.3","A++"]].map(([v,t])=>`<button type="button" data-font="${v}" aria-pressed="${(S.font||"1")===v}" aria-label="Schrift ${t}">${t}</button>`).join("")}</div>`;
-  if(S.wiz||RECHNER||(S.done&&S.tab!=="ansprueche")){ $("hero").innerHTML=`<div class="row">${brand}<div class="row" style="gap:12px">${langSelect()}${personBtn}${fontsw}${save}${acct}</div></div>`; return }
+  if(S.wiz||RECHNER||(S.done&&S.tab!=="ansprueche")){ $("hero").innerHTML=`<div class="row">${brand}<div class="row" style="gap:12px">${langSelect()}${fontsw}${save}</div></div>`; return }
   if(!S.done){
-    $("hero").innerHTML=`<div class="row">${brand}<div class="row" style="gap:12px">${langSelect()}${personBtn}${fontsw}${save}${acct}</div></div>
+    $("hero").innerHTML=`<div class="row">${brand}<div class="row" style="gap:12px">${langSelect()}${fontsw}${save}</div></div>
      <p class="lead">Pflegegrad oder Schwerbehinderung: Wir prüfen, welche Leistungen 2026 noch offen sind, schreiben die Anträge vor, sortieren deine Belege und erinnern an Fristen.</p>`;
     return;
   }
   const s=sums(); const dl=deadlines(); const crit=dl.find(x=>x.main&&!x.ok&&urg(x.d)!=="ok") || dl.find(x=>urg(x.d)==="late");
   const next=dl[0];
-  $("hero").innerHTML=`<div class="row">${brand}<div class="row" style="gap:12px">${langSelect()}${personBtn}${fontsw}${save}${acct}</div></div>
+  $("hero").innerHTML=`<div class="row">${brand}<div class="row" style="gap:12px">${langSelect()}${fontsw}${save}</div></div>
    <div style="position:relative;z-index:1;display:flex;flex-direction:column;gap:4px">
      <span class="small" style="color:var(--hero-muted)">Noch offen an Geld und Budgets pro Jahr</span>
      <span class="figure">${eur(s.cash)}</span>
@@ -1311,7 +1627,7 @@ function renderHero(){
    </div>`;
 }
 function renderTabs(){
-  const t=$("tabs"); t.hidden=!S.done||!!S.wiz||!!RECHNER||(!USER&&!GUEST)||consentNeeded(); if(t.hidden) return;
+  const t=$("tabs"); t.hidden=!S.done||!!S.wiz||!!RECHNER; if(t.hidden) return;
   const dl=deadlines(); const att=dl.filter(x=>!x.ok && urg(x.d)!=="ok").length;
   const T=[["ansprueche","Ansprüche","list",0],["belege","Belege","receipt",0],["termine","Termine","cal",att]];
   t.innerHTML=T.map(([k,l,i,b])=>`<button type="button" role="tab" data-tab="${k}" aria-selected="${S.tab===k}">${ic(i)}<span class="lbl">${l}</span>${b?`<span class="badge">${b}</span>`:""}</button>`).join("");
@@ -1320,9 +1636,6 @@ function renderMain(){
   document.documentElement.style.setProperty("--fs", S.font||"1");
   if(!loaded){ $("main").innerHTML=`<section class="panel"><p class="muted">Einen Moment, deine Daten werden geladen …</p></section>`; return }
   if(RECHNER){ $("main").innerHTML=viewRechner(); return }
-  if(!USER && !GUEST){ $("main").innerHTML=viewLogin(); return }
-  if(USER && showPersons){ $("main").innerHTML=viewPersons(); return }
-  if(consentNeeded()){ $("main").innerHTML=viewConsent(); return }
   if(S.wiz && B.find(x=>x.k===S.wiz.k)){ $("main").innerHTML=viewWizard(); return }
   S.wiz=null;
   if(!S.done){
@@ -1459,8 +1772,7 @@ function viewAnsprueche(){
    <div class="list">${sorted.map(itemHTML).join("") || '<p class="muted">Ihr nutzt bereits alles, was wir prüfen konnten.</p>'}</div>
    ${genutzt.length?`<details class="used"><summary>Bereits genutzt (${genutzt.length})</summary><div class="list" style="margin-top:10px">${genutzt.map(itemHTML).join("")}</div></details>`:""}
    <div class="nav"><button class="btn ghost" type="button" data-act="edit">Angaben ändern</button><button class="btn ghost" type="button" data-act="reset">Antworten zurücksetzen</button></div>
-   <div id="resetconfirm" hidden class="notice bad">${ic("alert")}<span>Alle Antworten aus dem Fragebogen zurücksetzen und neu anfangen? Belege und Fristen bleiben erhalten. <span class="btnrow" style="margin-top:8px"><button class="btn small danger" type="button" data-act="reset-yes">Ja, löschen</button><button class="btn small ghost" type="button" data-act="reset-no">Abbrechen</button></span></span></div>
-   ${datenBox()}`;
+   <div id="resetconfirm" hidden class="notice bad">${ic("alert")}<span>Alle Antworten aus dem Fragebogen zurücksetzen und neu anfangen? Belege und Fristen bleiben erhalten. <span class="btnrow" style="margin-top:8px"><button class="btn small danger" type="button" data-act="reset-yes">Ja, löschen</button><button class="btn small ghost" type="button" data-act="reset-no">Abbrechen</button></span></span></div>`;
 }
 function valueLabel(b){
   if(b.val && b.val()) return `<span class="val">${eur(b.val())}/Jahr</span>`;
@@ -1543,7 +1855,7 @@ function viewBelege(){
         ${canFiles?`<button class="btn" type="button" data-act="cam">${ic("camera")}Foto aufnehmen</button><button class="btn soft" type="button" data-act="pick">${ic("file")}Datei wählen</button>`:""}
         <button class="btn ${canFiles?"ghost":""}" type="button" data-act="manual">${ic("plus")}Ohne Foto erfassen</button>
       </div>
-      ${canFiles?"":`<p class="small muted">Fotos speichern geht nur mit Konto. Beträge kannst du trotzdem erfassen, sie bleiben aber nur bis zum Schließen der Seite.</p>`}
+      ${canFiles?"":`<p class="small muted">Fotos speichern ist in dieser Ansicht nicht möglich (nur mit Bearbeitungsrecht). Beträge kannst du trotzdem erfassen.</p>`}
     </div>`}
   </section>
 
@@ -1571,7 +1883,7 @@ function viewBelege(){
 }
 function belegRow(b){
   const isImg=b.asset && /^image\//.test(b.ctype||"");
-  const thumb = b.asset ? (isImg?`<button type="button" class="thumb" data-view="${b.asset}" style="padding:0;cursor:zoom-in" aria-label="Beleg ansehen"><img src="${esc(blobUrl(b.asset))}" alt="" loading="lazy"></button>`:`<a class="thumb" href="${esc(blobUrl(b.asset))}" target="_blank" rel="noopener" aria-label="PDF öffnen">${ic("file")}</a>`) : `<span class="thumb">${ic("receipt")}</span>`;
+  const thumb = b.asset ? (isImg?`<button type="button" class="thumb" data-view="${b.asset}" style="padding:0;cursor:zoom-in" aria-label="Beleg ansehen"><img src="/_blob/${esc(b.asset)}" alt="" loading="lazy"></button>`:`<a class="thumb" href="/_blob/${esc(b.asset)}" target="_blank" rel="noopener" aria-label="PDF öffnen">${ic("file")}</a>`) : `<span class="thumb">${ic("receipt")}</span>`;
   const d=parseIso(b.datum);
   return `<div class="beleg">${thumb}
     <div style="min-width:0"><div class="b-t">${esc(b.titel||(KATS[b.kat]||KATS.sonst).t)}</div><div class="b-m">${d?deD(d):"ohne Datum"}${b.eingereicht?' · <span style="color:var(--money);font-weight:700">eingereicht</span>':''}</div></div>
@@ -1602,7 +1914,6 @@ function viewTermine(){
   const dl=deadlines(); const rel=beratungRelevant(); const st=beratungStatus();
   const halves=[st.prev,st.H,st.next];
   return `
-  ${eriCard()}
   ${rel?`<section class="panel">
     <div class="section-title"><h2>Beratungsbesuch</h2><span class="small muted">§ 37 Abs. 3 SGB XI</span></div>
     <p class="muted small">Wer Pflegegeld bekommt, muss einmal in jedem Kalenderhalbjahr (Januar–Juni und Juli–Dezember) einen Beratungsbesuch durch einen Pflegedienst oder eine anerkannte Beratungsstelle nachweisen. Fehlt der Nachweis, kürzt die Pflegekasse das Pflegegeld, im Wiederholungsfall wird es gestrichen. Der Besuch ist kostenlos, jeder zweite darf per Video sein.</p>
@@ -1681,7 +1992,7 @@ async function saveFile(filename,data,okMsg){
 }
 async function makePDF(b){ const doc=newDoc(); if(!doc) return; drawLetter(doc,b); await saveFile(`Antrag-${b.k}.pdf`,doc.output("blob"),"PDF gespeichert") }
 async function blobToDataURL(id){
-  const res=await fetch(blobUrl(id)); if(!res.ok) throw new Error("fetch");
+  const res=await fetch("/_blob/"+id); if(!res.ok) throw new Error("fetch");
   const bl=await res.blob(); if(!/^image\//.test(bl.type)) return null;
   const bmp=await createImageBitmap(bl); const c=document.createElement("canvas"); const s=Math.min(1,1600/Math.max(bmp.width,bmp.height));
   c.width=Math.round(bmp.width*s); c.height=Math.round(bmp.height*s); c.getContext("2d").drawImage(bmp,0,0,c.width,c.height);
@@ -1738,7 +2049,7 @@ function startPending(file){
 }
 function editBeleg(id){
   const b=BEL.find(x=>x.id===id); if(!b) return;
-  pending={editId:id, file:null, keepAsset:b.asset||"", keepType:b.ctype||"", preview:b.asset&&/^image\//.test(b.ctype||"")?blobUrl(b.asset):"", kat:b.kat||"sonst", datum:b.datum||isoD(TODAY()), betrag:b.betrag==null||b.betrag===""?"":String(b.betrag).replace(".",","), titel:b.titel||""};
+  pending={editId:id, file:null, keepAsset:b.asset||"", keepType:b.ctype||"", preview:b.asset&&/^image\//.test(b.ctype||"")?"/_blob/"+b.asset:"", kat:b.kat||"sonst", datum:b.datum||isoD(TODAY()), betrag:b.betrag==null||b.betrag===""?"":String(b.betrag).replace(".",","), titel:b.titel||""};
   render(); scrollTop();
 }
 async function prepareFile(f){
@@ -1989,13 +2300,12 @@ async function bulkSave(){
 
 /* ---------- Events ---------- */
 document.addEventListener("click", e=>{
-  const t=e.target.closest("[data-act],[data-open],[data-copy],[data-pdf],[data-resettx],[data-tab],[data-area],[data-kat],[data-del],[data-delyes],[data-delno],[data-sub-toggle],[data-view],[data-delown],[data-year],[data-befpdf],[data-befcopy],[data-edit],[data-wopen],[data-wnav],[data-font],[data-gotoclaim],[data-rmember]");
+  const t=e.target.closest("[data-act],[data-open],[data-copy],[data-pdf],[data-resettx],[data-tab],[data-area],[data-kat],[data-del],[data-delyes],[data-delno],[data-sub-toggle],[data-view],[data-delown],[data-year],[data-befpdf],[data-befcopy],[data-edit],[data-wopen],[data-wnav],[data-font],[data-gotoclaim]");
   if(!t) return;
   const a=t.dataset.act;
   if(t.dataset.tab){if(t.classList.contains("howbtn"))S.welcomeSeen=true;S.tab=t.dataset.tab;openKey=null;save();render();scrollTop();return}
   if(t.dataset.area){areaFilter=t.dataset.area;render();return}
   if(t.dataset.gotoclaim){ S.tab="ansprueche"; openKey=t.dataset.gotoclaim; render(); const el=$("it-"+openKey); el&&el.scrollIntoView({block:"start"}); return }
-  if(t.dataset.rmember){ removeMember(t.dataset.rmember); return }
   if(t.dataset.font){ S.font=t.dataset.font; save(); render(); return }
   if(t.dataset.edit){ editBeleg(t.dataset.edit); return }
   if(t.dataset.wopen){ startWiz(t.dataset.wopen); return }
@@ -2013,7 +2323,7 @@ document.addEventListener("click", e=>{
   if(t.dataset.delno){delAsk=null;render();return}
   if(t.dataset.delyes){deleteBeleg(t.dataset.delyes);return}
   if(t.dataset.subToggle){toggleSubmitted(t.dataset.subToggle);return}
-  if(t.dataset.view){$("lbimg").src=blobUrl(t.dataset.view);$("lightbox").hidden=false;return}
+  if(t.dataset.view){$("lbimg").src="/_blob/"+t.dataset.view;$("lightbox").hidden=false;return}
   if(t.dataset.delown){S.termine.eigene=(S.termine.eigene||[]).filter(x=>x.id!==t.dataset.delown);save();render();return}
   if(t.dataset.open){openKey = openKey===t.dataset.open?null:t.dataset.open; render(); if(openKey) reveal($("it-"+openKey));return}
   if(t.dataset.copy){const b=B.find(x=>x.k===t.dataset.copy);const L=curLetter(b);copy(`Betreff: ${L.subject}\n\n${L.body}`);return}
@@ -2041,32 +2351,6 @@ document.addEventListener("click", e=>{
     case "r-neu": startRechner(); break;
     case "r-antrag": { const k=pg()?"pg_hoch":"pg_antrag"; RECHNER=null; S.bereiche.pflege=true; if(!S.done){ S.done=true } startWiz(k); break }
     case "r-konto": RECHNER=null; if(typeof authMode!=="undefined"){ authMode="register"; authMsg="Lege ein kostenloses Konto an. Danach hilft dir die App Schritt für Schritt beim Antrag." } render(); scrollTop(); break;
-    case "au-google": googleLogin(); break;
-    case "au-login": case "au-register": case "au-forgot": case "au-newpw": authAction(a); break;
-    case "au-mode": authMode=t.dataset.mode; authMsg=""; render(); break;
-    case "au-show": { const p=$("au-pw"); if(p){ p.type=p.type==="password"?"text":"password"; t.textContent=p.type==="password"?"Zeigen":"Verbergen" } break }
-    case "au-guest": lsSet("dein-anspruch-modus","gast"); startGuest(); scrollTop(); break;
-    case "guest-register": GUEST=false; authMode="register"; authMsg=""; lsSet("dein-anspruch-modus",""); render(); scrollTop(); break;
-    case "logout": logout(); break;
-    case "cs-yes": giveConsent(); break;
-    case "fb-open": openFeedback(); break;
-    case "fb-close": closeFeedback(); break;
-    case "fb-send": sendFeedback(); break;
-    case "teilen": shareApp(); break;
-    case "eri-on": setEri(true,($("eri-mail")||{}).value); break;
-    case "eri-off": setEri(false); break;
-    case "persons": showPersons=!showPersons; delPersonAsk=false; if(showPersons) loadMembers(); render(); scrollTop(); break;
-    case "add-person": addPerson(); break;
-    case "invite": makeInvite(); break;
-    case "inv-copy": copy(inviteLink); break;
-    case "del-person": delPersonAsk=true; render(); break;
-    case "del-person-no": delPersonAsk=false; render(); break;
-    case "del-person-yes": deletePerson(); break;
-    case "wipe": wipeAsk=true; render(); { const w=$("wipe-word"); if(w) try{ w.focus({preventScroll:true}) }catch(e){} } break;
-    case "wipe-no": wipeAsk=false; render(); break;
-    case "wipe-yes": wipeAll(); break;
-    case "backup": backupData(); break;
-    case "restore": { const f=$("fileJson"); if(f){ f.value=""; f.click() } break }
     case "welcome-ok": S.welcomeSeen=true;save();render();break;
     case "vhp-quittung": makeQuittung();break;
     case "reset-no": $("resetconfirm").hidden=true;break;
@@ -2095,7 +2379,6 @@ document.addEventListener("change", e=>{
   if(t.id==="fileCam"||t.id==="fileAny"){ const f=t.files&&t.files[0]; if(f){ if(fileTarget==="bescheid"){ fileTarget=null; scanBescheid(f) } else if(!pending && (f.type==="application/pdf"||/\.pdf$/i.test(f.name||""))) importPdf(f); else startPending(f) } return }
   if(t.dataset.bd && bescheidDraft){ bescheidDraft[t.dataset.bd]=t.value; return }
   if(t.dataset.bi && bulk && bulk.items){ const [i,f]=t.dataset.bi.split(":"); const it=bulk.items[+i]; if(it){ it[f]=t.type==="checkbox"?t.checked:t.value; render() } return }
-  if(t.dataset.fall){ openFall(t.dataset.fall); scrollTop(); return }
   if(t.id==="entl-seit"){ S.entlSeit=t.value; save(); render(); return }
   if(t.dataset.wq && t.type==="radio"){ const q=wizSteps().list.find(x=>x.k===t.dataset.wq); if(q){ setQ(q,t.value); render(); const k=S.wiz.k, i=S.wiz.i; setTimeout(()=>{ if(S.wiz&&S.wiz.k===k&&S.wiz.i===i){ const nx=document.querySelector('.wiz .nav [data-wnav="next"]:not(.ghost)'); nx&&nx.click() } },420) } return }
   if(t.dataset.wqm){ const q=wizSteps().list.find(x=>x.k===t.dataset.wqm); if(q){ const cur=Array.isArray(getQ(q))?getQ(q):[]; setQ(q, t.checked?[...cur,t.value]:cur.filter(x=>x!==t.value)); render() } return }
@@ -2145,7 +2428,6 @@ document.addEventListener("drop", e=>{const d=e.target.closest&&e.target.closest
 $("lbclose").onclick=()=>{$("lightbox").hidden=true};
 $("lightbox").onclick=e=>{if(e.target.id==="lightbox") $("lightbox").hidden=true};
 document.addEventListener("keydown",e=>{if(e.key==="Escape"){ $("lightbox").hidden=true; const fb=$("fbbox"); if(fb) fb.hidden=true }
-  if(e.key==="Enter" && e.target.closest && e.target.closest(".auth") && e.target.tagName==="INPUT"){ e.preventDefault(); const b=document.querySelector('.auth .btn.big'); b&&b.click(); return }
   if(e.key==="Enter" && S.wiz && e.target.matches && e.target.matches(".wiz input")){ e.preventDefault(); const nx=document.querySelector('.wiz .nav [data-wnav="next"]:not(.ghost)'); nx&&nx.click() }});
 
 async function copy(text){
@@ -2155,427 +2437,49 @@ async function copy(text){
 let tT; function toast(m){const t=$("toast");t.textContent=tr(m);t.hidden=false;clearTimeout(tT);tT=setTimeout(()=>t.hidden=true,2800)}
 
 /* ---------- Speicher (privat pro Konto) ---------- */
-
-/* ---------- Speicher: Supabase (Konto, Datenbank, Beleg-Fotos) ---------- */
-const SB_URL="https://ssamgluufgwsxvkyvaob.supabase.co";
-const SB_KEY="sb_publishable_UiXPXKzQ6uKTyQF3SqFQiw_VtjqAAbd";
-let sb=null, USER=null, GUEST=false, RECOVERY=false, authMsg="", authMode="login", authBusy=false;
 let ref=null, BCOL=null, ASSETS=null, saveTimer=null, writing=Promise.resolve(), canSave=false;
-let saveState={c:"",t:"Verbinde …"};
-let URLS={};
-const lsGet=k=>{try{return JSON.parse(localStorage.getItem(k)||"null")}catch(e){return null}};
-const lsSet=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
-function blobUrl(p){ return URLS[p]||"" }
+let saveState={c:"",t:"Verbinde mit deinem Konto …"};
 function setSave(c,t){saveState={c,t}; const d=$("savedot"), x=$("savetxt"); if(d){d.className="dot "+c} if(x) x.textContent=t}
-const DL={ async save({filename,data}){
-  const type=/\.csv$/.test(filename)?"text/csv;charset=utf-8":/\.pdf$/.test(filename)?"application/pdf":"application/octet-stream";
-  const blob=data instanceof Blob?data:new Blob([data],{type});
-  const u=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=u; a.download=filename; document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(()=>URL.revokeObjectURL(u),8000); return {status:"saved"} } };
-function claudeUse(n){ return Promise.resolve(n==="downloads"?DL:null) }
-const UI_KEYS=["tab","wiz","belegFilter","welcomeSeen"];
-let FAELLE=[], FALL_ID=null, MEMBERS=[], showPersons=false, inviteLink="", inviteBusy=false;
-function uiKey(){ return "da-ui-"+(USER?USER.id:"gast")+"-"+(FALL_ID||"x") }
+function claudeUse(n){ try{ return window.claude&&window.claude.use ? window.claude.use(n) : Promise.resolve(null) }catch(e){return Promise.resolve(null)} }
 function save(){
-  if(!canSave||!ref) return;
+  if(!canSave) return;
   clearTimeout(saveTimer); setSave("","Speichert …");
-  const ui={}; UI_KEYS.forEach(k=>ui[k]=S[k]); lsSet(uiKey(),ui); lsSet("da-font",S.font);
   saveTimer=setTimeout(()=>{
-    saveTimer=null;
     const data=JSON.parse(JSON.stringify(S)); data.updated=new Date().toISOString();
-    if(USER) UI_KEYS.forEach(k=>delete data[k]);
-    const f=FAELLE.find(x=>x.id===FALL_ID); if(f) f.data=data;
-    writing = writing.then(()=>ref.set(data)).then(()=>setSave("ok",USER?"Gespeichert":"Nur auf diesem Gerät")).catch(()=>{ setSave("warn","Nicht gespeichert – Internet prüfen") });
+    writing = writing.then(()=>ref.set(data)).then(()=>setSave("ok","Gespeichert")).catch(()=>{
+      canSave=false; setSave("warn","Nicht gespeichert");
+    });
   },700);
 }
 function merge(d){
   const b=blank();
   const m={...b,...d,bereiche:{...b.bereiche,...(d.bereiche||{})},pp:{...b.pp,...(d.pp||{})},sb:{...b.sb,...(d.sb||{}),mz:{...(d.sb&&d.sb.mz||{})}},person:{...b.person,...(d.person||{})},termine:{...b.termine,...(d.termine||{})},belegFilter:{...b.belegFilter,...(d.belegFilter||{})},vhp:{...b.vhp,...(d.vhp||{})},bruttoJahr:{...(d.bruttoJahr||{})},ans:{...(d.ans||{})},sent:{...(d.sent||{})}};
+  if(d.done && d.welcomeSeen===undefined) m.welcomeSeen=false;
   if(d.done===undefined) m.done = (d.step||0)>=6 && !!d.rolle;
   delete m.updated; return m;
 }
-function fallName(f){ const p=(f&&f.data&&f.data.person)||{}; return (p.name||"").trim()||"Neue Person" }
-const toRow=d=>{ const r={}; for(const k of ["kat","titel","ctype","eingereicht","jahr"]) if(k in d) r[k]=d[k];
-  if("datum" in d) r.datum=d.datum||null; if("betrag" in d) r.betrag=(d.betrag===""||d.betrag==null||isNaN(d.betrag))?null:Number(d.betrag);
-  if("asset" in d) r.pfad=d.asset||""; return r };
-async function refreshUrls(){
-  const paths=BEL.map(b=>b.asset).filter(p=>p&&!URLS[p]); if(!paths.length) return;
-  const {data}=await sb.storage.from("belege").createSignedUrls(paths,6*3600);
-  (data||[]).forEach(x=>{ if(x.signedUrl) URLS[x.path]=x.signedUrl });
-}
-async function reloadBelege(){
-  if(!USER||!FALL_ID) return;
-  const {data,error}=await sb.from("belege").select("*").eq("fall_id",FALL_ID).order("datum",{ascending:false});
-  if(error){ toast("Belege konnten nicht geladen werden."); return }
-  BEL=data.map(r=>({id:r.id,kat:r.kat,datum:r.datum||"",jahr:r.jahr,betrag:r.betrag==null?"":Number(r.betrag),titel:r.titel||"",asset:r.pfad||"",ctype:r.ctype||"",eingereicht:!!r.eingereicht}));
-  try{ await refreshUrls() }catch(e){}
+let loaded=false;
+setTimeout(()=>{ if(!loaded){ loaded=true; setSave("warn","Speicher antwortet langsam …"); render() } },3500);
+async function initStore(){
+  const [db,user,assets] = await Promise.all([claudeUse("db"),claudeUse("user"),claudeUse("assets")]);
+  ASSETS=assets||null;
+  if(!db||!user){ loaded=true;  setSave("warn","Nicht angemeldet: nichts wird gespeichert"); render(); return }
+  let id=null; try{ id=await user.id() }catch(e){}
+  if(!id){ loaded=true; setSave("warn","Nicht angemeldet: nichts wird gespeichert"); render(); return }
+  ref=db.doc("data/users/"+id+"/fall");
+  try{
+    const late=loaded;
+    const snap=await ref.get();
+    if(snap.exists){ S=merge(snap.data()); if(late) toast("Deine gespeicherten Angaben sind jetzt geladen.") }
+    canSave=true; setSave("ok","Privat gespeichert");
+  }catch(e){ setSave("warn","Speicher nicht erreichbar") }
+  loaded=true;
+  try{
+    BCOL=ref.collection("belege");
+    BCOL.onSnapshot(qs=>{ BEL=qs.docs.filter(d=>d.exists).map(d=>({id:d.id,...d.data()})); render() }, ()=>{ BCOL=null; });
+  }catch(e){ BCOL=null }
   render();
 }
-const BCOL_SB={
-  async add(d){ const {error}=await sb.from("belege").insert({...toRow(d),fall_id:FALL_ID}); if(error) throw error; await reloadBelege() },
-  doc(id){ return {
-    async update(d){ const {error}=await sb.from("belege").update(toRow(d)).eq("id",id); if(error) throw error; await reloadBelege() },
-    async delete(){ const {error}=await sb.from("belege").delete().eq("id",id); if(error) throw error; await reloadBelege() } } },
-};
-const ASSETS_SB={
-  async upload(blob,{type}){
-    const ext=type==="application/pdf"?"pdf":type==="image/png"?"png":type==="image/webp"?"webp":"jpg";
-    const id=(crypto.randomUUID?crypto.randomUUID():String(Date.now())+Math.random().toString(16).slice(2));
-    const path=`${FALL_ID}/${id}.${ext}`;
-    const {error}=await sb.storage.from("belege").upload(path,blob,{contentType:type,upsert:false});
-    if(error) throw {code:/size|large|exceed/i.test(error.message||"")?"too_large":"upload"};
-    const {data}=await sb.storage.from("belege").createSignedUrl(path,6*3600); if(data) URLS[path]=data.signedUrl;
-    return {id:path,contentType:type};
-  },
-  async delete(path){ await sb.storage.from("belege").remove([path]) },
-};
-const REF_SB={ async set(data){ const {error}=await sb.from("fall").update({data,updated_at:new Date().toISOString()}).eq("id",FALL_ID); if(error) throw error } };
-const REF_LOCAL={ async set(data){ lsSet("dein-anspruch-gast",data) } };
-
-async function loadFaelle(){
-  const {data,error}=await sb.from("fall").select("id,data,created_by,updated_at").order("created_at");
-  if(error) throw error;
-  const {data:m}=await sb.from("mitglied").select("fall_id,rolle").eq("user_id",USER.id);
-  const rollen=Object.fromEntries((m||[]).map(x=>[x.fall_id,x.rolle]));
-  FAELLE=data.map(f=>({...f,rolle:rollen[f.id]||"mitglied"}));
-}
-async function createFall(data){
-  const {data:row,error}=await sb.from("fall").insert({data:data||{}}).select("id,data,created_by,updated_at").single();
-  if(error) throw error; FAELLE.push({...row,rolle:"besitzer"}); return row.id;
-}
-async function openFall(id){
-  FALL_ID=id; lsSet("da-fall-"+USER.id,id); inviteLink=""; showPersons=false;
-  const f=FAELLE.find(x=>x.id===id);
-  S=merge({...(f?f.data:{}),...(lsGet(uiKey())||{}),font:lsGet("da-font")||"1"});
-  BEL=[]; URLS={}; openKey=null; pending=null; bescheidDraft=null;
-  ref=REF_SB; canSave=true; render(); reloadBelege(); loadMembers();
-}
-async function loadMembers(){
-  MEMBERS=[]; if(!FALL_ID) return;
-  const {data}=await sb.from("mitglied").select("user_id,rolle,email").eq("fall_id",FALL_ID);
-  MEMBERS=data||[]; if(showPersons) render();
-}
-const CONSENT_VERSION="2026-10";
-function consentNeeded(){ return !!USER && !((USER.user_metadata||{}).einwilligung_am) }
-let consentBusy=false;
-function viewConsent(){
-  return `<section class="panel auth consent">
-    <h2>Bevor es losgeht</h2>
-    <p>Damit die App dir helfen kann, speichert sie Angaben zur Pflege, zum Beispiel den Pflegegrad, Anträge und Belege. Das sind Gesundheitsdaten, und die sind besonders geschützt. Deshalb brauchen wir einmalig deine ausdrückliche Einwilligung.</p>
-    <ul class="small">
-      <li>Die Daten liegen verschlüsselt in Frankfurt (EU).</li>
-      <li>Nur du und Personen, die du selbst einlädst, sehen sie.</li>
-      <li>Keine Werbung, kein Verkauf von Daten.</li>
-      <li>Du kannst alles jederzeit selbst löschen.</li>
-    </ul>
-    <label class="choice" for="cs-ok"><input type="checkbox" id="cs-ok"><span>Ich willige ein, dass Dein Anspruch meine Angaben, auch Gesundheitsdaten, speichert und verarbeitet, um mir die Funktionen der App bereitzustellen (Art. 9 Abs. 2 lit. a DSGVO). Wenn ich Angaben über eine andere Person mache, bin ich dazu berechtigt, zum Beispiel mit ihrem Einverständnis oder als Bevollmächtigte/r. Ich kann die Einwilligung jederzeit widerrufen, indem ich meine Daten in der App lösche.<small>Mehr dazu in der <a href="datenschutz.html" target="_blank" rel="noopener">Datenschutzerklärung</a>. Es gelten die <a href="nutzungsbedingungen.html" target="_blank" rel="noopener">Nutzungsbedingungen</a>.</small></span></label>
-    <button class="btn big" type="button" data-act="cs-yes" ${consentBusy?"disabled":""}>${consentBusy?"Einen Moment …":"Zustimmen und weiter"}</button>
-    <button class="btn ghost" type="button" data-act="logout">Nicht zustimmen und abmelden</button>
-  </section>`;
-}
-async function giveConsent(){
-  const c=$("cs-ok"); if(!c||!c.checked){ toast("Bitte zuerst das Häkchen bei der Einwilligung setzen."); return }
-  consentBusy=true; render();
-  const {data,error}=await sb.auth.updateUser({data:{einwilligung_am:new Date().toISOString(),einwilligung_version:CONSENT_VERSION}});
-  consentBusy=false;
-  if(error){ toast("Das hat nicht geklappt. Bitte noch einmal versuchen."); return render() }
-  if(data&&data.user) USER=data.user;
-  await loadUserData();
-}
-async function loadUserData(){
-  if(consentNeeded()){ loaded=true; canSave=false; setSave("","Einwilligung fehlt"); render(); return }
-  setSave("","Lade deine Daten …");
-  try{
-    const code=lsGet("da-einladung"); let joined=null;
-    if(code){ lsSet("da-einladung",null); const {data,error}=await sb.rpc("einladung_annehmen",{c:code}); if(error) toast("Die Einladung ist ungültig oder abgelaufen."); else { joined=data; toast("Willkommen! Ihr pflegt jetzt gemeinsam.") } }
-    await loadFaelle();
-    if(!FAELLE.length){ const guest=lsGet("dein-anspruch-gast"); await createFall(guest||{}); if(guest) toast("Deine Angaben von diesem Gerät wurden ins Konto übernommen.") }
-    const want=joined||lsGet("da-fall-"+USER.id);
-    ASSETS=ASSETS_SB; BCOL=BCOL_SB; GUEST=false; loaded=true;
-    setSave("ok","Gespeichert");
-    await openFall(FAELLE.some(f=>f.id===want)?want:FAELLE[0].id);
-  }catch(e){ canSave=false; loaded=true; setSave("warn","Speicher nicht erreichbar"); render() }
-}
-async function refreshFromServer(){
-  if(!USER||!FALL_ID||saveTimer) return;
-  const {data}=await sb.from("fall").select("data,updated_at").eq("id",FALL_ID).maybeSingle();
-  const f=FAELLE.find(x=>x.id===FALL_ID);
-  if(data && f && data.updated_at!==f.updated_at){ f.data=data.data; f.updated_at=data.updated_at; const ui={}; UI_KEYS.forEach(k=>ui[k]=S[k]); S=merge({...data.data,...ui,font:S.font}); render(); }
-  reloadBelege();
-}
-document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible") refreshFromServer().catch(()=>{}) });
-async function addPerson(){
-  try{ const id=await createFall({}); await openFall(id); scrollTop(); toast("Neue Person angelegt. Beantworte kurz die Fragen.") }catch(e){ toast("Anlegen hat nicht geklappt.") }
-}
-async function makeInvite(){
-  inviteBusy=true; render();
-  const {data,error}=await sb.rpc("einladung_erstellen",{f:FALL_ID});
-  inviteBusy=false;
-  if(error){ toast("Einladung konnte nicht erstellt werden."); return render() }
-  inviteLink=location.origin+location.pathname+"?einladung="+data; render();
-}
-async function removeMember(uid){
-  const {error}=await sb.from("mitglied").delete().eq("fall_id",FALL_ID).eq("user_id",uid);
-  if(error) return toast("Entfernen hat nicht geklappt.");
-  if(uid===USER.id){ FAELLE=FAELLE.filter(f=>f.id!==FALL_ID); toast("Du bist ausgetreten."); if(!FAELLE.length) await createFall({}); return openFall(FAELLE[0].id) }
-  toast("Person entfernt."); loadMembers().then(render);
-}
-let delPersonAsk=false;
-async function deletePerson(){
-  try{
-    const paths=BEL.map(b=>b.asset).filter(Boolean); if(paths.length) await sb.storage.from("belege").remove(paths);
-    const {error}=await sb.from("fall").delete().eq("id",FALL_ID); if(error) throw error;
-    FAELLE=FAELLE.filter(f=>f.id!==FALL_ID); delPersonAsk=false; toast("Person und ihre Daten wurden gelöscht.");
-    if(!FAELLE.length) await createFall({}); openFall(FAELLE[0].id);
-  }catch(e){ toast("Löschen hat nicht geklappt.") }
-}
-function viewPersons(){
-  const cur=FAELLE.find(f=>f.id===FALL_ID)||{}; const own=cur.rolle==="besitzer";
-  const others=MEMBERS.filter(m=>m.user_id!==USER.id);
-  return `<section class="panel persons">
-    <div class="section-title"><h2>Für wen?</h2><button type="button" class="linkbtn" data-act="persons">Schließen</button></div>
-    <div class="choices big">${FAELLE.map(f=>`<label class="choice" for="pf-${f.id}"><input type="radio" id="pf-${f.id}" name="pfall" data-fall="${f.id}" ${f.id===FALL_ID?"checked":""}><span>${esc(fallName(f))}<small>${f.rolle==="besitzer"?"angelegt von dir":"mit dir geteilt"}</small></span></label>`).join("")}</div>
-    <button class="btn ghost" type="button" data-act="add-person">${ic("plus")}Weitere Person anlegen</button>
-    <hr class="sep">
-    <h3>Gemeinsam pflegen</h3>
-    <p class="small muted">Lade Geschwister oder andere Helfer ein. Sie sehen dann die Angaben, Belege und Fristen von ${esc(fallName(cur))} und können mithelfen.</p>
-    ${others.length?`<ul class="members">${others.map(m=>`<li><span>${esc(m.email||"Familienmitglied")}${m.rolle==="besitzer"?' <span class="tag">hat angelegt</span>':""}</span>${own?`<button type="button" class="linkbtn danger" data-rmember="${m.user_id}">Entfernen</button>`:""}</li>`).join("")}</ul>`:""}
-    ${inviteLink?`<div class="recip"><span><strong>Einladungslink</strong> (14 Tage gültig, für eine Person)</span><code>${esc(inviteLink)}</code>
-        <span class="btnrow"><button class="btn small" type="button" data-act="inv-copy">Link kopieren</button><a class="btn small soft" href="https://wa.me/?text=${encodeURIComponent("Ich lade dich zu „Dein Anspruch“ ein, damit wir uns gemeinsam um "+fallName(cur)+" kümmern können: "+inviteLink)}" target="_blank" rel="noopener">Per WhatsApp</a>
-        <a class="btn small ghost" href="mailto:?subject=${encodeURIComponent("Einladung: Dein Anspruch")}&body=${encodeURIComponent("Hallo, ich lade dich zu „Dein Anspruch“ ein, damit wir uns gemeinsam um "+fallName(cur)+" kümmern können:\n\n"+inviteLink)}">Per E-Mail</a></span></div>`
-      :`<button class="btn" type="button" data-act="invite" ${inviteBusy?"disabled":""}>${ic("user")}Jemanden einladen</button>`}
-    <hr class="sep">
-    ${own?(delPersonAsk?`<p class="notice bad">${ic("alert")}<span>${esc(fallName(cur))} mit allen Angaben und Belegen für alle löschen? <span class="btnrow" style="margin-top:8px"><button class="btn small danger" type="button" data-act="del-person-yes">Ja, löschen</button><button class="btn small ghost" type="button" data-act="del-person-no">Abbrechen</button></span></span></p>`
-      :`<button class="linkbtn danger" type="button" data-act="del-person">${esc(fallName(cur))} löschen</button>`)
-      :`<button class="linkbtn danger" type="button" data-rmember="${USER.id}">Aus diesem gemeinsamen Fall austreten</button>`}
-  </section>`;
-}
-function startGuest(){
-  GUEST=true; USER=null; ref=REF_LOCAL; canSave=true; ASSETS=null; BCOL=null;
-  const g=lsGet("dein-anspruch-gast"); S=g?merge(g):blank();
-  setSave("warn","Nur auf diesem Gerät"); render();
-}
-let loaded=false;
-async function initStore(){
-  try{ if(new URLSearchParams(location.search).has("rechner")) RECHNER={i:0,a:[]} }catch(e){}
-  try{ const q=new URLSearchParams(location.search); const c=q.get("einladung"); if(c){ lsSet("da-einladung",c); history.replaceState(null,"",location.pathname) } }catch(e){}
-  if(!window.supabase){ loaded=true; setSave("warn","Keine Verbindung – nur auf diesem Gerät"); startGuest(); return }
-  sb=window.supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,storageKey:"dein-anspruch-auth"}});
-  sb.auth.onAuthStateChange((ev,session)=>{
-    if(ev==="PASSWORD_RECOVERY"){ RECOVERY=true; render() }
-    const u=session?session.user:null;
-    if(u && (!USER || USER.id!==u.id)){ USER=u; setTimeout(loadUserData,0) }
-    if(!u && USER){ USER=null; S=blank(); BEL=[]; URLS={}; FAELLE=[]; FALL_ID=null; canSave=false; ref=null; ASSETS=null; BCOL=null; render() }
-  });
-  try{
-    const {data:{session}}=await sb.auth.getSession();
-    if(session&&session.user){ if(!USER){ USER=session.user; await loadUserData() } }
-    else { loaded=true; if(lsGet("dein-anspruch-modus")==="gast") startGuest(); else render() }
-  }catch(e){ loaded=true; render() }
-}
-
-/* ---------- Anmeldung ---------- */
-function viewLogin(){
-  if(RECOVERY) return `<section class="panel auth"><h2>Neues Passwort festlegen</h2>
-    <div class="field"><label for="au-pw">Neues Passwort (mindestens 8 Zeichen)</label><input type="password" id="au-pw" autocomplete="new-password"></div>
-    ${authMsg?`<p class="notice">${ic("info")}<span>${esc(authMsg)}</span></p>`:""}
-    <button class="btn big" type="button" data-act="au-newpw" ${authBusy?"disabled":""}>Passwort speichern</button></section>`;
-  const reg=authMode==="register", fg=authMode==="forgot";
-  return `<section class="panel auth">
-    ${lsGet("da-einladung")?`<p class="notice good">${ic("user")}<span><strong>Du wurdest eingeladen.</strong> Melde dich an oder lege ein Konto an. Danach siehst du den gemeinsamen Fall.</span></p>`:""}
-    <h2>${reg?"Konto anlegen":fg?"Passwort vergessen":"Willkommen"}</h2>
-    <p class="muted">${reg?"Mit einem Konto sind deine Angaben und Belege sicher gespeichert und auf Handy und Computer gleich.":fg?"Gib deine E-Mail-Adresse ein. Wir schicken dir einen Link zum Zurücksetzen.":"Melde dich an, um deine Angaben und Belege zu sehen."}</p>
-    ${fg?"":`<button type="button" class="btn big gbtn" data-act="au-google"><svg viewBox="0 0 48 48" width="22" height="22" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>Mit Google anmelden</button>
-    <div class="orline"><span>oder mit E-Mail</span></div>`}
-    <div class="field"><label for="au-mail">E-Mail-Adresse</label><input type="email" id="au-mail" autocomplete="email" inputmode="email" value="${esc(lsGet("dein-anspruch-mail")||"")}"></div>
-    ${fg?"":`<div class="field"><label for="au-pw">Passwort${reg?" (mindestens 8 Zeichen)":""}</label><div class="euro"><input type="password" id="au-pw" autocomplete="${reg?"new-password":"current-password"}"><button type="button" class="btn small ghost" data-act="au-show">Zeigen</button></div></div>`}
-    ${authMsg?`<p class="notice ${/fehl|falsch|nicht/i.test(authMsg)?"bad":"info"}">${ic("info")}<span>${esc(authMsg)}</span></p>`:""}
-    <button class="btn big" type="button" data-act="${reg?"au-register":fg?"au-forgot":"au-login"}" ${authBusy?"disabled":""}>${authBusy?"Einen Moment …":reg?"Konto anlegen":fg?"Link schicken":"Anmelden"}</button>
-    <div class="btnrow">
-      ${authMode!=="login"?`<button type="button" class="linkbtn" data-act="au-mode" data-mode="login">Ich habe schon ein Konto</button>`:`<button type="button" class="linkbtn" data-act="au-mode" data-mode="register">Neu hier? Konto anlegen</button><button type="button" class="linkbtn" data-act="au-mode" data-mode="forgot">Passwort vergessen?</button>`}
-    </div>
-    <hr style="border:0;border-top:1px solid var(--line);margin:4px 0">
-    <button type="button" class="btn ghost" data-act="au-guest">Ohne Konto ausprobieren</button>
-    <button type="button" class="linkbtn" data-act="r-start">Pflegegrad-Rechner: ohne Anmeldung einschätzen, welcher Pflegegrad in Frage kommt</button>
-    <p class="small muted">Ohne Konto bleiben deine Angaben nur in diesem Browser, und Belege-Fotos werden nicht gespeichert. Du kannst später jederzeit ein Konto anlegen, deine Angaben werden dann übernommen.</p>
-  </section>`;
-}
-async function authAction(a){
-  const mail=($("au-mail")||{}).value?.trim()||"", pw=($("au-pw")||{}).value||"";
-  if(a!=="au-newpw" && !/^\S+@\S+\.\S+$/.test(mail)){ authMsg="Bitte eine gültige E-Mail-Adresse eingeben."; return render() }
-  if((a==="au-register"||a==="au-newpw") && pw.length<8){ authMsg="Das Passwort muss mindestens 8 Zeichen haben."; return render() }
-  lsSet("dein-anspruch-mail",mail||lsGet("dein-anspruch-mail"));
-  authBusy=true; authMsg=""; render();
-  const back=location.origin+location.pathname;
-  let r;
-  try{
-    if(a==="au-login"){ r=await sb.auth.signInWithPassword({email:mail,password:pw}); if(r.error) authMsg=/confirm/i.test(r.error.message)?"Die E-Mail-Adresse ist noch nicht bestätigt. Bitte den Link in der Bestätigungs-E-Mail antippen.":"Anmeldung fehlgeschlagen. E-Mail oder Passwort ist falsch."; else lsSet("dein-anspruch-modus","konto") }
-    else if(a==="au-register"){ r=await sb.auth.signUp({email:mail,password:pw,options:{emailRedirectTo:back}});
-      if(r.error) authMsg=/already|registered/i.test(r.error.message)?"Für diese E-Mail gibt es schon ein Konto. Bitte anmelden.":/rate|limit/i.test(r.error.message)?"Gerade werden zu viele E-Mails verschickt. Bitte in einer Stunde noch einmal versuchen.":"Konto anlegen hat nicht geklappt: "+r.error.message;
-      else if(!r.data.session){ authMsg="Fast geschafft! Wir haben dir eine E-Mail geschickt. Bitte den Link darin antippen und dich danach hier anmelden."; authMode="login" } }
-    else if(a==="au-forgot"){ r=await sb.auth.resetPasswordForEmail(mail,{redirectTo:back}); authMsg=r.error?"Das hat nicht geklappt. Bitte später noch einmal versuchen.":"Wenn es ein Konto mit dieser Adresse gibt, ist jetzt eine E-Mail mit einem Link unterwegs."; }
-    else if(a==="au-newpw"){ r=await sb.auth.updateUser({password:pw}); if(r.error) authMsg="Das neue Passwort konnte nicht gespeichert werden."; else { RECOVERY=false; authMsg=""; toast("Neues Passwort gespeichert") } }
-  }catch(e){ authMsg="Keine Verbindung. Bitte Internet prüfen." }
-  authBusy=false; render();
-}
-async function googleLogin(){
-  authBusy=true; authMsg=""; render();
-  const {error}=await sb.auth.signInWithOAuth({provider:"google",options:{redirectTo:location.origin+location.pathname}});
-  if(error){ authBusy=false; authMsg=/not enabled|provider/i.test(error.message)?"Die Anmeldung mit Google ist noch nicht eingeschaltet. Bitte vorerst mit E-Mail anmelden.":"Anmeldung mit Google hat nicht geklappt. Bitte erneut versuchen."; render() }
-}
-async function logout(){ try{ await sb.auth.signOut() }catch(e){} ERI=null; eriLoaded=false; lsSet("dein-anspruch-modus",""); USER=null; GUEST=false; S=blank(); BEL=[]; URLS={}; FAELLE=[]; FALL_ID=null; showPersons=false; canSave=false; ref=null; render(); scrollTop() }
-
-let wipeAsk=false, dataBusy="";
-const WIPE_WORD=v=>/^l(ö|oe|o)schen$/i.test(String(v||"").trim());
-async function wipeAll(){
-  const w=$("wipe-word"); if(!w || !WIPE_WORD(w.value)){ toast("Bitte zum Bestätigen das Wort LÖSCHEN eintippen."); if(w) w.focus(); return }
-  wipeAsk=false;
-  if(!USER){ lsSet("dein-anspruch-gast",null); S=blank(); BEL=[]; render(); toast("Alle Angaben auf diesem Gerät wurden gelöscht."); return }
-  try{
-    for(const f of FAELLE){
-      if(f.rolle==="besitzer"){
-        const {data:bl}=await sb.from("belege").select("pfad").eq("fall_id",f.id);
-        const paths=(bl||[]).map(b=>b.pfad).filter(Boolean); if(paths.length) await sb.storage.from("belege").remove(paths);
-        await sb.from("fall").delete().eq("id",f.id);
-      } else await sb.from("mitglied").delete().eq("fall_id",f.id).eq("user_id",USER.id);
-    }
-    await sb.from("faelle").delete().eq("user_id",USER.id);
-    lsSet("dein-anspruch-gast",null);
-    toast("Alle deine Daten wurden gelöscht.");
-  }catch(e){ toast("Löschen hat nicht vollständig geklappt. Bitte erneut versuchen."); return }
-  await logout();
-}
-
-/* ---------- Sicherung herunterladen und wieder einspielen ---------- */
-const blobToDataUrl=b=>new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsDataURL(b) });
-function cleanData(d){ const x=JSON.parse(JSON.stringify(d||{})); delete x.wiz; delete x.updated; return x }
-async function backupData(){
-  if(dataBusy) return; dataBusy="backup"; render();
-  try{
-    const out={app:"dein-anspruch",version:1,exportiert:new Date().toISOString(),personen:[]};
-    const list=USER?FAELLE:[{id:null,data:S}];
-    for(const f of list){
-      const data=cleanData(f.id===FALL_ID||!USER?S:f.data); const belege=[];
-      if(USER){
-        const {data:rows}=await sb.from("belege").select("*").eq("fall_id",f.id);
-        for(const r of rows||[]){
-          const b={kat:r.kat,datum:r.datum||"",jahr:r.jahr,betrag:r.betrag==null?"":Number(r.betrag),titel:r.titel||"",ctype:r.ctype||"",eingereicht:!!r.eingereicht};
-          if(r.pfad){ try{ const {data:blob}=await sb.storage.from("belege").download(r.pfad); if(blob) b.datei=await blobToDataUrl(blob) }catch(e){} }
-          belege.push(b);
-        }
-      } else BEL.forEach(b=>belege.push({kat:b.kat,datum:b.datum,jahr:b.jahr,betrag:b.betrag,titel:b.titel,eingereicht:!!b.eingereicht}));
-      out.personen.push({name:fallName({data}),data,belege});
-    }
-    const blob=new Blob([JSON.stringify(out)],{type:"application/json"});
-    const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=`dein-anspruch-sicherung-${isoD(TODAY())}.json`;
-    document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove() },4000);
-    toast("Sicherung heruntergeladen. Bewahre die Datei gut auf.");
-  }catch(e){ toast("Sicherung hat nicht geklappt. Bitte erneut versuchen.") }
-  dataBusy=""; render();
-}
-async function restoreData(file){
-  if(!file||dataBusy) return;
-  let j=null; try{ j=JSON.parse(await file.text()) }catch(e){}
-  if(!j||j.app!=="dein-anspruch"||!Array.isArray(j.personen)||!j.personen.length){ toast("Das ist keine Sicherung von Dein Anspruch."); return }
-  dataBusy="restore"; render();
-  try{
-    if(!USER){
-      const p=j.personen[0]; S=merge(p.data||{}); BEL=(p.belege||[]).map((b,i)=>({id:"local-r"+i,...b,asset:""})); save();
-      toast("Sicherung eingespielt (ohne Fotos, da ohne Konto).");
-    } else {
-      let first=null;
-      for(const p of j.personen){
-        const id=await createFall(p.data||{}); first=first||id;
-        for(const b of p.belege||[]){
-          let pfad="";
-          if(b.datei && /^data:/.test(b.datei)){
-            try{ const blob=await (await fetch(b.datei)).blob(); const type=blob.type||b.ctype||"image/jpeg";
-              const ext=type==="application/pdf"?"pdf":type==="image/png"?"png":type==="image/webp"?"webp":"jpg";
-              const path=`${id}/${crypto.randomUUID?crypto.randomUUID():Date.now()+Math.random().toString(16).slice(2)}.${ext}`;
-              const {error}=await sb.storage.from("belege").upload(path,blob,{contentType:type,upsert:false}); if(!error) pfad=path }catch(e){}
-          }
-          await sb.from("belege").insert({fall_id:id,kat:b.kat||"sonst",titel:b.titel||"",datum:b.datum||null,jahr:b.jahr||null,betrag:b.betrag===""||b.betrag==null?null:Number(b.betrag),eingereicht:!!b.eingereicht,ctype:pfad?(b.ctype||""):"",pfad});
-        }
-      }
-      await loadFaelle(); await openFall(first);
-      toast(j.personen.length===1?"Sicherung eingespielt.":`Sicherung eingespielt: ${j.personen.length} Personen.`);
-    }
-  }catch(e){ toast("Einspielen hat nicht vollständig geklappt. Bitte prüfen.") }
-  dataBusy=""; render();
-}
-function datenBox(){
-  return `<section class="panel datenbox">
-    <h3>Deine Daten</h3>
-    <p class="small muted">Lade ab und zu eine Sicherung herunter. Mit der Datei kannst du alles wiederherstellen, auch nach dem Löschen.</p>
-    <div class="btnrow"><button class="btn small soft" type="button" data-act="backup" ${dataBusy?"disabled":""}>${ic("down")}${dataBusy==="backup"?"Sicherung wird erstellt …":"Sicherung herunterladen"}</button><button class="btn small ghost" type="button" data-act="restore" ${dataBusy?"disabled":""}>${dataBusy==="restore"?"Wird eingespielt …":"Sicherung einspielen"}</button></div>
-    ${wipeAsk?`<div class="notice bad">${ic("alert")}<span><strong>Wirklich alles löschen?</strong> Alle Angaben, Belege und Fotos werden für immer gelöscht${USER&&MEMBERS.length>1?", auch für eingeladene Familienmitglieder":""}. Lade vorher eine Sicherung herunter.
-      <span class="field" style="margin-top:10px"><label for="wipe-word">Zum Bestätigen <strong>LÖSCHEN</strong> eintippen</label><input type="text" id="wipe-word" autocomplete="off" autocapitalize="characters" spellcheck="false"></span>
-      <span class="btnrow" style="margin-top:10px"><button class="btn small danger" type="button" data-act="wipe-yes">Endgültig löschen</button><button class="btn small ghost" type="button" data-act="wipe-no">Abbrechen</button></span></span></div>`
-    :`<button class="linkbtn danger" type="button" data-act="wipe" style="align-self:flex-start">Meine Daten endgültig löschen</button>`}
-  </section>`;
-}
-
-/* ---------- E-Mail-Erinnerungen ---------- */
-let ERI=null, eriLoaded=false;
-async function loadEri(){ if(!USER) return; const {data}=await sb.from("erinnerung").select("aktiv,email").eq("user_id",USER.id).maybeSingle(); ERI=data||null; eriLoaded=true; render() }
-async function setEri(aktiv,email){
-  const mail=(email||(ERI&&ERI.email)||USER.email||"").trim();
-  if(aktiv && !/^\S+@\S+\.\S+$/.test(mail)){ toast("Bitte eine gültige E-Mail-Adresse eingeben."); return }
-  const {error}=await sb.from("erinnerung").upsert({user_id:USER.id,aktiv,email:mail,updated_at:new Date().toISOString()});
-  if(error){ toast("Speichern hat nicht geklappt."); return }
-  ERI={aktiv,email:mail}; toast(aktiv?"Erinnerungen per E-Mail sind an.":"Erinnerungen per E-Mail sind aus."); render();
-}
-function eriCard(){
-  if(!USER) return "";
-  if(!eriLoaded){ loadEri(); return "" }
-  const on=ERI&&ERI.aktiv;
-  return `<section class="panel mini">
-    <div class="mini-head">${ic("bell")}<div><h3>Erinnerungen per E-Mail</h3><p class="small muted">Wir schreiben dir 14, 7 und 1 Tag vor jeder Frist, für alle Personen in deinem Konto.</p></div></div>
-    ${on?`<p class="small">An: <strong>${esc(ERI.email)}</strong></p><div class="btnrow"><button class="btn small ghost" type="button" data-act="eri-off">Ausschalten</button></div>`
-      :`<div class="grid2" style="align-items:end"><div class="field"><label for="eri-mail">E-Mail-Adresse</label><input type="email" id="eri-mail" value="${esc((ERI&&ERI.email)||USER.email||"")}"></div><div><button class="btn" type="button" data-act="eri-on">${ic("bell")}Einschalten</button></div></div>`}
-  </section>`;
-}
-
-/* ---------- Fehlerprotokoll (ohne persönliche Daten), Feedback, Weiterempfehlen ---------- */
-const APP_VERSION="a9821064"; let errN=0;
-function reportError(msg,stack){
-  if(!sb||errN>=5) return; errN++;
-  const clean=s=>String(s||"").replace(/[\w.+-]+@[\w-]+\.[\w.]+/g,"[mail]").replace(/\d{5,}/g,"[zahl]");
-  let seite=""; try{ seite=famKey().split(":")[0] }catch(e){}
-  try{ sb.from("fehler").insert({meldung:clean(msg).slice(0,500)||"?",stelle:clean(stack).slice(0,1500),seite:seite.slice(0,100),version:APP_VERSION,geraet:navigator.userAgent.slice(0,200)}).then(()=>{},()=>{}) }catch(e){}
-}
-window.addEventListener("error",e=>{ if(e.message && !/ResizeObserver|^Script error/.test(e.message)) reportError(e.message,(e.error&&e.error.stack)||((e.filename||"")+":"+(e.lineno||""))) });
-window.addEventListener("unhandledrejection",e=>{ const r=e.reason; if(r&&r.name==="AbortError") return; reportError((r&&r.message)||String(r),r&&r.stack) });
-function openFeedback(){
-  let d=$("fbbox"); if(!d){ d=document.createElement("div"); d.id="fbbox"; d.className="overlay"; document.body.appendChild(d) }
-  d.hidden=false;
-  d.innerHTML=`<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="fb-h">
-    <h3 id="fb-h">Feedback geben</h3>
-    <p class="small muted">Was gefällt dir, was fehlt, was klappt nicht? Jede Nachricht wird gelesen. Bitte keine Gesundheitsdaten hineinschreiben.</p>
-    <div class="field"><label for="fb-text">Deine Nachricht</label><textarea id="fb-text" rows="5" maxlength="3000"></textarea></div>
-    <div class="field"><label for="fb-kontakt">E-Mail für Rückfragen (freiwillig)</label><input type="email" id="fb-kontakt" value="${esc((USER&&USER.email)||"")}"></div>
-    <div class="btnrow"><button class="btn" type="button" data-act="fb-send">Senden</button><button class="btn ghost" type="button" data-act="fb-close">Abbrechen</button></div>
-  </div>`;
-  try{ applyI18n(d) }catch(e){}
-  setTimeout(()=>{ const t=$("fb-text"); if(t) try{ t.focus() }catch(e){} },60);
-}
-function closeFeedback(){ const d=$("fbbox"); if(d) d.hidden=true }
-async function sendFeedback(){
-  const t=(($("fb-text")||{}).value||"").trim(); if(t.length<2){ toast("Bitte kurz schreiben, worum es geht."); return }
-  if(!sb){ toast("Keine Verbindung. Bitte später noch einmal versuchen."); return }
-  const btn=document.querySelector('#fbbox [data-act="fb-send"]'); if(btn){ btn.disabled=true; btn.textContent="Wird gesendet …" }
-  const kontakt=(($("fb-kontakt")||{}).value||"").trim().slice(0,200);
-  const {error}=await sb.from("rueckmeldung").insert({text:t.slice(0,3000),kontakt:kontakt||null,version:APP_VERSION});
-  if(error){ toast("Senden hat nicht geklappt. Bitte noch einmal versuchen."); if(btn){ btn.disabled=false; btn.textContent="Senden" } return }
-  closeFeedback(); toast("Danke! Deine Nachricht ist angekommen.");
-}
-async function shareApp(){
-  const url="https://yotan31.github.io/dein-anspruch/";
-  const text="Schau mal: Mit „Dein Anspruch“ siehst du kostenlos, welche Pflege-Leistungen euch noch zustehen. Mit fertigen Anträgen und Erinnerung an Fristen.";
-  if(navigator.share){ try{ await navigator.share({title:"Dein Anspruch",text,url}); return }catch(e){ if(e&&e.name==="AbortError") return } }
-  window.open("https://wa.me/?text="+encodeURIComponent(text+" "+url),"_blank","noopener");
-}
-document.addEventListener("click",e=>{ if(e.target && e.target.id==="fbbox") closeFeedback() });
-
 render();
 initStore();
+</script>
