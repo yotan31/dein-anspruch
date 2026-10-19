@@ -316,3 +316,6 @@ button,.btn,.choice,a,select,label{touch-action:manipulation}
 .members li{display:flex;justify-content:space-between;gap:10px;border:1px solid var(--line);border-radius:10px;padding:8px 12px;flex-wrap:wrap}
 hr.sep{border:0;border-top:1px solid var(--line);margin:4px 0}
 .recip code{display:block;padding:6px 0}
+
+/* ohne Internet */
+.offlinebanner{position:sticky;top:0;z-index:50;background:var(--warn-soft);color:var(--ink);font-weight:700;text-align:center;padding:8px 12px;font-size:.9rem;margin:-16px -16px 12px;border-bottom:1px solid var(--line)}
