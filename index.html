@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'wasm-unsafe-eval'; worker-src 'self' blob: https://cdn.jsdelivr.net; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://cdn.jsdelivr.net data: blob:; img-src 'self' data: blob: https://*.supabase.co; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'wasm-unsafe-eval'; worker-src 'self' blob: https://cdn.jsdelivr.net; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://cdn.jsdelivr.net data: blob:; img-src 'self' data: blob: https://*.supabase.co; style-src 'self' 'unsafe-inline'; font-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'self'">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex, nofollow">
 <meta name="description" content="Pflegegrad oder Schwerbehinderung: Welche Leistungen stehen noch zu? Mit fertigen Anträgen, Belege-Ablage und Fristen.">
@@ -14,10 +14,21 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>Dein Anspruch</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&display=swap">
-<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Dein Anspruch">
+<meta property="og:title" content="Dein Anspruch – welche Pflege-Leistungen stehen euch noch zu?">
+<meta property="og:description" content="Kostenlos prüfen, was bei Pflegegrad oder Schwerbehinderung noch offen ist. Mit fertigen Anträgen, Belege-Ablage und Erinnerung an Fristen.">
+<meta property="og:image" content="https://yotan31.github.io/dein-anspruch/teilen.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:url" content="https://yotan31.github.io/dein-anspruch/">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preload" href="vendor/schrift/AtkinsonHyperlegible-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<style>@font-face{font-family:"Atkinson Hyperlegible";src:url(vendor/schrift/AtkinsonHyperlegible-Regular.woff2) format("woff2");font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:"Atkinson Hyperlegible";src:url(vendor/schrift/AtkinsonHyperlegible-Bold.woff2) format("woff2");font-weight:700;font-style:normal;font-display:swap}
+@font-face{font-family:"Atkinson Hyperlegible";src:url(vendor/schrift/AtkinsonHyperlegible-Italic.woff2) format("woff2");font-weight:400;font-style:italic;font-display:swap}
+@font-face{font-family:"Source Serif 4";src:url(vendor/schrift/SourceSerif4.woff) format("woff");font-weight:500 700;font-style:normal;font-display:swap}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}
 
 /* Layout: eine ruhige Spalte. Oben ein dunkles „Akten-Deckblatt“ mit der Summe, darunter Reiter wie bei einem Ordner: Ansprüche · Belege · Termine. */
 :root{
@@ -257,6 +268,13 @@ details.used summary{cursor:pointer;font-weight:700;padding:6px 0}
 
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:10px;font-size:.95rem;max-width:calc(100% - 32px);z-index:30}
 footer{font-size:.83rem;color:var(--muted);padding-top:6px;display:flex;flex-direction:column;gap:6px}
+/* Feedback-Fenster */
+.overlay{position:fixed;inset:0;background:rgba(10,20,32,.45);z-index:40;display:flex;align-items:flex-end;justify-content:center;padding:16px}
+.overlay .sheet{background:var(--paper);color:var(--ink);border-radius:18px;padding:20px;max-width:520px;width:100%;display:flex;flex-direction:column;gap:12px;box-shadow:0 10px 40px rgba(0,0,0,.25);margin-bottom:env(safe-area-inset-bottom,0px)}
+.overlay .sheet h3{margin:0}
+.overlay textarea{width:100%;font:inherit;padding:10px;border:1.5px solid var(--line);border-radius:10px;background:var(--paper);color:var(--ink);box-sizing:border-box}
+@media (min-width:701px){.overlay{align-items:center}}
+.consent ul{margin:0;padding-left:1.2em;display:flex;flex-direction:column;gap:2px}
 /* Sammel-PDF */
 .bulklist{display:flex;flex-direction:column;gap:12px}
 .bulkitem{display:grid;grid-template-columns:96px 1fr;gap:12px;border:1.5px solid var(--line);border-radius:12px;padding:12px;background:var(--paper);transition:opacity .2s,border-color .2s}
@@ -325,7 +343,7 @@ hr.sep{border:0;border-top:1px solid var(--line);margin:4px 0}
 .recip code{display:block;padding:6px 0}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js" integrity="sha256-hZaWX+kY5lZgChtWjToWj1wNPSKmAIhrtvRKZVXbAec=" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js" crossorigin="anonymous" defer></script>
+<script src="vendor/jspdf.umd.min.js?v=4.2.1" defer></script>
 </head>
 <body>
 
@@ -336,7 +354,7 @@ hr.sep{border:0;border-top:1px solid var(--line);margin:4px 0}
   <main id="main" style="display:flex;flex-direction:column;gap:16px"></main>
   <footer>
     <p>Beträge nach der Leistungsübersicht des Bundesgesundheitsministeriums für 2026 (Stand 04.11.2025) und den Änderungen durch das BEEP-Gesetz ab 01.01.2026. Schwerbehinderten-Nachteilsausgleiche nach SGB IX und EStG, Stand 2026.</p>
-    <p>Deine Daten werden verschlüsselt übertragen und in einer Datenbank in Frankfurt gespeichert. Nur du kannst sie sehen. <a href="datenschutz.html">Datenschutz</a> · <a href="impressum.html">Impressum</a></p>
+    <p>Deine Daten werden verschlüsselt übertragen und in einer Datenbank in Frankfurt gespeichert. Nur du und Personen, die du einlädst, können sie sehen. <a href="datenschutz.html">Datenschutz</a> · <a href="nutzungsbedingungen.html">Nutzungsbedingungen</a> · <a href="impressum.html">Impressum</a> · <button type="button" class="linkbtn" data-act="fb-open">Feedback geben</button> · <button type="button" class="linkbtn" data-act="teilen">App weiterempfehlen</button></p>
     <p>Diese App ersetzt keine Rechtsberatung. Kostenlose, unabhängige Hilfe gibt es bei den Pflegestützpunkten, der Pflegeberatung deiner Pflegekasse (§ 7a SGB XI) und der EUTB-Teilhabeberatung.</p>
   </footer>
 </div>
@@ -346,6 +364,6 @@ hr.sep{border:0;border-top:1px solid var(--line);margin:4px 0}
 <input type="file" id="fileAny" accept="image/*,application/pdf" hidden>
 <input type="file" id="fileJson" accept="application/json,.json" hidden>
 
-<script src="app.js"></script>
+<script src="app.js?v=a9821064"></script>
 </body>
 </html>

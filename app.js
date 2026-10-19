@@ -575,7 +575,9 @@ function personQ(k){
 }
 function wizSteps(){
   const w=S.wiz, b=B.find(x=>x.k===w.k);
-  const qs=[...(w.pq||[]).map(personQ), ...(b.q||[]).filter(q=>!q.show||q.show())];
+  // leichte Fragen zuerst, Adresse und Versichertennummer am Ende
+  const pq=w.pq||[], early=["name","beziehung"].filter(k=>pq.includes(k)), late=pq.filter(k=>!early.includes(k)).sort((x,y)=>["absender","adresse","vnr"].indexOf(x)-["absender","adresse","vnr"].indexOf(y));
+  const qs=[...early.map(personQ), ...(b.q||[]).filter(q=>!q.show||q.show()), ...late.map(personQ)];
   return {b, list:[...qs,{type:"summary"},{type:"done"}]};
 }
 function startWiz(k){
@@ -866,6 +868,7 @@ function viewRechner(){
       <div class="btnrow big">${hat?(e.grad>=1&&(!aktuell||e.grad>aktuell)?`<button class="btn" type="button" data-act="r-antrag">${aktuell?"Höherstufung beantragen":"Pflegegrad beantragen"}</button>`:"")
         :`<button class="btn" type="button" data-act="r-konto">Antrag vorbereiten (kostenlos)</button>`}
         <button class="btn ghost" type="button" data-act="r-neu">Noch einmal</button></div>
+      <button class="linkbtn" type="button" data-act="teilen" style="align-self:flex-start">Rechner an Familie oder Freunde weiterempfehlen</button>
     </section>`;
   }
   const q=RQ[R.i];
@@ -1308,7 +1311,7 @@ function renderHero(){
    </div>`;
 }
 function renderTabs(){
-  const t=$("tabs"); t.hidden=!S.done||!!S.wiz||!!RECHNER||(!USER&&!GUEST); if(t.hidden) return;
+  const t=$("tabs"); t.hidden=!S.done||!!S.wiz||!!RECHNER||(!USER&&!GUEST)||consentNeeded(); if(t.hidden) return;
   const dl=deadlines(); const att=dl.filter(x=>!x.ok && urg(x.d)!=="ok").length;
   const T=[["ansprueche","Ansprüche","list",0],["belege","Belege","receipt",0],["termine","Termine","cal",att]];
   t.innerHTML=T.map(([k,l,i,b])=>`<button type="button" role="tab" data-tab="${k}" aria-selected="${S.tab===k}">${ic(i)}<span class="lbl">${l}</span>${b?`<span class="badge">${b}</span>`:""}</button>`).join("");
@@ -1319,6 +1322,7 @@ function renderMain(){
   if(RECHNER){ $("main").innerHTML=viewRechner(); return }
   if(!USER && !GUEST){ $("main").innerHTML=viewLogin(); return }
   if(USER && showPersons){ $("main").innerHTML=viewPersons(); return }
+  if(consentNeeded()){ $("main").innerHTML=viewConsent(); return }
   if(S.wiz && B.find(x=>x.k===S.wiz.k)){ $("main").innerHTML=viewWizard(); return }
   S.wiz=null;
   if(!S.done){
@@ -2044,6 +2048,11 @@ document.addEventListener("click", e=>{
     case "au-guest": lsSet("dein-anspruch-modus","gast"); startGuest(); scrollTop(); break;
     case "guest-register": GUEST=false; authMode="register"; authMsg=""; lsSet("dein-anspruch-modus",""); render(); scrollTop(); break;
     case "logout": logout(); break;
+    case "cs-yes": giveConsent(); break;
+    case "fb-open": openFeedback(); break;
+    case "fb-close": closeFeedback(); break;
+    case "fb-send": sendFeedback(); break;
+    case "teilen": shareApp(); break;
     case "eri-on": setEri(true,($("eri-mail")||{}).value); break;
     case "eri-off": setEri(false); break;
     case "persons": showPersons=!showPersons; delPersonAsk=false; if(showPersons) loadMembers(); render(); scrollTop(); break;
@@ -2135,7 +2144,7 @@ document.addEventListener("dragleave", e=>{const d=e.target.closest&&e.target.cl
 document.addEventListener("drop", e=>{const d=e.target.closest&&e.target.closest("#drop"); if(d&&ASSETS){e.preventDefault();const f=e.dataTransfer.files[0]; if(f) startPending(f)}});
 $("lbclose").onclick=()=>{$("lightbox").hidden=true};
 $("lightbox").onclick=e=>{if(e.target.id==="lightbox") $("lightbox").hidden=true};
-document.addEventListener("keydown",e=>{if(e.key==="Escape") $("lightbox").hidden=true;
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){ $("lightbox").hidden=true; const fb=$("fbbox"); if(fb) fb.hidden=true }
   if(e.key==="Enter" && e.target.closest && e.target.closest(".auth") && e.target.tagName==="INPUT"){ e.preventDefault(); const b=document.querySelector('.auth .btn.big'); b&&b.click(); return }
   if(e.key==="Enter" && S.wiz && e.target.matches && e.target.matches(".wiz input")){ e.preventDefault(); const nx=document.querySelector('.wiz .nav [data-wnav="next"]:not(.ghost)'); nx&&nx.click() }});
 
@@ -2246,7 +2255,35 @@ async function loadMembers(){
   const {data}=await sb.from("mitglied").select("user_id,rolle,email").eq("fall_id",FALL_ID);
   MEMBERS=data||[]; if(showPersons) render();
 }
+const CONSENT_VERSION="2026-10";
+function consentNeeded(){ return !!USER && !((USER.user_metadata||{}).einwilligung_am) }
+let consentBusy=false;
+function viewConsent(){
+  return `<section class="panel auth consent">
+    <h2>Bevor es losgeht</h2>
+    <p>Damit die App dir helfen kann, speichert sie Angaben zur Pflege, zum Beispiel den Pflegegrad, Anträge und Belege. Das sind Gesundheitsdaten, und die sind besonders geschützt. Deshalb brauchen wir einmalig deine ausdrückliche Einwilligung.</p>
+    <ul class="small">
+      <li>Die Daten liegen verschlüsselt in Frankfurt (EU).</li>
+      <li>Nur du und Personen, die du selbst einlädst, sehen sie.</li>
+      <li>Keine Werbung, kein Verkauf von Daten.</li>
+      <li>Du kannst alles jederzeit selbst löschen.</li>
+    </ul>
+    <label class="choice" for="cs-ok"><input type="checkbox" id="cs-ok"><span>Ich willige ein, dass Dein Anspruch meine Angaben, auch Gesundheitsdaten, speichert und verarbeitet, um mir die Funktionen der App bereitzustellen (Art. 9 Abs. 2 lit. a DSGVO). Wenn ich Angaben über eine andere Person mache, bin ich dazu berechtigt, zum Beispiel mit ihrem Einverständnis oder als Bevollmächtigte/r. Ich kann die Einwilligung jederzeit widerrufen, indem ich meine Daten in der App lösche.<small>Mehr dazu in der <a href="datenschutz.html" target="_blank" rel="noopener">Datenschutzerklärung</a>. Es gelten die <a href="nutzungsbedingungen.html" target="_blank" rel="noopener">Nutzungsbedingungen</a>.</small></span></label>
+    <button class="btn big" type="button" data-act="cs-yes" ${consentBusy?"disabled":""}>${consentBusy?"Einen Moment …":"Zustimmen und weiter"}</button>
+    <button class="btn ghost" type="button" data-act="logout">Nicht zustimmen und abmelden</button>
+  </section>`;
+}
+async function giveConsent(){
+  const c=$("cs-ok"); if(!c||!c.checked){ toast("Bitte zuerst das Häkchen bei der Einwilligung setzen."); return }
+  consentBusy=true; render();
+  const {data,error}=await sb.auth.updateUser({data:{einwilligung_am:new Date().toISOString(),einwilligung_version:CONSENT_VERSION}});
+  consentBusy=false;
+  if(error){ toast("Das hat nicht geklappt. Bitte noch einmal versuchen."); return render() }
+  if(data&&data.user) USER=data.user;
+  await loadUserData();
+}
 async function loadUserData(){
+  if(consentNeeded()){ loaded=true; canSave=false; setSave("","Einwilligung fehlt"); render(); return }
   setSave("","Lade deine Daten …");
   try{
     const code=lsGet("da-einladung"); let joined=null;
@@ -2498,6 +2535,47 @@ function eriCard(){
       :`<div class="grid2" style="align-items:end"><div class="field"><label for="eri-mail">E-Mail-Adresse</label><input type="email" id="eri-mail" value="${esc((ERI&&ERI.email)||USER.email||"")}"></div><div><button class="btn" type="button" data-act="eri-on">${ic("bell")}Einschalten</button></div></div>`}
   </section>`;
 }
+
+/* ---------- Fehlerprotokoll (ohne persönliche Daten), Feedback, Weiterempfehlen ---------- */
+const APP_VERSION="a9821064"; let errN=0;
+function reportError(msg,stack){
+  if(!sb||errN>=5) return; errN++;
+  const clean=s=>String(s||"").replace(/[\w.+-]+@[\w-]+\.[\w.]+/g,"[mail]").replace(/\d{5,}/g,"[zahl]");
+  let seite=""; try{ seite=famKey().split(":")[0] }catch(e){}
+  try{ sb.from("fehler").insert({meldung:clean(msg).slice(0,500)||"?",stelle:clean(stack).slice(0,1500),seite:seite.slice(0,100),version:APP_VERSION,geraet:navigator.userAgent.slice(0,200)}).then(()=>{},()=>{}) }catch(e){}
+}
+window.addEventListener("error",e=>{ if(e.message && !/ResizeObserver|^Script error/.test(e.message)) reportError(e.message,(e.error&&e.error.stack)||((e.filename||"")+":"+(e.lineno||""))) });
+window.addEventListener("unhandledrejection",e=>{ const r=e.reason; if(r&&r.name==="AbortError") return; reportError((r&&r.message)||String(r),r&&r.stack) });
+function openFeedback(){
+  let d=$("fbbox"); if(!d){ d=document.createElement("div"); d.id="fbbox"; d.className="overlay"; document.body.appendChild(d) }
+  d.hidden=false;
+  d.innerHTML=`<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="fb-h">
+    <h3 id="fb-h">Feedback geben</h3>
+    <p class="small muted">Was gefällt dir, was fehlt, was klappt nicht? Jede Nachricht wird gelesen. Bitte keine Gesundheitsdaten hineinschreiben.</p>
+    <div class="field"><label for="fb-text">Deine Nachricht</label><textarea id="fb-text" rows="5" maxlength="3000"></textarea></div>
+    <div class="field"><label for="fb-kontakt">E-Mail für Rückfragen (freiwillig)</label><input type="email" id="fb-kontakt" value="${esc((USER&&USER.email)||"")}"></div>
+    <div class="btnrow"><button class="btn" type="button" data-act="fb-send">Senden</button><button class="btn ghost" type="button" data-act="fb-close">Abbrechen</button></div>
+  </div>`;
+  try{ applyI18n(d) }catch(e){}
+  setTimeout(()=>{ const t=$("fb-text"); if(t) try{ t.focus() }catch(e){} },60);
+}
+function closeFeedback(){ const d=$("fbbox"); if(d) d.hidden=true }
+async function sendFeedback(){
+  const t=(($("fb-text")||{}).value||"").trim(); if(t.length<2){ toast("Bitte kurz schreiben, worum es geht."); return }
+  if(!sb){ toast("Keine Verbindung. Bitte später noch einmal versuchen."); return }
+  const btn=document.querySelector('#fbbox [data-act="fb-send"]'); if(btn){ btn.disabled=true; btn.textContent="Wird gesendet …" }
+  const kontakt=(($("fb-kontakt")||{}).value||"").trim().slice(0,200);
+  const {error}=await sb.from("rueckmeldung").insert({text:t.slice(0,3000),kontakt:kontakt||null,version:APP_VERSION});
+  if(error){ toast("Senden hat nicht geklappt. Bitte noch einmal versuchen."); if(btn){ btn.disabled=false; btn.textContent="Senden" } return }
+  closeFeedback(); toast("Danke! Deine Nachricht ist angekommen.");
+}
+async function shareApp(){
+  const url="https://yotan31.github.io/dein-anspruch/";
+  const text="Schau mal: Mit „Dein Anspruch“ siehst du kostenlos, welche Pflege-Leistungen euch noch zustehen. Mit fertigen Anträgen und Erinnerung an Fristen.";
+  if(navigator.share){ try{ await navigator.share({title:"Dein Anspruch",text,url}); return }catch(e){ if(e&&e.name==="AbortError") return } }
+  window.open("https://wa.me/?text="+encodeURIComponent(text+" "+url),"_blank","noopener");
+}
+document.addEventListener("click",e=>{ if(e.target && e.target.id==="fbbox") closeFeedback() });
 
 render();
 initStore();
