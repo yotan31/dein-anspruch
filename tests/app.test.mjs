@@ -27,7 +27,14 @@ const BASE = `http://127.0.0.1:${server.address().port}/`;
 
 // ---------- Test-Helfer ----------
 let failed = 0, passed = 0;
-function check(name, ok, info = "") { if (ok) { passed++; console.log("  ✓ " + name) } else { failed++; console.log("  ✗ " + name + (info ? "  → " + info : "")) } }
+let bereich = "";
+function check(name, ok, info = "") {
+  if (ok) { passed++; console.log("  ✓ " + name); return }
+  failed++; console.log("  ✗ " + name + (info ? "  → " + info : ""));
+  if (process.env.GITHUB_ACTIONS) console.log(`::error title=Test fehlgeschlagen (${bereich})::${name}${info ? " → " + String(info).replace(/[\r\n]+/g, " ").slice(0, 300) : ""}`);
+}
+const log = console.log; console.log = (...a) => { if (a.length === 1 && typeof a[0] === "string" && !a[0].startsWith(" ") && !a[0].startsWith("::") && !a[0].startsWith("\n")) bereich = a[0]; log(...a) };
+process.on("unhandledRejection", e => { console.log(`::error title=Testlauf abgebrochen (${bereich})::${String(e && e.message || e).replace(/[\r\n]+/g, " ").slice(0, 400)}`); process.exit(1) });
 const browser = await chromium.launch();
 async function newPage({ gast = null, stub = false } = {}) {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, acceptDownloads: true });
