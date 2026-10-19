@@ -41,7 +41,7 @@ const ASSIST={
    {k:"tage",type:"choice",label:"An wie vielen Tagen pro Woche?",opts:OPT(["1","2","3","4","5"])}],
   ask:()=>`beantrage ich hiermit Leistungen der Tages- und Nachtpflege nach § 41 SGB XI ab dem ${ad("tagespflege","ab","Datum")} an ${av("tagespflege","tage","Anzahl")} Tagen pro Woche in der Einrichtung ${av("tagespflege","einr","Name der Tagespflege")}.`},
  verbrauch:{q:[{k:"anbieter",label:"Wer soll die Pflegehilfsmittel liefern?",help:"Apotheke, Sanitätshaus oder Versandanbieter. Noch keinen? Überspringen.",ph:"Name des Anbieters"}],
-  ask:()=>`beantrage ich hiermit die Kostenübernahme für zum Verbrauch bestimmte Pflegehilfsmittel nach § 40 Abs. 2 SGB XI (z. B. Einmalhandschuhe, Desinfektion, Bettschutzeinlagen) bis zur Höhe von 42 Euro monatlich. Die Versorgung soll erfolgen durch: ${av("verbrauch","anbieter","Anbieter")}.`},
+  ask:()=>`beantrage ich hiermit die Kostenübernahme für zum Verbrauch bestimmte Pflegehilfsmittel nach § 40 Abs. 2 SGB XI (z. B. Einmalhandschuhe, Desinfektion, Bettschutzeinlagen) bis zur Höhe von ${VERBRAUCH} Euro monatlich. Die Versorgung soll erfolgen durch: ${av("verbrauch","anbieter","Anbieter")}.`},
  technisch:{q:[
    {k:"was",type:"multi",label:"Was wird gebraucht?",opts:OPT(["Hausnotruf","Pflegebett","Lagerungskissen","Duschstuhl","Badewannenlift","Anderes"])},
    {k:"anbieter",label:"Von welchem Anbieter gibt es ein Angebot?",ph:"z. B. Sanitätshaus Müller",help:"Noch keins? Überspringen."}],

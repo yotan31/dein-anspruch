@@ -2,7 +2,7 @@
 // Startet die gebaute App aus site/ auf einem lokalen Server und spielt die wichtigsten Abläufe
 // in einem Handy-Browser durch. Die Datenbank wird durch einen Platzhalter ersetzt, es werden
 // also keine echten Daten gelesen oder geschrieben.
-// Aufruf: node tests/app.test.mjs   (vorher: python3 quelle/bauen.py)
+// Aufruf: node tests/oberflaeche.mjs   (vorher: python3 quelle/bauen.py)
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";

@@ -118,7 +118,7 @@ function entlCard(){
   const k=entlKonto(); if(!k) return "";
   const pct=k.bisHeute?Math.min(100,(k.genutzt/(k.bisHeute+(k.vorjOffen||0)))*100):0;
   return `<section class="panel mini">
-    <div class="mini-head">${ic("receipt")}<div><h3>Entlastungsbetrag</h3><p class="small muted">131 € im Monat für Haushaltshilfe, Betreuung oder Tagespflege</p></div>
+    <div class="mini-head">${ic("receipt")}<div><h3>Entlastungsbetrag</h3><p class="small muted">${ENTLASTUNG} € im Monat für Haushaltshilfe, Betreuung oder Tagespflege</p></div>
       <div class="mini-num"><span class="small muted">jetzt frei</span><b>${eur(k.frei)}</b></div></div>
     <div class="meter"><div class="track"><i style="width:${pct}%"></i></div>
       <div class="nums"><span>${k.y} genutzt: <strong>${eur(k.genutzt,2)}</strong></span><span>Anspruch bis heute: <strong>${eur(k.bisHeute)}</strong></span></div></div>

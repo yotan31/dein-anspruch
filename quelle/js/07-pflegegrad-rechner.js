@@ -54,7 +54,7 @@ function viewRechner(){
       <h2 class="wq">${e.grad?`Voraussichtlich Pflegegrad ${e.grad}`:"Voraussichtlich noch kein Pflegegrad"}</h2>
       <p class="whelp">${ic("info")}<span>Geschätzt ${String(e.summe.toFixed(1)).replace(".",",")} von 100 Punkten.${next?` Ab ${String(next).replace(".",",")} Punkten gäbe es Pflegegrad ${e.grad+1}.`:""} Das ist eine Schätzung. Die Entscheidung trifft der Medizinische Dienst bei einem Hausbesuch.</span></p>
       <div class="rbars">${bars.map(([k,l,mx,v])=>`<div><span>${l}</span><div class="track"><i style="width:${Math.round(v/mx*100)}%"></i></div><b>${String(v).replace(".",",")}</b></div>`).join("")}</div>
-      ${e.grad>=1&&(!aktuell||e.grad>aktuell)?`<p class="notice good">${ic("check")}<span>${aktuell?`Das wäre höher als der jetzige Pflegegrad ${aktuell}. Ein Antrag auf Höherstufung kann sich lohnen.`:"Ein Antrag auf einen Pflegegrad kann sich lohnen. Ab Pflegegrad 1 gibt es schon 131 € im Monat Entlastungsbetrag und mehr."}</span></p>`:""}
+      ${e.grad>=1&&(!aktuell||e.grad>aktuell)?`<p class="notice good">${ic("check")}<span>${aktuell?`Das wäre höher als der jetzige Pflegegrad ${aktuell}. Ein Antrag auf Höherstufung kann sich lohnen.`:`Ein Antrag auf einen Pflegegrad kann sich lohnen. Ab Pflegegrad 1 gibt es schon ${ENTLASTUNG} € im Monat Entlastungsbetrag und mehr.`}</span></p>`:""}
       <div class="btnrow big">${hat?(e.grad>=1&&(!aktuell||e.grad>aktuell)?`<button class="btn" type="button" data-act="r-antrag">${aktuell?"Höherstufung beantragen":"Pflegegrad beantragen"}</button>`:"")
         :`<button class="btn" type="button" data-act="r-konto">Antrag vorbereiten (kostenlos)</button>`}
         <button class="btn ghost" type="button" data-act="r-neu">Noch einmal</button></div>

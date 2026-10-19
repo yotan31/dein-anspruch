@@ -15,13 +15,14 @@ Kostenlose Web-App für Menschen mit Pflegegrad oder Schwerbehinderung und ihre 
 | `quelle/bauen.py` | fügt alles zu `site/index.html`, `site/app.css`, `site/app.js` zusammen |
 | `site/` | die veröffentlichte App, dazu Datenschutz, Nutzungsbedingungen, Impressum und `vendor/` (selbst gehostete Schriften, pdf.js, jsPDF) |
 | `supabase/functions/` | Server-Funktionen (z. B. `konto-loeschen`) |
-| `tests/` | automatische Tests (`app.test.mjs`) mit Test-PDF |
+| `tests/` | `rechnungen.test.mjs`: Prüfung jeder Berechnung und Erkennung ohne Browser · `oberflaeche.mjs`: Klick-Tests im Handy-Browser mit Test-PDF |
+| `supabase/migrations/` | Aufbau der Datenbank, Schritt für Schritt (siehe `supabase/README.md`) |
 
-**Beträge für ein neues Jahr** stehen in `quelle/js/01-grundlagen.js` (Stammdaten) und `quelle/js/02-leistungen.js`.
+**Beträge für ein neues Jahr** stehen ausschließlich in `quelle/js/00-betraege.js`. Nach einer Änderung die Erwartungen in `tests/rechnungen.test.mjs` anpassen.
 
 ## Ablauf bei Änderungen
 
-1. Quelle ändern, `python3 quelle/bauen.py`, `node tests/app.test.mjs`
+1. Quelle ändern, `python3 quelle/bauen.py`, `node --test tests/rechnungen.test.mjs`, `node tests/oberflaeche.mjs`
 2. Erst auf den Branch `test` schieben → erscheint unter `/test/` zum Ausprobieren
 3. Dann auf `main` → erscheint in der echten App
 

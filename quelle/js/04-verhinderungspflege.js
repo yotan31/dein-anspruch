@@ -1,5 +1,5 @@
 /* ---------- Verhinderungspflege-Assistent ---------- */
-const KM_SATZ=0.20;
+const KM_SATZ=BETRAEGE.kmPauschale;
 const numDE=x=>Number(String(x??"").replace(/\s/g,"").replace(/\.(?=\d{3}(\D|$))/g,"").replace(",","."))||0;
 const VHP_GRUND={urlaub:"Urlaub",krank:"Krankheit",kur:"Kur oder Reha",termine:"Termine, Erholung oder andere wichtige Gründe"};
 const VHP_ERSATZ={

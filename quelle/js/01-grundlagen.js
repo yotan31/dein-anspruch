@@ -1,17 +1,15 @@
-"use strict";
 
-
-/* ---------- Stammdaten 2026 ---------- */
+/* ---------- Stammdaten (Beträge kommen aus 00-betraege.js) ---------- */
 const PG = {
-  pflegegeld:[0,0,347,599,800,990],
-  sachleistung:[0,0,796,1497,1859,2299],
-  tagespflege:[0,0,721,1357,1685,2085],
-  stationaer:[0,131,805,1319,1855,2096],
-  rv:[0,0,198.62,316.32,514.94,735.63],
-  pflegePausch:[0,0,600,1100,1800,1800],
+  pflegegeld:BETRAEGE.pflegegeld,
+  sachleistung:BETRAEGE.sachleistung,
+  tagespflege:BETRAEGE.tagespflege,
+  stationaer:BETRAEGE.stationaer,
+  rv:BETRAEGE.rentenbeitrag,
+  pflegePausch:BETRAEGE.pflegePauschbetrag,
 };
-const ENTLASTUNG=131, JAHRESBETRAG=3539, VERBRAUCH=42, WOHNUMFELD=4180, WG=224, DIPA=40, DIPA_UL=30;
-const BEHPAUSCH={20:384,30:620,40:860,50:1140,60:1440,70:1780,80:2120,90:2460,100:2840};
+const ENTLASTUNG=BETRAEGE.entlastung, JAHRESBETRAG=BETRAEGE.jahresbetrag, VERBRAUCH=BETRAEGE.verbrauch, WOHNUMFELD=BETRAEGE.wohnumfeld, WG=BETRAEGE.wg, DIPA=BETRAEGE.dipa, DIPA_UL=BETRAEGE.dipaUnterstuetzung;
+const BEHPAUSCH=BETRAEGE.behindertenPauschbetrag;
 
 const KASSEN = {
   tk:{name:"Techniker Krankenkasse (TK)", pk:"TK-Pflegeversicherung", mail:"service@tk.de", app:"TK-App (sicherer Upload)"},

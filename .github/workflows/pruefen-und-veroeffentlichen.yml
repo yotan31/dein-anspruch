@@ -22,15 +22,17 @@ jobs:
           node-version: 22
       - name: App bauen
         run: python3 quelle/bauen.py
+      - name: Berechnungen prüfen
+        run: node --test tests/rechnungen.test.mjs
       - name: Testbrowser installieren
         run: |
           npm install --no-save --no-audit --no-fund playwright@1.48.2
           npx playwright install --with-deps chromium
-      - name: Automatische Tests
+      - name: Oberfläche im Browser prüfen
         shell: bash
         run: |
           set -o pipefail
-          node tests/app.test.mjs 2>&1 | tee testlauf.txt
+          node tests/oberflaeche.mjs 2>&1 | tee testlauf.txt
       - name: Fehler der Tests anzeigen
         if: failure()
         shell: bash

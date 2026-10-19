@@ -34,7 +34,7 @@ function bruttoOf(j){ j=String(j); const bj=S.bruttoJahr||{}; if(bj[j]!=null&&bj
 function chronisch(){ if(S.chronisch) return S.chronisch==="ja"; return pg()>=3||gdb()>=60 }
 function zuz(jahr){
   const sum=BEL.filter(b=>KATS[b.kat]&&KATS[b.kat].zz&&String(b.jahr)===String(jahr)).reduce((s,b)=>s+(Number(b.betrag)||0),0);
-  const pct=chronisch()?1:2; const brutto=numDE(bruttoOf(jahr));
+  const pct=chronisch()?BETRAEGE.belastungsgrenzeChronischProzent:BETRAEGE.belastungsgrenzeProzent; const brutto=numDE(bruttoOf(jahr));
   return {sum,pct,brutto,grenze:brutto?brutto*pct/100:0};
 }
 
