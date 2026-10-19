@@ -27,7 +27,7 @@ const TODAY=()=>{const d=new Date();d.setHours(0,0,0,0);return d};
 const isoD=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 const parseIso=s=>{if(!s||!/^\d{4}-\d{2}-\d{2}$/.test(s))return null;const [y,m,d]=s.split("-").map(Number);return new Date(y,m-1,d)};
 const deD=d=>d.toLocaleDateString("de-DE");
-const daysUntil=d=>Math.round((d-TODAY())/864e5);
+const daysUntil=d=>Math.round((+d - +TODAY())/864e5);
 const addDays=(d,n)=>{const x=new Date(d);x.setDate(x.getDate()+n);return x};
 const MON=["Jan","Feb","Mär","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"];
 function halfOf(d){const h=d.getMonth()<6?1:2;const y=d.getFullYear();return {y,h,start:new Date(y,h===1?0:6,1),end:new Date(y,h===1?5:11,h===1?30:31),label:`${h}. Halbjahr ${y}`}}

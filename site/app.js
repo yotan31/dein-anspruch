@@ -341,7 +341,7 @@ const TODAY=()=>{const d=new Date();d.setHours(0,0,0,0);return d};
 const isoD=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 const parseIso=s=>{if(!s||!/^\d{4}-\d{2}-\d{2}$/.test(s))return null;const [y,m,d]=s.split("-").map(Number);return new Date(y,m-1,d)};
 const deD=d=>d.toLocaleDateString("de-DE");
-const daysUntil=d=>Math.round((d-TODAY())/864e5);
+const daysUntil=d=>Math.round((+d - +TODAY())/864e5);
 const addDays=(d,n)=>{const x=new Date(d);x.setDate(x.getDate()+n);return x};
 const MON=["Jan","Feb","Mär","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"];
 function halfOf(d){const h=d.getMonth()<6?1:2;const y=d.getFullYear();return {y,h,start:new Date(y,h===1?0:6,1),end:new Date(y,h===1?5:11,h===1?30:31),label:`${h}. Halbjahr ${y}`}}
@@ -361,7 +361,7 @@ const VHP_ERSATZ={
   dienst:{t:"Pflegedienst oder Betreuungsdienst",s:"stellt eine Rechnung"},
   heim:{t:"Kurzzeitpflege im Heim",s:"vorübergehend in einer Einrichtung"},
 };
-function vhpTage(){const a=parseIso(S.vhp.von), b=parseIso(S.vhp.bis)||a; return a&&b&&b>=a?Math.round((b-a)/864e5)+1:0}
+function vhpTage(){const a=parseIso(S.vhp.von), b=parseIso(S.vhp.bis)||a; return a&&b&&b>=a?Math.round((+b - +a)/864e5)+1:0}
 function vhpCalc(){
   const v=S.vhp, rest=Math.max(0,JAHRESBETRAG-numDE(v.verbraucht));
   const basis = (v.ersatz==="dienst"||v.ersatz==="heim") ? numDE(v.rechnung) : numDE(v.stunden)*numDE(v.satz);
@@ -731,6 +731,7 @@ async function loadTesseract(){
   if(window.Tesseract) return window.Tesseract;
   return new Promise((res,rej)=>{ const s=document.createElement("script"); s.src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"; s.integrity="sha256-qOKZGNCYsrBuEBK9rv+0rsBEXF1WVHCQI+C9H0QqgOg="; s.crossOrigin="anonymous"; s.onload=()=>res(window.Tesseract); s.onerror=rej; document.head.appendChild(s) });
 }
+/** @type {[RegExp,string,string][]} */
 const GUT_HINWEISE=[[/pflegebett/i,"Pflegebett","technisch"],[/hausnotruf/i,"Hausnotruf","technisch"],[/rollator/i,"Rollator (über die Krankenkasse)","technisch"],[/duschstuhl|duschhocker|badewannenlift|badewannen/i,"Hilfe im Bad","technisch"],[/haltegriff|treppenlift|umbau|wohnumfeld|schwelle/i,"Wohnungsumbau","wohnumfeld"],[/tagespflege/i,"Tagespflege","tagespflege"],[/reha|rehabilitation/i,"Reha-Empfehlung","beratung"],[/pflegekurs|schulung/i,"Pflegekurs","pflegekurs"]];
 function parseBescheid(t){
   const out={};
@@ -764,7 +765,6 @@ function bescheidCard(){
      <div class="mini-head">${ic("file")}<div><h3>Bescheid oder Gutachten bekommen?</h3><p class="small muted">Foto machen: Wir prüfen, ob sich ein Widerspruch lohnt, und behalten die Frist im Blick.</p></div></div>
      <div class="btnrow"><button class="btn small" type="button" data-act="bes-cam">${ic("camera")}Foto machen</button><button class="btn small ghost" type="button" data-act="bes-manual">Abtippen</button><button class="linkbtn" type="button" data-act="r-start">Pflegegrad selbst einschätzen</button></div>
    </section>`;
-  const tage=i.frist?daysUntil(i.frist):null;
   const lohnt = (i.knapp||i.abgelehnt) && i.offen;
   return `<section class="panel mini ${lohnt?"warn":""}">
      <div class="mini-head">${ic("file")}<div><h3>Dein Bescheid${S.bescheid.datum?` vom ${deD(parseIso(S.bescheid.datum))}`:""}</h3>
@@ -1104,6 +1104,7 @@ const T={
 };
 let LANG="de"; try{ LANG=JSON.parse(localStorage.getItem("da-lang")||'"de"')||"de" }catch(e){}
 const LIDX={tr:0,ru:1,ar:2,ti:3};
+/** @type {[RegExp,string[]][]} */
 const RX=[
  [/^Frage (\d+) von (\d+)$/,["Soru $1 / $2","Вопрос $1 из $2","السؤال $1 من $2","ሕቶ $1 ካብ $2"]],
  [/^Schritt (\d+) von (\d+)$/,["Adım $1 / $2","Шаг $1 из $2","الخطوة $1 من $2","ስጉምቲ $1 ካብ $2"]],
@@ -1158,7 +1159,7 @@ const KATS={
  sonst:{t:"Sonstiges"},
 };
 let BEL=[];            // Belege aus der Datenbank
-let pending=null;      // Beleg, der gerade erfasst wird
+/** @type {any} */ let pending=null;      // Beleg, der gerade erfasst wird
 let delAsk=null;       // Beleg-ID, deren Löschen bestätigt werden soll
 let busy=false;
 let areaFilter="Alle";
@@ -1209,7 +1210,7 @@ function deadlines(){
   const wm=parseIso(S.termine.wertmarke);
   if(wm) L.push({k:"wm",t:"Wertmarke läuft ab",d:wm,remind:addDays(wm,-30),s:"Neue Wertmarke rechtzeitig beim Versorgungsamt beantragen."});
   for(const e of (S.termine.eigene||[])){ const d=parseIso(e.d); if(d) L.push({k:"own-"+e.id,t:e.t,d,remind:d,s:e.n||"Eigene Erinnerung",own:e.id}) }
-  return L.sort((a,b)=>a.d-b.d);
+  return L.sort((a,b)=>(+a.d)-(+b.d));
 }
 function urg(d){const n=daysUntil(d); return n<0?"late":n<=60?"soon":"ok"}
 function urgTxt(d){const n=daysUntil(d); return n<0?`${-n} Tage überfällig`:n===0?"heute":n===1?"morgen":`in ${n} Tagen`}
@@ -1223,7 +1224,9 @@ function ocal(item){
 }
 
 /* ---------- Rendering ---------- */
+/** @param {string} id @returns {any} Element der Seite (bewusst ohne genauen Typ, wird überall als Formularfeld oder Bereich genutzt) */
 const $ = id => document.getElementById(id);
+/** @param {string} name @param {string} val @param {string} label @param {string} [small] @param {string} [type] @param {any} [checked] */
 function choice(name,val,label,small,type="radio",checked=false){
   const id=`${name}-${val}`.replace(/[^a-zA-Z0-9-_]/g,"_");
   return `<label class="choice" for="${id}"><input type="${type}" id="${id}" name="${name}" value="${esc(val)}" ${checked?"checked":""}><span>${esc(label)}${small?`<small>${esc(small)}</small>`:""}</span></label>`;
@@ -1371,6 +1374,7 @@ function stepper(){
   const vs=visSteps(); const n=S.step+1;
   return `<div class="stepper"><div class="meta"><span>Schritt ${n} von ${vs.length}</span><span>${vs[S.step].label}</span></div><div class="bar"><i style="width:${Math.round(n/vs.length*100)}%"></i></div></div>`;
 }
+/** @param {any} [canNext] wahr, wenn die Frage beantwortet ist @param {string} [nextLabel] @param {string} [why] */
 function nav(canNext=true,nextLabel="Weiter",why="Bitte beantworte zuerst die Frage oben."){
   return `<p class="notice navwarn" id="navwarn" hidden>${ic("alert")}<span>${esc(why)}</span></p><div class="nav go">${S.step>0?`<button class="btn ghost" type="button" data-act="back">Zurück</button>`:"<span></span>"}<button class="btn big" type="button" data-act="next" data-ok="${canNext?1:0}">${nextLabel}</button></div>`;
 }
@@ -1476,7 +1480,7 @@ function viewAnsprueche(){
   const areas=["Alle",...new Set(offen.map(b=>b.area))];
   if(!areas.includes(areaFilter)) areaFilter="Alle";
   const sorted = offen.filter(b=>areaFilter==="Alle"||b.area===areaFilter)
-    .sort((a,b)=>(!!a.opt-!!b.opt) || ((b.val()||0)-(a.val()||0)) || ((b.mon?b.mon():0)-(a.mon?a.mon():0)));
+    .sort((a,b)=>(Number(!!a.opt)-Number(!!b.opt)) || ((b.val()||0)-(a.val()||0)) || ((b.mon?b.mon():0)-(a.mon?a.mon():0)));
   const dl=deadlines().filter(x=>!x.ok && urg(x.d)!=="ok").slice(0,2);
   return `
    ${dl.map(x=>`<p class="notice ${urg(x.d)==="late"?"bad":""}">${ic("bell")}<span><strong>${esc(x.t)}</strong> – Frist ${deD(x.d)} (${urgTxt(x.d)}). <button type="button" class="linkbtn" data-tab="termine">Zu den Terminen</button></span></p>`).join("")}
@@ -1833,7 +1837,7 @@ async function toggleSubmitted(id){
 }
 
 /* ---------- Sammel-PDF: mehrere Rechnungen erkennen und nach Jahr einsortieren ---------- */
-let bulk=null; // {phase:"lesen"|"pruefen"|"speichern", n, total, items:[], pdf, file, pages}
+/** @type {any} */ let bulk=null; // {phase:"lesen"|"pruefen"|"speichern", n, total, items:[], pdf, file, pages}
 let pdfjsP=null;
 function loadPdfJs(){
   if(!pdfjsP) pdfjsP=import(new URL("vendor/pdf.min.js",location.href).href).then(m=>{ m.GlobalWorkerOptions.workerSrc=new URL("vendor/pdf.worker.min.js",location.href).href; return m }).catch(e=>{ pdfjsP=null; throw e });
@@ -1876,6 +1880,7 @@ function pickAmount(lines,kat){
   for(const re of tiers){ for(let i=lines.length-1;i>=0;i--){ if(re.test(lines[i]) && !/netto|mwst|ust|steuer|rabatt/i.test(lines[i])){ const v=val(i); if(v!=null) return v } } }
   const all=lines.flatMap(amountsIn); return all.length?Math.max(...all):null;
 }
+/** @type {[string,RegExp][]} */
 const KAT_REGELN=[
   ["vhp",/verhinderungspflege|§\s?39\b|kurzzeitpflege|§\s?42\b|ersatzpflege/i],
   ["beratung",/beratungsbesuch|beratungseinsatz|§\s?37\s?abs\.?\s?3/i],
@@ -2023,7 +2028,7 @@ async function bulkSave(){
 
 /* ---------- Events ---------- */
 document.addEventListener("click", e=>{
-  const t=e.target.closest("[data-act],[data-open],[data-copy],[data-pdf],[data-resettx],[data-tab],[data-area],[data-kat],[data-del],[data-delyes],[data-delno],[data-sub-toggle],[data-view],[data-delown],[data-year],[data-befpdf],[data-befcopy],[data-edit],[data-wopen],[data-wnav],[data-font],[data-gotoclaim],[data-rmember]");
+  const t=/** @type {HTMLElement} */(/** @type {HTMLElement} */(e.target).closest("[data-act],[data-open],[data-copy],[data-pdf],[data-resettx],[data-tab],[data-area],[data-kat],[data-del],[data-delyes],[data-delno],[data-sub-toggle],[data-view],[data-delown],[data-year],[data-befpdf],[data-befcopy],[data-edit],[data-wopen],[data-wnav],[data-font],[data-gotoclaim],[data-rmember]"));
   if(!t) return;
   const a=t.dataset.act;
   if(t.dataset.tab){if(t.classList.contains("howbtn"))S.welcomeSeen=true;S.tab=t.dataset.tab;openKey=null;save();render();scrollTop();return}
@@ -2121,7 +2126,7 @@ document.addEventListener("click", e=>{
   }
 });
 document.addEventListener("change", e=>{
-  const t=e.target, n=t.name;
+  const t=/** @type {HTMLInputElement} */(e.target), n=t.name;
   if(t.id==="langsel"){ LANG=t.value; try{localStorage.setItem("da-lang",JSON.stringify(LANG))}catch(e){} render(); return }
   if(t.dataset.plz){ if(/^\d{5}$/.test(t.value.trim())){ S.plz=t.value.trim(); save(); render() } return }
   if(t.dataset.rq!=null && RECHNER){ RECHNER.a[RECHNER.i]=t.dataset.rq; render(); setTimeout(()=>{ if(RECHNER && RECHNER.a[RECHNER.i]!=null){ RECHNER.i++; render(); scrollTop() } },350); return }
@@ -2159,7 +2164,7 @@ document.addEventListener("change", e=>{
   save(); render();
 });
 document.addEventListener("input", e=>{
-  const t=e.target;
+  const t=/** @type {HTMLInputElement} */(e.target);
   if(t.dataset.wq && t.type!=="radio" && t.type!=="date"){ const q=wizSteps().list.find(x=>x.k===t.dataset.wq); if(q){ setQ(q,t.value); const sk=document.querySelector('.wiz [data-wnav="next"].ghost'); if(sk) sk.hidden=!!t.value.trim() } return }
   if(t.dataset.bd && bescheidDraft){ bescheidDraft[t.dataset.bd]=t.value; return }
   if(t.dataset.bi && bulk && bulk.items && t.type!=="checkbox"){ const [i,f]=t.dataset.bi.split(":"); const it=bulk.items[+i]; if(it) it[f]=t.value; return }
@@ -2173,14 +2178,14 @@ document.addEventListener("input", e=>{
   else if(t.id==="tdienst"){S.termine.dienst=t.value;save()}
   else if(t.id==="ttel"){S.termine.tel=t.value;save()}
 });
-document.addEventListener("dragover", e=>{const d=e.target.closest&&e.target.closest("#drop"); if(d&&ASSETS){e.preventDefault();d.classList.add("over")}});
-document.addEventListener("dragleave", e=>{const d=e.target.closest&&e.target.closest("#drop"); if(d) d.classList.remove("over")});
-document.addEventListener("drop", e=>{const d=e.target.closest&&e.target.closest("#drop"); if(d&&ASSETS){e.preventDefault();const f=e.dataTransfer.files[0]; if(f) startPending(f)}});
+document.addEventListener("dragover", e=>{const tg=/** @type {HTMLElement} */(e.target); const d=tg.closest&&tg.closest("#drop"); if(d&&ASSETS){e.preventDefault();d.classList.add("over")}});
+document.addEventListener("dragleave", e=>{const tg=/** @type {HTMLElement} */(e.target); const d=tg.closest&&tg.closest("#drop"); if(d) d.classList.remove("over")});
+document.addEventListener("drop", e=>{const tg=/** @type {HTMLElement} */(e.target); const d=tg.closest&&tg.closest("#drop"); if(d&&ASSETS){e.preventDefault();const f=e.dataTransfer.files[0]; if(f) startPending(f)}});
 $("lbclose").onclick=()=>{$("lightbox").hidden=true};
-$("lightbox").onclick=e=>{if(e.target.id==="lightbox") $("lightbox").hidden=true};
-document.addEventListener("keydown",e=>{if(e.key==="Escape"){ $("lightbox").hidden=true; const fb=$("fbbox"); if(fb) fb.hidden=true }
-  if(e.key==="Enter" && e.target.closest && e.target.closest(".auth") && e.target.tagName==="INPUT"){ e.preventDefault(); const b=document.querySelector('.auth .btn.big'); b&&b.click(); return }
-  if(e.key==="Enter" && S.wiz && e.target.matches && e.target.matches(".wiz input")){ e.preventDefault(); const nx=document.querySelector('.wiz .nav [data-wnav="next"]:not(.ghost)'); nx&&nx.click() }});
+$("lightbox").onclick=e=>{if(/** @type {HTMLElement} */(e.target).id==="lightbox") $("lightbox").hidden=true};
+document.addEventListener("keydown",e=>{ const tg=/** @type {HTMLElement} */(e.target);if(e.key==="Escape"){ $("lightbox").hidden=true; const fb=$("fbbox"); if(fb) fb.hidden=true }
+  if(e.key==="Enter" && tg.closest && tg.closest(".auth") && tg.tagName==="INPUT"){ e.preventDefault(); const b=document.querySelector('.auth .btn.big'); b&&b.click(); return }
+  if(e.key==="Enter" && S.wiz && tg.matches && tg.matches(".wiz input")){ e.preventDefault(); const nx=document.querySelector('.wiz .nav [data-wnav="next"]:not(.ghost)'); nx&&nx.click() }});
 
 async function copy(text){
   try{await navigator.clipboard.writeText(text);toast("Text kopiert")}
@@ -2567,7 +2572,7 @@ function eriCard(){
 }
 
 /* ---------- Fehlerprotokoll (ohne persönliche Daten), Feedback, Weiterempfehlen ---------- */
-const APP_VERSION="0d111243"; let errN=0;
+const APP_VERSION="54cc7792"; let errN=0;
 function reportError(msg,stack){
   if(!sb||errN>=5) return; errN++;
   const clean=s=>String(s||"").replace(/[\w.+-]+@[\w-]+\.[\w.]+/g,"[mail]").replace(/\d{5,}/g,"[zahl]");
@@ -2605,7 +2610,7 @@ async function shareApp(){
   if(navigator.share){ try{ await navigator.share({title:"Dein Anspruch",text,url}); return }catch(e){ if(e&&e.name==="AbortError") return } }
   window.open("https://wa.me/?text="+encodeURIComponent(text+" "+url),"_blank","noopener");
 }
-document.addEventListener("click",e=>{ if(e.target && e.target.id==="fbbox") closeFeedback() });
+document.addEventListener("click",e=>{ const tg=/** @type {HTMLElement} */(e.target); if(tg && tg.id==="fbbox") closeFeedback() });
 
 render();
 initStore();

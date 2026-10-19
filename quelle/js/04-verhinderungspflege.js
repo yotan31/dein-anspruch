@@ -8,7 +8,7 @@ const VHP_ERSATZ={
   dienst:{t:"Pflegedienst oder Betreuungsdienst",s:"stellt eine Rechnung"},
   heim:{t:"Kurzzeitpflege im Heim",s:"vorübergehend in einer Einrichtung"},
 };
-function vhpTage(){const a=parseIso(S.vhp.von), b=parseIso(S.vhp.bis)||a; return a&&b&&b>=a?Math.round((b-a)/864e5)+1:0}
+function vhpTage(){const a=parseIso(S.vhp.von), b=parseIso(S.vhp.bis)||a; return a&&b&&b>=a?Math.round((+b - +a)/864e5)+1:0}
 function vhpCalc(){
   const v=S.vhp, rest=Math.max(0,JAHRESBETRAG-numDE(v.verbraucht));
   const basis = (v.ersatz==="dienst"||v.ersatz==="heim") ? numDE(v.rechnung) : numDE(v.stunden)*numDE(v.satz);

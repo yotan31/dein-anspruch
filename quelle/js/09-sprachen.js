@@ -159,6 +159,7 @@ const T={
 };
 let LANG="de"; try{ LANG=JSON.parse(localStorage.getItem("da-lang")||'"de"')||"de" }catch(e){}
 const LIDX={tr:0,ru:1,ar:2,ti:3};
+/** @type {[RegExp,string[]][]} */
 const RX=[
  [/^Frage (\d+) von (\d+)$/,["Soru $1 / $2","Вопрос $1 из $2","السؤال $1 من $2","ሕቶ $1 ካብ $2"]],
  [/^Schritt (\d+) von (\d+)$/,["Adım $1 / $2","Шаг $1 из $2","الخطوة $1 من $2","ስጉምቲ $1 ካብ $2"]],

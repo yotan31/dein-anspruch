@@ -37,5 +37,5 @@ async function shareApp(){
   if(navigator.share){ try{ await navigator.share({title:"Dein Anspruch",text,url}); return }catch(e){ if(e&&e.name==="AbortError") return } }
   window.open("https://wa.me/?text="+encodeURIComponent(text+" "+url),"_blank","noopener");
 }
-document.addEventListener("click",e=>{ if(e.target && e.target.id==="fbbox") closeFeedback() });
+document.addEventListener("click",e=>{ const tg=/** @type {HTMLElement} */(e.target); if(tg && tg.id==="fbbox") closeFeedback() });
 

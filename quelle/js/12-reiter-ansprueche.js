@@ -5,7 +5,7 @@ function viewAnsprueche(){
   const areas=["Alle",...new Set(offen.map(b=>b.area))];
   if(!areas.includes(areaFilter)) areaFilter="Alle";
   const sorted = offen.filter(b=>areaFilter==="Alle"||b.area===areaFilter)
-    .sort((a,b)=>(!!a.opt-!!b.opt) || ((b.val()||0)-(a.val()||0)) || ((b.mon?b.mon():0)-(a.mon?a.mon():0)));
+    .sort((a,b)=>(Number(!!a.opt)-Number(!!b.opt)) || ((b.val()||0)-(a.val()||0)) || ((b.mon?b.mon():0)-(a.mon?a.mon():0)));
   const dl=deadlines().filter(x=>!x.ok && urg(x.d)!=="ok").slice(0,2);
   return `
    ${dl.map(x=>`<p class="notice ${urg(x.d)==="late"?"bad":""}">${ic("bell")}<span><strong>${esc(x.t)}</strong> – Frist ${deD(x.d)} (${urgTxt(x.d)}). <button type="button" class="linkbtn" data-tab="termine">Zu den Terminen</button></span></p>`).join("")}

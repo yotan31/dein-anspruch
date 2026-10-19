@@ -1,5 +1,5 @@
 /* ---------- Sammel-PDF: mehrere Rechnungen erkennen und nach Jahr einsortieren ---------- */
-let bulk=null; // {phase:"lesen"|"pruefen"|"speichern", n, total, items:[], pdf, file, pages}
+/** @type {any} */ let bulk=null; // {phase:"lesen"|"pruefen"|"speichern", n, total, items:[], pdf, file, pages}
 let pdfjsP=null;
 function loadPdfJs(){
   if(!pdfjsP) pdfjsP=import(new URL("vendor/pdf.min.js",location.href).href).then(m=>{ m.GlobalWorkerOptions.workerSrc=new URL("vendor/pdf.worker.min.js",location.href).href; return m }).catch(e=>{ pdfjsP=null; throw e });
@@ -42,6 +42,7 @@ function pickAmount(lines,kat){
   for(const re of tiers){ for(let i=lines.length-1;i>=0;i--){ if(re.test(lines[i]) && !/netto|mwst|ust|steuer|rabatt/i.test(lines[i])){ const v=val(i); if(v!=null) return v } } }
   const all=lines.flatMap(amountsIn); return all.length?Math.max(...all):null;
 }
+/** @type {[string,RegExp][]} */
 const KAT_REGELN=[
   ["vhp",/verhinderungspflege|§\s?39\b|kurzzeitpflege|§\s?42\b|ersatzpflege/i],
   ["beratung",/beratungsbesuch|beratungseinsatz|§\s?37\s?abs\.?\s?3/i],

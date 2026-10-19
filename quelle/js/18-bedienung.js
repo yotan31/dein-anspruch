@@ -1,6 +1,6 @@
 /* ---------- Events ---------- */
 document.addEventListener("click", e=>{
-  const t=e.target.closest("[data-act],[data-open],[data-copy],[data-pdf],[data-resettx],[data-tab],[data-area],[data-kat],[data-del],[data-delyes],[data-delno],[data-sub-toggle],[data-view],[data-delown],[data-year],[data-befpdf],[data-befcopy],[data-edit],[data-wopen],[data-wnav],[data-font],[data-gotoclaim],[data-rmember]");
+  const t=/** @type {HTMLElement} */(/** @type {HTMLElement} */(e.target).closest("[data-act],[data-open],[data-copy],[data-pdf],[data-resettx],[data-tab],[data-area],[data-kat],[data-del],[data-delyes],[data-delno],[data-sub-toggle],[data-view],[data-delown],[data-year],[data-befpdf],[data-befcopy],[data-edit],[data-wopen],[data-wnav],[data-font],[data-gotoclaim],[data-rmember]"));
   if(!t) return;
   const a=t.dataset.act;
   if(t.dataset.tab){if(t.classList.contains("howbtn"))S.welcomeSeen=true;S.tab=t.dataset.tab;openKey=null;save();render();scrollTop();return}
@@ -98,7 +98,7 @@ document.addEventListener("click", e=>{
   }
 });
 document.addEventListener("change", e=>{
-  const t=e.target, n=t.name;
+  const t=/** @type {HTMLInputElement} */(e.target), n=t.name;
   if(t.id==="langsel"){ LANG=t.value; try{localStorage.setItem("da-lang",JSON.stringify(LANG))}catch(e){} render(); return }
   if(t.dataset.plz){ if(/^\d{5}$/.test(t.value.trim())){ S.plz=t.value.trim(); save(); render() } return }
   if(t.dataset.rq!=null && RECHNER){ RECHNER.a[RECHNER.i]=t.dataset.rq; render(); setTimeout(()=>{ if(RECHNER && RECHNER.a[RECHNER.i]!=null){ RECHNER.i++; render(); scrollTop() } },350); return }
@@ -136,7 +136,7 @@ document.addEventListener("change", e=>{
   save(); render();
 });
 document.addEventListener("input", e=>{
-  const t=e.target;
+  const t=/** @type {HTMLInputElement} */(e.target);
   if(t.dataset.wq && t.type!=="radio" && t.type!=="date"){ const q=wizSteps().list.find(x=>x.k===t.dataset.wq); if(q){ setQ(q,t.value); const sk=document.querySelector('.wiz [data-wnav="next"].ghost'); if(sk) sk.hidden=!!t.value.trim() } return }
   if(t.dataset.bd && bescheidDraft){ bescheidDraft[t.dataset.bd]=t.value; return }
   if(t.dataset.bi && bulk && bulk.items && t.type!=="checkbox"){ const [i,f]=t.dataset.bi.split(":"); const it=bulk.items[+i]; if(it) it[f]=t.value; return }
@@ -150,14 +150,14 @@ document.addEventListener("input", e=>{
   else if(t.id==="tdienst"){S.termine.dienst=t.value;save()}
   else if(t.id==="ttel"){S.termine.tel=t.value;save()}
 });
-document.addEventListener("dragover", e=>{const d=e.target.closest&&e.target.closest("#drop"); if(d&&ASSETS){e.preventDefault();d.classList.add("over")}});
-document.addEventListener("dragleave", e=>{const d=e.target.closest&&e.target.closest("#drop"); if(d) d.classList.remove("over")});
-document.addEventListener("drop", e=>{const d=e.target.closest&&e.target.closest("#drop"); if(d&&ASSETS){e.preventDefault();const f=e.dataTransfer.files[0]; if(f) startPending(f)}});
+document.addEventListener("dragover", e=>{const tg=/** @type {HTMLElement} */(e.target); const d=tg.closest&&tg.closest("#drop"); if(d&&ASSETS){e.preventDefault();d.classList.add("over")}});
+document.addEventListener("dragleave", e=>{const tg=/** @type {HTMLElement} */(e.target); const d=tg.closest&&tg.closest("#drop"); if(d) d.classList.remove("over")});
+document.addEventListener("drop", e=>{const tg=/** @type {HTMLElement} */(e.target); const d=tg.closest&&tg.closest("#drop"); if(d&&ASSETS){e.preventDefault();const f=e.dataTransfer.files[0]; if(f) startPending(f)}});
 $("lbclose").onclick=()=>{$("lightbox").hidden=true};
-$("lightbox").onclick=e=>{if(e.target.id==="lightbox") $("lightbox").hidden=true};
-document.addEventListener("keydown",e=>{if(e.key==="Escape"){ $("lightbox").hidden=true; const fb=$("fbbox"); if(fb) fb.hidden=true }
-  if(e.key==="Enter" && e.target.closest && e.target.closest(".auth") && e.target.tagName==="INPUT"){ e.preventDefault(); const b=document.querySelector('.auth .btn.big'); b&&b.click(); return }
-  if(e.key==="Enter" && S.wiz && e.target.matches && e.target.matches(".wiz input")){ e.preventDefault(); const nx=document.querySelector('.wiz .nav [data-wnav="next"]:not(.ghost)'); nx&&nx.click() }});
+$("lightbox").onclick=e=>{if(/** @type {HTMLElement} */(e.target).id==="lightbox") $("lightbox").hidden=true};
+document.addEventListener("keydown",e=>{ const tg=/** @type {HTMLElement} */(e.target);if(e.key==="Escape"){ $("lightbox").hidden=true; const fb=$("fbbox"); if(fb) fb.hidden=true }
+  if(e.key==="Enter" && tg.closest && tg.closest(".auth") && tg.tagName==="INPUT"){ e.preventDefault(); const b=document.querySelector('.auth .btn.big'); b&&b.click(); return }
+  if(e.key==="Enter" && S.wiz && tg.matches && tg.matches(".wiz input")){ e.preventDefault(); const nx=document.querySelector('.wiz .nav [data-wnav="next"]:not(.ghost)'); nx&&nx.click() }});
 
 async function copy(text){
   try{await navigator.clipboard.writeText(text);toast("Text kopiert")}

@@ -18,6 +18,7 @@ async function loadTesseract(){
   if(window.Tesseract) return window.Tesseract;
   return new Promise((res,rej)=>{ const s=document.createElement("script"); s.src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"; s.integrity="sha256-qOKZGNCYsrBuEBK9rv+0rsBEXF1WVHCQI+C9H0QqgOg="; s.crossOrigin="anonymous"; s.onload=()=>res(window.Tesseract); s.onerror=rej; document.head.appendChild(s) });
 }
+/** @type {[RegExp,string,string][]} */
 const GUT_HINWEISE=[[/pflegebett/i,"Pflegebett","technisch"],[/hausnotruf/i,"Hausnotruf","technisch"],[/rollator/i,"Rollator (über die Krankenkasse)","technisch"],[/duschstuhl|duschhocker|badewannenlift|badewannen/i,"Hilfe im Bad","technisch"],[/haltegriff|treppenlift|umbau|wohnumfeld|schwelle/i,"Wohnungsumbau","wohnumfeld"],[/tagespflege/i,"Tagespflege","tagespflege"],[/reha|rehabilitation/i,"Reha-Empfehlung","beratung"],[/pflegekurs|schulung/i,"Pflegekurs","pflegekurs"]];
 function parseBescheid(t){
   const out={};
@@ -51,7 +52,6 @@ function bescheidCard(){
      <div class="mini-head">${ic("file")}<div><h3>Bescheid oder Gutachten bekommen?</h3><p class="small muted">Foto machen: Wir prüfen, ob sich ein Widerspruch lohnt, und behalten die Frist im Blick.</p></div></div>
      <div class="btnrow"><button class="btn small" type="button" data-act="bes-cam">${ic("camera")}Foto machen</button><button class="btn small ghost" type="button" data-act="bes-manual">Abtippen</button><button class="linkbtn" type="button" data-act="r-start">Pflegegrad selbst einschätzen</button></div>
    </section>`;
-  const tage=i.frist?daysUntil(i.frist):null;
   const lohnt = (i.knapp||i.abgelehnt) && i.offen;
   return `<section class="panel mini ${lohnt?"warn":""}">
      <div class="mini-head">${ic("file")}<div><h3>Dein Bescheid${S.bescheid.datum?` vom ${deD(parseIso(S.bescheid.datum))}`:""}</h3>

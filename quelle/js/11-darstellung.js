@@ -1,5 +1,7 @@
 /* ---------- Rendering ---------- */
+/** @param {string} id @returns {any} Element der Seite (bewusst ohne genauen Typ, wird überall als Formularfeld oder Bereich genutzt) */
 const $ = id => document.getElementById(id);
+/** @param {string} name @param {string} val @param {string} label @param {string} [small] @param {string} [type] @param {any} [checked] */
 function choice(name,val,label,small,type="radio",checked=false){
   const id=`${name}-${val}`.replace(/[^a-zA-Z0-9-_]/g,"_");
   return `<label class="choice" for="${id}"><input type="${type}" id="${id}" name="${name}" value="${esc(val)}" ${checked?"checked":""}><span>${esc(label)}${small?`<small>${esc(small)}</small>`:""}</span></label>`;
@@ -147,6 +149,7 @@ function stepper(){
   const vs=visSteps(); const n=S.step+1;
   return `<div class="stepper"><div class="meta"><span>Schritt ${n} von ${vs.length}</span><span>${vs[S.step].label}</span></div><div class="bar"><i style="width:${Math.round(n/vs.length*100)}%"></i></div></div>`;
 }
+/** @param {any} [canNext] wahr, wenn die Frage beantwortet ist @param {string} [nextLabel] @param {string} [why] */
 function nav(canNext=true,nextLabel="Weiter",why="Bitte beantworte zuerst die Frage oben."){
   return `<p class="notice navwarn" id="navwarn" hidden>${ic("alert")}<span>${esc(why)}</span></p><div class="nav go">${S.step>0?`<button class="btn ghost" type="button" data-act="back">Zurück</button>`:"<span></span>"}<button class="btn big" type="button" data-act="next" data-ok="${canNext?1:0}">${nextLabel}</button></div>`;
 }

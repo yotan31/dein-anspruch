@@ -23,7 +23,7 @@ const KATS={
  sonst:{t:"Sonstiges"},
 };
 let BEL=[];            // Belege aus der Datenbank
-let pending=null;      // Beleg, der gerade erfasst wird
+/** @type {any} */ let pending=null;      // Beleg, der gerade erfasst wird
 let delAsk=null;       // Beleg-ID, deren Löschen bestätigt werden soll
 let busy=false;
 let areaFilter="Alle";
@@ -74,7 +74,7 @@ function deadlines(){
   const wm=parseIso(S.termine.wertmarke);
   if(wm) L.push({k:"wm",t:"Wertmarke läuft ab",d:wm,remind:addDays(wm,-30),s:"Neue Wertmarke rechtzeitig beim Versorgungsamt beantragen."});
   for(const e of (S.termine.eigene||[])){ const d=parseIso(e.d); if(d) L.push({k:"own-"+e.id,t:e.t,d,remind:d,s:e.n||"Eigene Erinnerung",own:e.id}) }
-  return L.sort((a,b)=>a.d-b.d);
+  return L.sort((a,b)=>(+a.d)-(+b.d));
 }
 function urg(d){const n=daysUntil(d); return n<0?"late":n<=60?"soon":"ok"}
 function urgTxt(d){const n=daysUntil(d); return n<0?`${-n} Tage überfällig`:n===0?"heute":n===1?"morgen":`in ${n} Tagen`}
