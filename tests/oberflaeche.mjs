@@ -106,8 +106,8 @@ console.log("Ansprüche und Antrag-Assistent");
   }
   check("Auswahl springt automatisch zur nächsten Frage", advanced);
   await page.tap('.wiz [data-wnav="close"]'); await page.waitForTimeout(300);
-  await page.tap('[data-tab="termine"]'); await page.waitForTimeout(100);
-  check("Reiter wechselt mit Animation", /go-/.test(await page.getAttribute("#main", "class") || ""));
+  await page.tap('[data-tab="termine"]'); await page.waitForTimeout(50);
+  check("Reiter wechselt sofort, ohne Animation", !/go-/.test(await page.getAttribute("#main", "class") || "") && await page.locator('[data-tab="termine"][aria-selected="true"]').count() === 1);
   check("keine Programmfehler", errors.length === 0, errors.join(" | "));
 }
 

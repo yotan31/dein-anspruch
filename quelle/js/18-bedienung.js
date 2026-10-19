@@ -62,7 +62,7 @@ document.addEventListener("click", e=>{
   if(t.dataset.pdf){makePDF(B.find(x=>x.k===t.dataset.pdf));return}
   if(t.dataset.resettx){delete Z.S.texte[t.dataset.resettx];delete Z.S.texte[t.dataset.resettx+"_sub"];save();render();return}
   switch(a){
-    case "next": { if(t.dataset.ok==="0"){ const w=$("navwarn"); if(w){ w.hidden=false; w.scrollIntoView({block:"center",behavior:"smooth"}) } break }
+    case "next": { if(t.dataset.ok==="0"){ const w=$("navwarn"); if(w){ w.hidden=false; w.scrollIntoView({block:"center"}) } break }
       const vs=visSteps(); if(Z.S.step>=vs.length-1){Z.S.done=true;Z.S.tab="ansprueche"} else Z.S.step++; save();render();scrollTop();break }
     case "back": Z.S.step=Math.max(0,Z.S.step-1);save();render();scrollTop();break;
     case "edit": Z.S.done=false;Z.S.step=0;save();render();scrollTop();break;
@@ -136,14 +136,14 @@ document.addEventListener("change", e=>{
   const t=/** @type {HTMLInputElement} */(e.target), n=t.name;
   if(t.id==="langsel"){ Z.LANG=t.value; try{localStorage.setItem("da-lang",JSON.stringify(Z.LANG))}catch(e){} render(); return }
   if(t.dataset.plz){ if(/^\d{5}$/.test(t.value.trim())){ Z.S.plz=t.value.trim(); save(); render() } return }
-  if(t.dataset.rq!=null && Z.RECHNER){ Z.RECHNER.a[Z.RECHNER.i]=t.dataset.rq; render(); setTimeout(()=>{ if(Z.RECHNER && Z.RECHNER.a[Z.RECHNER.i]!=null){ Z.RECHNER.i++; render(); scrollTop() } },350); return }
+  if(t.dataset.rq!=null && Z.RECHNER){ Z.RECHNER.a[Z.RECHNER.i]=t.dataset.rq; render(); setTimeout(()=>{ if(Z.RECHNER && Z.RECHNER.a[Z.RECHNER.i]!=null){ Z.RECHNER.i++; render(); scrollTop() } },180); return }
   if(t.id==="fileJson"){ const f=t.files&&t.files[0]; if(f && typeof restoreData==="function") restoreData(f); return }
   if(t.id==="fileCam"||t.id==="fileAny"){ const f=t.files&&t.files[0]; if(f){ if(Z.fileTarget==="bescheid"){ Z.fileTarget=null; scanBescheid(f) } else if(!Z.pending && (f.type==="application/pdf"||/\.pdf$/i.test(f.name||""))) importPdf(f); else startPending(f) } return }
   if(t.dataset.bd && Z.bescheidDraft){ Z.bescheidDraft[t.dataset.bd]=t.value; return }
   if(t.dataset.bi && Z.bulk && Z.bulk.items){ const [i,f]=t.dataset.bi.split(":"); const it=Z.bulk.items[+i]; if(it){ it[f]=t.type==="checkbox"?t.checked:t.value; render() } return }
   if(t.dataset.fall){ openFall(t.dataset.fall); scrollTop(); return }
   if(t.id==="entl-seit"){ Z.S.entlSeit=t.value; save(); render(); return }
-  if(t.dataset.wq && t.type==="radio"){ const q=wizSteps().list.find(x=>x.k===t.dataset.wq); if(q){ setQ(q,t.value); render(); const k=Z.S.wiz.k, i=Z.S.wiz.i; setTimeout(()=>{ if(Z.S.wiz&&Z.S.wiz.k===k&&Z.S.wiz.i===i){ const nx=document.querySelector('.wiz .nav [data-wnav="next"]:not(.ghost)'); nx&&nx.click() } },420) } return }
+  if(t.dataset.wq && t.type==="radio"){ const q=wizSteps().list.find(x=>x.k===t.dataset.wq); if(q){ setQ(q,t.value); render(); const k=Z.S.wiz.k, i=Z.S.wiz.i; setTimeout(()=>{ if(Z.S.wiz&&Z.S.wiz.k===k&&Z.S.wiz.i===i){ const nx=document.querySelector('.wiz .nav [data-wnav="next"]:not(.ghost)'); nx&&nx.click() } },200) } return }
   if(t.dataset.wqm){ const q=wizSteps().list.find(x=>x.k===t.dataset.wqm); if(q){ const cur=Array.isArray(getQ(q))?getQ(q):[]; setQ(q, t.checked?[...cur,t.value]:cur.filter(x=>x!==t.value)); render() } return }
   if(t.dataset.wq && t.type==="date"){ const q=wizSteps().list.find(x=>x.k===t.dataset.wq); if(q){ setQ(q,t.value); render() } return }
   if(n==="rolle") Z.S.rolle=t.value;

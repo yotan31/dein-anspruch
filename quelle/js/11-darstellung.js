@@ -20,7 +20,6 @@ function choice(name,val,label,small,type="radio",checked=false){
   return `<label class="choice" for="${id}"><input type="${type}" id="${id}" name="${name}" value="${esc(val)}" ${checked?"checked":""}><span>${esc(label)}${small?`<small>${esc(small)}</small>`:""}</span></label>`;
 }
 /* ---------- Sanftes Neuzeichnen: nur geänderte Teile austauschen, Bildschirmwechsel animieren ---------- */
-const RM=(()=>{ try{ return matchMedia("(prefers-reduced-motion: reduce)").matches }catch(e){ return false } })();
 const IH=Object.getOwnPropertyDescriptor(Element.prototype,"innerHTML");
 function sameNode(a,b){
   if(a.nodeType!==b.nodeType||a.nodeName!==b.nodeName) return false;
@@ -73,31 +72,16 @@ export function famKey(){
   return "tab:"+(typeof Z.FALL_ID!=="undefined"?Z.FALL_ID:"");
 }
 function screenIdx(){ return Z.RECHNER?Z.RECHNER.i : Z.S.wiz?Z.S.wiz.i : !Z.S.done?Z.S.step : TAB_ORDER.indexOf(Z.S.tab) }
-Z.lastFam = null; Z.lastIdx = 0; Z.lastCash = null; Z.figAnim = 0;
-function animateScreen(dir){
-  if(RM) return; const m=$("main"); m.classList.remove("go-f","go-b","go-fade"); void m.offsetWidth; m.classList.add(dir);
-}
-function countFigure(){
-  const f=document.querySelector("#hero .figure"); if(!f){ Z.lastCash=null; return }
-  const v=sums().cash; const from=Z.lastCash; Z.lastCash=v;
-  if(from==null||from===v||RM) return;
-  f.classList.remove("flash"); void f.offsetWidth; f.classList.add("flash");
-  const t0=performance.now(), d=700;
-  const step=now=>{ const p=Math.min(1,(now-t0)/d), e=1-Math.pow(1-p,3); f.textContent=eur(Math.round(from+(v-from)*e)); if(p<1) Z.figAnim=requestAnimationFrame(step) };
-  Z.figAnim=requestAnimationFrame(step);
-}
+Z.lastFam = null; Z.lastIdx = 0;
 export function reveal(el){
   if(!el) return; const r=el.getBoundingClientRect();
-  if(r.top<70 || r.top>innerHeight*0.45) el.scrollIntoView({block:"start",behavior:RM?"auto":"smooth"});
+  if(r.top<70 || r.top>innerHeight*0.45) el.scrollIntoView({block:"start"});
 }
 export function render(){
   const fam=famKey(), idx=screenIdx(), changed=Z.lastFam!==null && (fam!==Z.lastFam||idx!==Z.lastIdx);
   if(changed){ const a=document.activeElement; if(a && a!==document.body && a.blur && !(a.closest&&a.closest("#hero"))) try{ a.blur() }catch(e){} }
-  cancelAnimationFrame(Z.figAnim);
   renderHero(); renderTabs(); renderMain(); try{ applyI18n(document.querySelector(".wrap")) }catch(e){}
-  if(changed) animateScreen(fam===Z.lastFam ? (idx>=Z.lastIdx?"go-f":"go-b") : "go-fade");
   Z.lastFam=fam; Z.lastIdx=idx;
-  countFigure();
 }
 export function scrollTop(){ window.scrollTo({top:0,behavior:"instant"}) }
 
