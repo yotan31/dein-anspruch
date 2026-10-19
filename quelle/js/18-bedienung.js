@@ -36,6 +36,7 @@ document.addEventListener("click", e=>{
   const a=t.dataset.act;
   if(t.dataset.tab){if(t.classList.contains("howbtn"))Z.S.welcomeSeen=true;Z.S.tab=t.dataset.tab;Z.openKey=null;save();render();scrollTop();return}
   if(t.dataset.area){Z.areaFilter=t.dataset.area;render();return}
+  if(t.dataset.act!=="menu" && !t.closest("#hmenu .fontsw")) Z.showMenu=false;
   if(t.dataset.gotoclaim){ Z.S.tab="ansprueche"; Z.openKey=t.dataset.gotoclaim; render(); const el=$("it-"+Z.openKey); el&&el.scrollIntoView({block:"start"}); return }
   if(t.dataset.rmember){ removeMember(t.dataset.rmember); return }
   if(t.dataset.font){ Z.S.font=t.dataset.font; save(); render(); return }
@@ -65,7 +66,8 @@ document.addEventListener("click", e=>{
     case "next": { if(t.dataset.ok==="0"){ const w=$("navwarn"); if(w){ w.hidden=false; w.scrollIntoView({block:"center"}) } break }
       const vs=visSteps(); if(Z.S.step>=vs.length-1){Z.S.done=true;Z.S.tab="ansprueche"} else Z.S.step++; save();render();scrollTop();break }
     case "back": Z.S.step=Math.max(0,Z.S.step-1);save();render();scrollTop();break;
-    case "edit": Z.S.done=false;Z.S.step=0;save();render();scrollTop();break;
+    case "menu": Z.showMenu=!Z.showMenu; render(); break;
+    case "edit": Z.showMenu=false; Z.S.done=false;Z.S.step=0;save();render();scrollTop();break;
     case "reset": $("resetconfirm").hidden=false;break;
     case "sent": { const k=t.dataset.k; Z.S.status[k]="beantragt"; Z.S.sent=Z.S.sent||{}; Z.S.sent[k]=isoD(TODAY()); const bb=B.find(x=>x.k===k);
       Z.S.termine.eigene=[...(Z.S.termine.eigene||[]),{id:String(Date.now()),t:`Antwort auf Antrag „${bb?bb.t:k}“ da?`,d:isoD(addDays(TODAY(),28)),n:"Falls noch keine Antwort da ist: bei der Kasse nachfragen. Das Datum des Antrags steht in der App."}];

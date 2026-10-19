@@ -72,7 +72,7 @@ export function famKey(){
   return "tab:"+(typeof Z.FALL_ID!=="undefined"?Z.FALL_ID:"");
 }
 function screenIdx(){ return Z.RECHNER?Z.RECHNER.i : Z.S.wiz?Z.S.wiz.i : !Z.S.done?Z.S.step : TAB_ORDER.indexOf(Z.S.tab) }
-Z.lastFam = null; Z.lastIdx = 0;
+Z.lastFam = null; Z.lastIdx = 0; Z.showMenu = false;
 export function reveal(el){
   if(!el) return; const r=el.getBoundingClientRect();
   if(r.top<70 || r.top>innerHeight*0.45) el.scrollIntoView({block:"start"});
@@ -91,33 +91,53 @@ export function sums(){
   const frei=offen.filter(b=>b.frei).reduce((s,b)=>s+b.frei(),0);
   return {all,offen,cash,frei};
 }
+const MENU_ICON="M4 7h16 M4 12h16 M4 17h16";
 function renderHero(){
   const save=`<div class="savestate"><span class="dot ${Z.saveState.c}" id="savedot"></span><span id="savetxt">${esc(Z.saveState.t)}</span></div>`;
   const brand=`<div class="brand"><span class="mark" aria-hidden="true">§</span><b>Dein Anspruch</b></div>`;
   const curF = Z.USER && Z.FAELLE.find(f=>f.id===Z.FALL_ID);
   const personBtn = curF ? `<button type="button" class="acct person" data-act="persons" aria-expanded="${Z.showPersons}">${ic("user")}${esc(fallName(curF))} ▾</button>` : "";
-  const acct = Z.USER?`<button type="button" class="acct" data-act="logout" title="${esc(Z.USER.email||"")}">Abmelden</button>`:Z.GUEST?`<button type="button" class="acct" data-act="guest-register">Konto anlegen</button>`:"";
   const fontsw=`<div class="fontsw" role="group" aria-label="Schriftgröße">${[["1","A"],["1.15","A+"],["1.3","A++"]].map(([v,t])=>`<button type="button" data-font="${v}" aria-pressed="${(Z.S.font||"1")===v}" aria-label="Schrift ${t}">${t}</button>`).join("")}</div>`;
-  if(Z.S.wiz||Z.RECHNER||(Z.S.done&&Z.S.tab!=="ansprueche")){ $("hero").innerHTML=`<div class="row">${brand}<div class="row" style="gap:12px">${langSelect()}${personBtn}${fontsw}${save}${acct}</div></div>`; return }
+  const acct = Z.USER?`<button type="button" class="linkbtn danger" data-act="logout" title="${esc(Z.USER.email||"")}">Abmelden</button>`:Z.GUEST?`<button type="button" class="linkbtn" data-act="guest-register">Konto anlegen</button>`:"";
+  const menuBtn=`<button type="button" class="menubtn" data-act="menu" aria-expanded="${!!Z.showMenu}" aria-controls="hmenu"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="${MENU_ICON}"/></svg><span class="sr">Menü: Sprache, Schriftgröße, Konto</span></button>`;
+  const menu=Z.showMenu?`<div class="hmenu" id="hmenu">
+     <div><span>Sprache</span>${langSelect()}</div>
+     <div><span>Schriftgröße</span>${fontsw}</div>
+     ${Z.S.done&&!Z.S.wiz&&!Z.RECHNER?`<div><button type="button" class="linkbtn" data-act="edit">Angaben ändern</button></div>`:""}
+     ${acct?`<div>${acct}</div>`:""}
+   </div>`:"";
+  const top=`<div class="topbar">${brand}${menuBtn}</div>${menu}`;
+  const kopf=`<div class="hrow">${personBtn||'<span></span>'}${save}</div>`;
+  if(Z.S.wiz||Z.RECHNER||(Z.S.done&&Z.S.tab!=="ansprueche")){ $("hero").innerHTML=top+(personBtn?`<div class="hsheet slim">${kopf}</div>`:""); return }
   if(!Z.S.done){
-    $("hero").innerHTML=`<div class="row">${brand}<div class="row" style="gap:12px">${langSelect()}${personBtn}${fontsw}${save}${acct}</div></div>
-     <p class="lead">Pflegegrad oder Schwerbehinderung: Wir prüfen, welche Leistungen 2026 noch offen sind, schreiben die Anträge vor, sortieren deine Belege und erinnern an Fristen.</p>`;
+    $("hero").innerHTML=`${top}<div class="hsheet">${personBtn?kopf:""}
+     <p class="lead">Pflegegrad oder Schwerbehinderung: Wir prüfen, welche Leistungen 2026 noch offen sind, schreiben die Anträge vor, sortieren deine Belege und erinnern an Fristen.</p></div>`;
     return;
   }
   const s=sums(); const dl=deadlines(); const crit=dl.find(x=>x.main&&!x.ok&&urg(x.d)!=="ok") || dl.find(x=>urg(x.d)==="late");
   const next=dl[0];
-  $("hero").innerHTML=`<div class="row">${brand}<div class="row" style="gap:12px">${langSelect()}${personBtn}${fontsw}${save}${acct}</div></div>
-   <div style="position:relative;z-index:1;display:flex;flex-direction:column;gap:4px">
-     <span class="small" style="color:var(--hero-muted)">Noch offen an Geld und Budgets pro Jahr</span>
+  // Aufschlüsselung wie auf einem Auszug: die größten Posten, der Rest zusammengefasst
+  const posten=s.offen.filter(b=>b.cash && (Z.S.status[b.k]||"offen")==="offen" && (b.val()||0)>0).map(b=>({k:b.k,t:b.t,v:b.val()||0})).sort((x,y)=>y.v-x.v);
+  const top3=posten.slice(0,3), rest=posten.slice(3), restV=rest.reduce((a,x)=>a+x.v,0);
+  const ohne=s.offen.length-posten.length;
+  const tones=["var(--money)","var(--money-2)","var(--money-3)","var(--line)"];
+  const bar=s.cash?`<div class="track" aria-hidden="true">${[...top3.map(x=>x.v),restV].map((v,i)=>v?`<i style="flex:${v};background:${tones[i]}"></i>`:"").join("")}</div>`:"";
+  const rows=top3.map(x=>`<button type="button" class="hpost" data-gotoclaim="${x.k}"><span>${esc(x.t)}</span><b>${eur(x.v)}</b></button>`).join("")
+    +(rest.length?`<div class="hpost rest"><span>${rest.length} weitere</span><b>${eur(restV)}</b></div>`:"");
+  $("hero").innerHTML=`${top}<div class="hsheet">${kopf}
+   <div class="hsum">
+     <span class="small muted">Noch offen pro Jahr</span>
      <span class="figure">${eur(s.cash)}</span>
-     ${s.frei?`<span class="small" style="color:var(--hero-muted)">plus ${eur(s.frei)} Steuerfreibeträge</span>`:""}
+     ${s.frei?`<span class="small muted">plus ${eur(s.frei)} Steuerfreibeträge</span>`:""}
    </div>
-   <div class="stats">
-     <span class="stat">${ic("list")}<strong>${s.offen.length}</strong> offene Punkte</span>
-     <span class="stat">${ic("receipt")}<strong>${Z.BEL.length}</strong> Belege</span>
-     ${crit?`<button type="button" class="stat alert" data-tab="termine" style="border:0;font:inherit;cursor:pointer">${ic("bell")}${esc(crit.t)}: ${urgTxt(crit.d)}</button>`: next?`<span class="stat">${ic("cal")}Nächste Frist ${urgTxt(next.d)}</span>`:""}
-     <button type="button" class="stat" data-act="edit" style="border:0;font:inherit;color:inherit;cursor:pointer">${ic("user")}Angaben ändern</button>
-   </div>`;
+   ${bar}
+   ${rows?`<div class="hposten">${rows}</div>`:""}
+   <div class="hfoot">
+     <span>${ohne>0?`+ ${ohne} ${ohne===1?"Punkt":"Punkte"} ohne festen Betrag`:`${s.offen.length} offene Punkte`}</span>
+     <span>${Z.BEL.length} ${Z.BEL.length===1?"Beleg":"Belege"}</span>
+   </div>
+   ${crit?`<button type="button" class="halert" data-tab="termine">${ic("bell")}${esc(crit.t)}: ${urgTxt(crit.d)}</button>`: next?`<button type="button" class="hnext" data-tab="termine">${ic("cal")}Nächste Frist ${urgTxt(next.d)}</button>`:""}
+  </div>`;
 }
 function renderTabs(){
   const t=$("tabs"); t.hidden=!Z.S.done||!!Z.S.wiz||!!Z.RECHNER||(!Z.USER&&!Z.GUEST)||consentNeeded()||Z.RECOVERY; if(t.hidden) return;
