@@ -2356,6 +2356,8 @@ function startGuest(){
   setSave("warn","Nur auf diesem Gerät"); render();
 }
 let loaded=false;
+// Testversion (…/test/): deutlich markieren, sie nutzt dieselbe Datenbank wie die echte App
+if(/\/test\//.test(location.pathname)){ const t=document.createElement("div"); t.className="testbanner"; t.textContent="TESTVERSION – zum Ausprobieren neuer Funktionen. Achtung: echte Daten!"; document.body.prepend(t) }
 async function initStore(){
   try{ if(new URLSearchParams(location.search).has("rechner")) RECHNER={i:0,a:[]} }catch(e){}
   try{ const q=new URLSearchParams(location.search); const c=q.get("einladung"); if(c){ lsSet("da-einladung",c); history.replaceState(null,"",location.pathname) } }catch(e){}
@@ -2537,7 +2539,7 @@ function eriCard(){
 }
 
 /* ---------- Fehlerprotokoll (ohne persönliche Daten), Feedback, Weiterempfehlen ---------- */
-const APP_VERSION="a9821064"; let errN=0;
+const APP_VERSION="dda65ccd"; let errN=0;
 function reportError(msg,stack){
   if(!sb||errN>=5) return; errN++;
   const clean=s=>String(s||"").replace(/[\w.+-]+@[\w-]+\.[\w.]+/g,"[mail]").replace(/\d{5,}/g,"[zahl]");
