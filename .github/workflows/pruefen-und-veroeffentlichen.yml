@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   pruefen:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -27,7 +27,18 @@ jobs:
           npm install --no-save --no-audit --no-fund playwright@1.48.2
           npx playwright install --with-deps chromium
       - name: Automatische Tests
-        run: node tests/app.test.mjs
+        shell: bash
+        run: |
+          set -o pipefail
+          node tests/app.test.mjs 2>&1 | tee testlauf.txt
+      - name: Fehler der Tests anzeigen
+        if: failure()
+        shell: bash
+        run: |
+          [ -f testlauf.txt ] || exit 0
+          grep -v "✓" testlauf.txt | tail -n 25 | while IFS= read -r z; do
+            z="${z//'%'/'%25'}"; [ -n "$z" ] && echo "::error title=Testlauf::$z"
+          done
       - name: Veröffentlichen
         run: |
           git config user.name "github-actions[bot]"
