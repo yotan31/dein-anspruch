@@ -41,9 +41,9 @@ async function newPage({ gast = null, stub = false } = {}) {
   const extern = [];
   await ctx.route(/^https?:\/\/(?!127\.0\.0\.1)/, r => { extern.push(r.request().url()); r.abort() });
   if (gast) await ctx.addInitScript(g => { if (!sessionStorage.x) { sessionStorage.x = 1; localStorage.setItem("dein-anspruch-modus", JSON.stringify("gast")); localStorage.setItem("dein-anspruch-gast", JSON.stringify(g)) } }, gast);
-  if (stub) await ctx.addInitScript(() => {
+  if (stub) await ctx.addInitScript((einwilligung) => {
     // Platzhalter-Datenbank: angemeldeter Nutzer ohne Einwilligung
-    window.__ins = []; let user = { id: "u1", email: "test@example.org", user_metadata: {} }; const rows = { fall: [], mitglied: [], belege: [] };
+    window.__ins = []; let user = { id: "u1", email: "test@example.org", user_metadata: einwilligung ? { einwilligung_am: "2026-10-01T00:00:00Z" } : {} }; const rows = { fall: [], mitglied: [], belege: [] };
     const q = t => { const st = { op: "select" }; const api = {
       select() { return api }, eq() { return api }, order() { return api },
       single() { return Promise.resolve({ data: rows.fall[rows.fall.length - 1], error: null }) },
@@ -52,9 +52,9 @@ async function newPage({ gast = null, stub = false } = {}) {
       update() { st.op = "upd"; return api }, delete() { return api }, upsert() { return Promise.resolve({ error: null }) },
       then(res) { return Promise.resolve({ data: st.op === "select" ? (rows[t] || []) : null, error: null }).then(res) } }; return api };
     Object.defineProperty(window, "supabase", { configurable: true, get: () => ({ createClient: () => ({
-      auth: { onAuthStateChange() {}, getSession: async () => ({ data: { session: { user } } }), updateUser: async ({ data }) => { user = { ...user, user_metadata: { ...user.user_metadata, ...data } }; return { data: { user }, error: null } }, signOut: async () => {} },
+      auth: { onAuthStateChange() {}, getSession: async () => ({ data: { session: { user } } }), updateUser: async ({ data, password }) => { if (password) window.__pw = password; if (data) user = { ...user, user_metadata: { ...user.user_metadata, ...data } }; return { data: { user }, error: null } }, signOut: async () => {} },
       from: q, rpc: async () => ({ data: null, error: null }), functions: { invoke: async (n, o) => { window.__fn = [n, o && o.body]; return { data: { ok: true }, error: null } } }, storage: { from: () => ({ createSignedUrls: async () => ({ data: [] }) }) } }) }), set() {} });
-  });
+  }, stub === "mitEinwilligung");
   const page = await ctx.newPage(); const errors = [];
   page.on("pageerror", e => errors.push(e.message));
   return { page, ctx, errors, extern };
@@ -186,6 +186,25 @@ console.log("Konto, Einwilligung und Feedback");
   check("mit Bestätigung wird das Konto gelöscht", await page.evaluate(() => window.__fn && window.__fn[0] === "konto-loeschen" && window.__fn[1].bestaetigung === "LÖSCHEN"));
   check("danach ist man abgemeldet", await page.evaluate(() => !USER));
   check("keine anderen Programmfehler", errors.filter(e => !/Testfehler/.test(e)).length === 0, errors.join(" | "));
+}
+
+// ---------- 7. Passwort zurücksetzen ----------
+console.log("Passwort zurücksetzen");
+{
+  const { page, errors } = await newPage({ stub: "mitEinwilligung" });
+  await gehe(page, BASE + "?passwort=neu#access_token=x&type=recovery", 800);
+  check("Link aus der E-Mail öffnet „Neues Passwort festlegen“", (await page.textContent("#main h2")) === "Neues Passwort festlegen");
+  check("Reiter sind dabei ausgeblendet", await page.getAttribute("#tabs", "hidden") !== null);
+  await page.fill("#au-pw", "neuesPasswort1"); await page.fill("#au-pw2", "anderesPasswort1"); await page.tap('[data-act="au-newpw"]'); await page.waitForTimeout(200);
+  check("unterschiedliche Eingaben werden abgelehnt", /nicht gleich/.test(await page.textContent("#main")) && await page.evaluate(() => !window.__pw));
+  await page.fill("#au-pw", "kurz"); await page.fill("#au-pw2", "kurz"); await page.tap('[data-act="au-newpw"]'); await page.waitForTimeout(200);
+  check("zu kurzes Passwort wird abgelehnt", /mindestens 8/.test(await page.textContent("#main")) && await page.evaluate(() => !window.__pw));
+  await page.fill("#au-pw", "neuesPasswort1"); await page.fill("#au-pw2", "neuesPasswort1"); await page.tap('[data-act="au-newpw"]'); await page.waitForTimeout(400);
+  check("neues Passwort wird gespeichert", await page.evaluate(() => window.__pw === "neuesPasswort1"));
+  check("danach geht es normal in der App weiter", (await page.textContent("#main h2")) !== "Neues Passwort festlegen" && !/type=recovery|passwort=neu/.test(page.url()));
+  await page.evaluate(() => { S.done = true; S.welcomeSeen = true; S.tab = "ansprueche"; render() }); await page.waitForTimeout(150);
+  check("„Passwort ändern“ im Bereich Deine Daten vorhanden", await page.locator('[data-act="pw-aendern"]').count() === 1);
+  check("keine Programmfehler", errors.length === 0, errors.join(" | "));
 }
 
 await browser.close(); server.close();

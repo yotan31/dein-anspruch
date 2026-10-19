@@ -5,11 +5,20 @@ import { $, render, scrollTop } from "./11-darstellung.js";
 import { toast } from "./18-bedienung.js";
 import { lsGet, lsSet } from "./19-speicher.js";
 /* ---------- Anmeldung ---------- */
+/** Neues Passwort festlegen: nach dem Link aus der E-Mail „Passwort zurücksetzen“ oder über „Passwort ändern“. */
+export function viewNeuesPasswort(){
+  const bereit=!!Z.USER;
+  return `<section class="panel auth">
+    <h2>Neues Passwort festlegen</h2>
+    <p class="muted">${bereit?`Für ${esc(Z.USER.email||"dein Konto")}. Wähle ein Passwort mit mindestens 8 Zeichen und gib es zur Sicherheit zweimal ein.`:"Einen Moment, der Link wird geprüft …"}</p>
+    <div class="field"><label for="au-pw">Neues Passwort</label><div class="euro"><input type="password" id="au-pw" autocomplete="new-password" ${bereit?"":"disabled"}><button type="button" class="btn small ghost" data-act="au-show">Zeigen</button></div></div>
+    <div class="field"><label for="au-pw2">Neues Passwort wiederholen</label><input type="password" id="au-pw2" autocomplete="new-password" ${bereit?"":"disabled"}></div>
+    ${Z.authMsg?`<p class="notice ${/gespeichert/.test(Z.authMsg)?"good":"bad"}">${ic("info")}<span>${esc(Z.authMsg)}</span></p>`:""}
+    <button class="btn big" type="button" data-act="au-newpw" ${Z.authBusy||!bereit?"disabled":""}>${Z.authBusy?"Einen Moment …":"Neues Passwort speichern"}</button>
+    <button class="linkbtn" type="button" data-act="au-newpw-abbruch">Abbrechen</button>
+  </section>`;
+}
 export function viewLogin(){
-  if(Z.RECOVERY) return `<section class="panel auth"><h2>Neues Passwort festlegen</h2>
-    <div class="field"><label for="au-pw">Neues Passwort (mindestens 8 Zeichen)</label><input type="password" id="au-pw" autocomplete="new-password"></div>
-    ${Z.authMsg?`<p class="notice">${ic("info")}<span>${esc(Z.authMsg)}</span></p>`:""}
-    <button class="btn big" type="button" data-act="au-newpw" ${Z.authBusy?"disabled":""}>Passwort speichern</button></section>`;
   const reg=Z.authMode==="register", fg=Z.authMode==="forgot";
   return `<section class="panel auth">
     ${lsGet("da-einladung")?`<p class="notice good">${ic("user")}<span><strong>Du wurdest eingeladen.</strong> Melde dich an oder lege ein Konto an. Danach siehst du den gemeinsamen Fall.</span></p>`:""}
@@ -34,6 +43,7 @@ export async function authAction(a){
   const mail=($("au-mail")||{}).value?.trim()||"", pw=($("au-pw")||{}).value||"";
   if(a!=="au-newpw" && !/^\S+@\S+\.\S+$/.test(mail)){ Z.authMsg="Bitte eine gültige E-Mail-Adresse eingeben."; return render() }
   if((a==="au-register"||a==="au-newpw") && pw.length<8){ Z.authMsg="Das Passwort muss mindestens 8 Zeichen haben."; return render() }
+  if(a==="au-newpw" && pw!==(($("au-pw2")||{}).value||"")){ Z.authMsg="Die beiden Passwörter sind nicht gleich. Bitte noch einmal eingeben."; return render() }
   lsSet("dein-anspruch-mail",mail||lsGet("dein-anspruch-mail"));
   Z.authBusy=true; Z.authMsg=""; render();
   const back=location.origin+location.pathname;
@@ -43,8 +53,10 @@ export async function authAction(a){
     else if(a==="au-register"){ r=await Z.sb.auth.signUp({email:mail,password:pw,options:{emailRedirectTo:back}});
       if(r.error) Z.authMsg=/already|registered/i.test(r.error.message)?"Für diese E-Mail gibt es schon ein Konto. Bitte anmelden.":/rate|limit/i.test(r.error.message)?"Gerade werden zu viele E-Mails verschickt. Bitte in einer Stunde noch einmal versuchen.":"Konto anlegen hat nicht geklappt: "+r.error.message;
       else if(!r.data.session){ Z.authMsg="Fast geschafft! Wir haben dir eine E-Mail geschickt. Bitte den Link darin antippen und dich danach hier anmelden."; Z.authMode="login" } }
-    else if(a==="au-forgot"){ r=await Z.sb.auth.resetPasswordForEmail(mail,{redirectTo:back}); Z.authMsg=r.error?"Das hat nicht geklappt. Bitte später noch einmal versuchen.":"Wenn es ein Konto mit dieser Adresse gibt, ist jetzt eine E-Mail mit einem Link unterwegs."; }
-    else if(a==="au-newpw"){ r=await Z.sb.auth.updateUser({password:pw}); if(r.error) Z.authMsg="Das neue Passwort konnte nicht gespeichert werden."; else { Z.RECOVERY=false; Z.authMsg=""; toast("Neues Passwort gespeichert") } }
+    else if(a==="au-forgot"){ r=await Z.sb.auth.resetPasswordForEmail(mail,{redirectTo:back+"?passwort=neu"}); Z.authMsg=r.error?"Das hat nicht geklappt. Bitte später noch einmal versuchen.":"Wenn es ein Konto mit dieser Adresse gibt, ist jetzt eine E-Mail mit einem Link unterwegs."; }
+    else if(a==="au-newpw"){ r=await Z.sb.auth.updateUser({password:pw});
+      if(r.error){ const m=String(r.error.message||""); Z.authMsg=/different|same/i.test(m)?"Das neue Passwort muss sich vom alten unterscheiden.":/weak|short|characters/i.test(m)?"Das Passwort ist zu schwach. Bitte ein längeres oder anderes wählen.":/session|expired|jwt|token/i.test(m)?"Der Link ist abgelaufen. Bitte unter „Passwort vergessen?“ einen neuen anfordern.":"Das neue Passwort konnte nicht gespeichert werden. Bitte noch einmal versuchen." }
+      else { Z.RECOVERY=false; Z.authMsg=""; try{ history.replaceState(null,"",location.pathname) }catch(e){} toast("Neues Passwort gespeichert. Ab jetzt meldest du dich damit an.") } }
   }catch(e){ Z.authMsg="Keine Verbindung. Bitte Internet prüfen." }
   Z.authBusy=false; render();
 }

@@ -204,6 +204,13 @@ Z.loaded = false;
 export async function initStore(){
   try{ if(new URLSearchParams(location.search).has("rechner")) Z.RECHNER={i:0,a:[]} }catch(e){}
   try{ const q=new URLSearchParams(location.search); const c=q.get("einladung"); if(c){ lsSet("da-einladung",c); history.replaceState(null,"",location.pathname) } }catch(e){}
+  // Link aus der E-Mail „Passwort zurücksetzen“: erst neues Passwort festlegen lassen (vor dem Anlegen der Verbindung prüfen, die Adresse wird danach bereinigt)
+  try{
+    const h=location.hash||"", q=location.search||"";
+    const istReset=/type=recovery/.test(h)||/[?&]passwort=neu/.test(q);
+    if(istReset && /error_code|error_description/.test(h)){ Z.authMode="forgot"; Z.authMsg="Der Link zum Zurücksetzen ist abgelaufen oder wurde schon benutzt. Bitte hier einen neuen anfordern."; history.replaceState(null,"",location.pathname) }
+    else if(istReset) Z.RECOVERY=true;
+  }catch(e){}
   if(!window.supabase){ Z.loaded=true; setSave("warn","Keine Verbindung – nur auf diesem Gerät"); startGuest(); return }
   Z.sb=window.supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,storageKey:"dein-anspruch-auth"}});
   Z.sb.auth.onAuthStateChange((ev,session)=>{

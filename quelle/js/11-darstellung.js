@@ -10,7 +10,7 @@ import { viewAnsprueche } from "./12-reiter-ansprueche.js";
 import { viewBelege } from "./13-reiter-belege.js";
 import { viewTermine } from "./14-reiter-termine.js";
 import { consentNeeded, fallName, viewConsent, viewPersons } from "./19-speicher.js";
-import { viewLogin } from "./20-anmeldung.js";
+import { viewLogin, viewNeuesPasswort } from "./20-anmeldung.js";
 /* ---------- Rendering ---------- */
 /** @param {string} id @returns {any} Element der Seite (bewusst ohne genauen Typ, wird überall als Formularfeld oder Bereich genutzt) */
 export function $(id) { return document.getElementById(id); }
@@ -136,7 +136,7 @@ function renderHero(){
    </div>`;
 }
 function renderTabs(){
-  const t=$("tabs"); t.hidden=!Z.S.done||!!Z.S.wiz||!!Z.RECHNER||(!Z.USER&&!Z.GUEST)||consentNeeded(); if(t.hidden) return;
+  const t=$("tabs"); t.hidden=!Z.S.done||!!Z.S.wiz||!!Z.RECHNER||(!Z.USER&&!Z.GUEST)||consentNeeded()||Z.RECOVERY; if(t.hidden) return;
   const dl=deadlines(); const att=dl.filter(x=>!x.ok && urg(x.d)!=="ok").length;
   const T=[["ansprueche","Ansprüche","list",0],["belege","Belege","receipt",0],["termine","Termine","cal",att]];
   t.innerHTML=T.map(([k,l,i,b])=>`<button type="button" role="tab" data-tab="${k}" aria-selected="${Z.S.tab===k}">${ic(i)}<span class="lbl">${l}</span>${b?`<span class="badge">${b}</span>`:""}</button>`).join("");
@@ -144,6 +144,7 @@ function renderTabs(){
 function renderMain(){
   document.documentElement.style.setProperty("--fs", Z.S.font||"1");
   if(!Z.loaded){ $("main").innerHTML=`<section class="panel"><p class="muted">Einen Moment, deine Daten werden geladen …</p></section>`; return }
+  if(Z.RECOVERY){ $("main").innerHTML=viewNeuesPasswort(); return }
   if(Z.RECHNER){ $("main").innerHTML=viewRechner(); return }
   if(!Z.USER && !Z.GUEST){ $("main").innerHTML=viewLogin(); return }
   if(Z.USER && Z.showPersons){ $("main").innerHTML=viewPersons(); return }
