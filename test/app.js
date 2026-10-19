@@ -1,17 +1,52 @@
 "use strict";
 
+/* ---------- Beträge und Grenzen (jedes Jahr im Dezember prüfen!) ----------
+   Alle Geldbeträge und Prozentsätze, die sich durch Gesetz oder Verordnung ändern, stehen nur hier.
+   Bei Änderungen: Werte anpassen, "stand" setzen, dann `node --test tests/` laufen lassen
+   (tests/rechnungen.test.mjs enthält die erwarteten Werte und muss mit angepasst werden). */
+const BETRAEGE = Object.freeze({
+  jahr: 2026,
+  stand: "Leistungsübersicht des Bundesgesundheitsministeriums, Stand 01.01.2026",
 
-/* ---------- Stammdaten 2026 ---------- */
+  // Pflegeversicherung (SGB XI), Index = Pflegegrad 0–5, Euro pro Monat
+  pflegegeld:   [0, 0, 347, 599, 800, 990],         // § 37
+  sachleistung: [0, 0, 796, 1497, 1859, 2299],      // § 36
+  tagespflege:  [0, 0, 721, 1357, 1685, 2085],      // § 41
+  stationaer:   [0, 131, 805, 1319, 1855, 2096],    // § 43
+  rentenbeitrag:[0, 0, 198.62, 316.32, 514.94, 735.63], // Rentenbeiträge für die Pflegeperson (Höchstwerte)
+  entlastung: 131,          // § 45b, pro Monat
+  jahresbetrag: 3539,       // § 42a, gemeinsamer Jahresbetrag Verhinderungs- und Kurzzeitpflege
+  verbrauch: 42,            // § 40 Abs. 2, Pflegehilfsmittel zum Verbrauch pro Monat
+  wohnumfeld: 4180,         // § 40 Abs. 4, je Maßnahme
+  wg: 224,                  // § 38a, Wohngruppenzuschlag pro Monat
+  dipa: 40, dipaUnterstuetzung: 30, // § 40a/b, digitale Pflegeanwendungen pro Monat
+  eingliederungMax: 278,    // § 43a, Höchstbetrag pro Monat
+  heimZuschlag: [15, 30, 50, 75], // § 43c, Prozent des Eigenanteils nach 0/12/24/36 Monaten
+
+  kmPauschale: 0.20,        // Fahrtkosten der Ersatzpflegeperson je km (Verhinderungspflege)
+
+  // Steuer (EStG)
+  pflegePauschbetrag: [0, 0, 600, 1100, 1800, 1800],  // § 33b Abs. 6, pro Jahr nach Pflegegrad
+  behindertenPauschbetrag: {20:384, 30:620, 40:860, 50:1140, 60:1440, 70:1780, 80:2120, 90:2460, 100:2840}, // § 33b Abs. 3
+  behindertenPauschbetragErhoeht: 7400, // § 33b Abs. 3 Satz 3: Merkzeichen H, Bl, TBl oder Pflegegrad 4/5
+
+  // Sonstiges
+  rundfunkVoll: 18.36, rundfunkErmaessigt: 6.12, // Rundfunkbeitrag pro Monat
+  elternunterhaltGrenze: 100000,                  // Jahresbrutto, ab dem Kinder für Heimkosten zahlen
+  belastungsgrenzeProzent: 2, belastungsgrenzeChronischProzent: 1, // § 62 SGB V
+});
+
+/* ---------- Stammdaten (Beträge kommen aus 00-betraege.js) ---------- */
 const PG = {
-  pflegegeld:[0,0,347,599,800,990],
-  sachleistung:[0,0,796,1497,1859,2299],
-  tagespflege:[0,0,721,1357,1685,2085],
-  stationaer:[0,131,805,1319,1855,2096],
-  rv:[0,0,198.62,316.32,514.94,735.63],
-  pflegePausch:[0,0,600,1100,1800,1800],
+  pflegegeld:BETRAEGE.pflegegeld,
+  sachleistung:BETRAEGE.sachleistung,
+  tagespflege:BETRAEGE.tagespflege,
+  stationaer:BETRAEGE.stationaer,
+  rv:BETRAEGE.rentenbeitrag,
+  pflegePausch:BETRAEGE.pflegePauschbetrag,
 };
-const ENTLASTUNG=131, JAHRESBETRAG=3539, VERBRAUCH=42, WOHNUMFELD=4180, WG=224, DIPA=40, DIPA_UL=30;
-const BEHPAUSCH={20:384,30:620,40:860,50:1140,60:1440,70:1780,80:2120,90:2460,100:2840};
+const ENTLASTUNG=BETRAEGE.entlastung, JAHRESBETRAG=BETRAEGE.jahresbetrag, VERBRAUCH=BETRAEGE.verbrauch, WOHNUMFELD=BETRAEGE.wohnumfeld, WG=BETRAEGE.wg, DIPA=BETRAEGE.dipa, DIPA_UL=BETRAEGE.dipaUnterstuetzung;
+const BEHPAUSCH=BETRAEGE.behindertenPauschbetrag;
 
 const KASSEN = {
   tk:{name:"Techniker Krankenkasse (TK)", pk:"TK-Pflegeversicherung", mail:"service@tk.de", app:"TK-App (sicherer Upload)"},
@@ -160,19 +195,19 @@ const B = [
   to:PK, ask:"beantrage ich hiermit Leistungen der vollstationären Pflege nach § 43 SGB XI in der Einrichtung [Name des Heims] ab dem [Datum]."},
  {k:"zuschlag", area:"Pflegeheim", t:"Leistungszuschlag zum Eigenanteil prüfen", p:"§ 43c SGB XI",
   when:()=>pg()>=2 && S.wohnen==="heim", val:()=>null,
-  short:"Die Kasse übernimmt 15 % des pflegebedingten Eigenanteils, nach 12 Monaten 30 %, nach 24 Monaten 50 %, nach 36 Monaten 75 %. Frühere Heimaufenthalte zählen mit.",
+  short:`Die Kasse übernimmt ${BETRAEGE.heimZuschlag[0]} % des pflegebedingten Eigenanteils, nach 12 Monaten ${BETRAEGE.heimZuschlag[1]} %, nach 24 Monaten ${BETRAEGE.heimZuschlag[2]} %, nach 36 Monaten ${BETRAEGE.heimZuschlag[3]} %. Frühere Heimaufenthalte zählen mit.`,
   steps:["Heimrechnung prüfen: Ist der Zuschlag abgezogen und die richtige Stufe angesetzt?","Frühere Heimzeiten (auch in anderen Heimen) der Kasse melden.","Bei Fehlern schriftlich Neuberechnung verlangen."],
   docs:["Heimrechnungen","Nachweise früherer Heimaufenthalte"],
   to:PK, ask:"bitte ich um Prüfung und ggf. Neuberechnung des Leistungszuschlags nach § 43c SGB XI. Der Aufenthalt in vollstationärer Pflege begann am [Datum]. Frühere Aufenthalte: [Einrichtung, Zeitraum]."},
  {k:"hzp", area:"Pflegeheim", t:"Hilfe zur Pflege vom Sozialamt", p:"§ 61 ff. SGB XII",
   when:()=>S.bereiche.pflege && (S.wohnen==="heim"), val:()=>null, opt:true,
-  short:"Reichen Rente und Vermögen nicht für den Eigenanteil, übernimmt das Sozialamt den Rest. Kinder zahlen erst ab 100.000 € Jahresbrutto.",
+  short:`Reichen Rente und Vermögen nicht für den Eigenanteil, übernimmt das Sozialamt den Rest. Kinder zahlen erst ab ${eur(BETRAEGE.elternunterhaltGrenze)} Jahresbrutto.`,
   steps:["Antrag beim Sozialamt stellen, sobald das Geld knapp wird. Leistungen gibt es erst ab Antrag.","Einkommens- und Vermögensnachweise sammeln."],
   docs:["Rentenbescheid","Kontoauszüge","Heimvertrag und Rechnungen"], to:"sozialamt",
   ask:"beantrage ich hiermit Hilfe zur Pflege nach §§ 61 ff. SGB XII, da Einkommen und Vermögen nicht ausreichen, um die Kosten der vollstationären Pflege zu decken."},
  {k:"eingliederung", area:"Pflege", t:"Pauschale in Einrichtungen der Eingliederungshilfe", p:"§ 43a SGB XI",
-  when:()=>pg()>=2 && S.wohnen==="eingliederung", val:()=>null, mon:()=>278,
-  short:"Die Pflegekasse übernimmt 15 % der Vergütung, höchstens 278 € im Monat. An Wochenenden zu Hause kann anteilig Pflegegeld fließen.",
+  when:()=>pg()>=2 && S.wohnen==="eingliederung", val:()=>null, mon:()=>BETRAEGE.eingliederungMax,
+  short:`Die Pflegekasse übernimmt 15 % der Vergütung, höchstens ${BETRAEGE.eingliederungMax} € im Monat. An Wochenenden zu Hause kann anteilig Pflegegeld fließen.`,
   steps:["Einrichtung fragen, ob die Pauschale abgerechnet wird.","Für Tage zu Hause anteiliges Pflegegeld beantragen."], docs:["Bescheinigung der Einrichtung über Heimfahrtstage"],
   to:PK, ask:"beantrage ich hiermit anteiliges Pflegegeld für die Tage der häuslichen Pflege außerhalb der Einrichtung [Name] (Nachweis liegt bei)."},
  {k:"fahrten", area:"Krankenkasse", t:"Fahrten zur ambulanten Behandlung", p:"§ 60 SGB V",
@@ -202,9 +237,9 @@ const B = [
   to:VA, ask:"beantrage ich hiermit die Neufeststellung des Grades der Behinderung wegen Verschlimmerung bzw. hinzugekommener Gesundheitsstörungen sowie die Prüfung folgender Merkzeichen: [z. B. H, G, B]. Aktuelle Befunde liegen bei."},
  {k:"behpausch", area:"Steuer", t:"Behinderten-Pauschbetrag", p:"§ 33b EStG",
   when:()=>gdb()>=20 || pg()>=4, val:()=>null,
-  frei:()=>{ if(mz("H")||mz("Bl")||mz("TBl")||pg()>=4) return 7400; const g=Math.min(100,Math.floor(gdb()/10)*10); return BEHPAUSCH[g]||0; },
+  frei:()=>{ if(mz("H")||mz("Bl")||mz("TBl")||pg()>=4) return BETRAEGE.behindertenPauschbetragErhoeht; const g=Math.min(100,Math.floor(gdb()/10)*10); return BEHPAUSCH[g]||0; },
   short:()=>`Steuerfreibetrag von ${eur(B.find(x=>x.k==="behpausch").frei())} pro Jahr. Kann auf Eltern oder Kinder übertragen werden, wenn die Person selbst keine Steuern zahlt.`,
-  steps:["In der Steuererklärung eintragen (Anlage Außergewöhnliche Belastungen).","Bescheid bzw. Ausweis bereithalten. Bei Pflegegrad 4/5 genügt der Pflegegrad-Bescheid für 7.400 €.","Rückwirkend für noch offene Steuerjahre beantragen."],
+  steps:["In der Steuererklärung eintragen (Anlage Außergewöhnliche Belastungen).",`Bescheid bzw. Ausweis bereithalten. Bei Pflegegrad 4/5 genügt der Pflegegrad-Bescheid für ${eur(BETRAEGE.behindertenPauschbetragErhoeht)}.`,"Rückwirkend für noch offene Steuerjahre beantragen."],
   docs:["Ausweis/Bescheid oder Pflegegrad-Bescheid"], to:FA},
  {k:"fahrtpausch", area:"Steuer", t:"Behinderungsbedingte Fahrtkostenpauschale", p:"§ 33 Abs. 2a EStG",
   when:()=>(gdb()>=80) || (gdb()>=70 && mz("G")) || mz("aG")||mz("Bl")||mz("TBl")||mz("H")||pg()>=4, val:()=>null,
@@ -229,8 +264,8 @@ const B = [
   steps:["Antrag bei der Straßenverkehrsbehörde bzw. dem Bürgeramt stellen.","Passfoto und Ausweis mitbringen."], docs:["Ausweis","Passfoto"], to:"strassenverkehrsbehoerde",
   ask:"beantrage ich hiermit die Ausstellung eines Parkausweises für Menschen mit Behinderung (blauer EU-Parkausweis)."},
  {k:"rundfunk", area:"Schwerbehinderung", t:"Ermäßigter Rundfunkbeitrag", p:"§ 4 RBStV", cash:true,
-  when:()=>mz("RF")||mz("TBl"), val:()=> mz("TBl")?220.32:146.88,
-  short:()=> mz("TBl") ? "Taubblinde Menschen werden ganz befreit (18,36 € im Monat gespart)." : "Nur 6,12 € statt 18,36 € im Monat zahlen.",
+  when:()=>mz("RF")||mz("TBl"), val:()=> mz("TBl")?Math.round(BETRAEGE.rundfunkVoll*12*100)/100:Math.round((BETRAEGE.rundfunkVoll-BETRAEGE.rundfunkErmaessigt)*12*100)/100,
+  short:()=> mz("TBl") ? `Taubblinde Menschen werden ganz befreit (${eur(BETRAEGE.rundfunkVoll,2)} im Monat gespart).` : `Nur ${eur(BETRAEGE.rundfunkErmaessigt,2)} statt ${eur(BETRAEGE.rundfunkVoll,2)} im Monat zahlen.`,
   steps:["Antrag beim ARD ZDF Deutschlandradio Beitragsservice stellen (online oder per Formular).","Kopie des Ausweises mit Merkzeichen beilegen."], docs:["Ausweis (Vorder- und Rückseite)"], to:"beitragsservice",
   ask:"beantrage ich hiermit die Ermäßigung bzw. Befreiung vom Rundfunkbeitrag nach § 4 Rundfunkbeitragsstaatsvertrag. Eine Kopie des Schwerbehindertenausweises liegt bei. Beitragsnummer: [Beitragsnummer]."},
  {k:"blind", area:"Schwerbehinderung", t:"Blindengeld / Landesblindenhilfe", p:"Landesrecht, § 72 SGB XII",
@@ -317,7 +352,7 @@ B.push({k:"befreiung", area:"Krankenkasse", t:"Antrag auf Befreiung von Zuzahlun
   docs:["Zuzahlungsbelege (siehe Belegübersicht)","Einkommensnachweise aller Haushaltsmitglieder","ggf. Bescheinigung über die Dauerbehandlung (chronisch krank)"], to:KK, ask:()=>{const z=zuz(befJahr);return `beantrage ich hiermit die Befreiung von Zuzahlungen bzw. die Erstattung von Zuzahlungen über der Belastungsgrenze nach § 62 SGB V für das Jahr ${befJahr}. Die Belastungsgrenze beträgt ${z.grenze?eur(z.grenze,2):"[Betrag]"} (${z.pct} % der jährlichen Bruttoeinnahmen zum Lebensunterhalt). Bisher wurden Zuzahlungen in Höhe von ${eur(z.sum,2)} geleistet. Die Belege liegen in Kopie bei. Bitte erstatten Sie den Betrag, der die Belastungsgrenze übersteigt${String(befJahr)===String(new Date().getFullYear())?", und stellen Sie eine Befreiungsbescheinigung für den Rest des Jahres aus":""}.`}});
 
 /* ---------- Verhinderungspflege-Assistent ---------- */
-const KM_SATZ=0.20;
+const KM_SATZ=BETRAEGE.kmPauschale;
 const numDE=x=>Number(String(x??"").replace(/\s/g,"").replace(/\.(?=\d{3}(\D|$))/g,"").replace(",","."))||0;
 const VHP_GRUND={urlaub:"Urlaub",krank:"Krankheit",kur:"Kur oder Reha",termine:"Termine, Erholung oder andere wichtige Gründe"};
 const VHP_ERSATZ={
@@ -478,7 +513,7 @@ const ASSIST={
    {k:"tage",type:"choice",label:"An wie vielen Tagen pro Woche?",opts:OPT(["1","2","3","4","5"])}],
   ask:()=>`beantrage ich hiermit Leistungen der Tages- und Nachtpflege nach § 41 SGB XI ab dem ${ad("tagespflege","ab","Datum")} an ${av("tagespflege","tage","Anzahl")} Tagen pro Woche in der Einrichtung ${av("tagespflege","einr","Name der Tagespflege")}.`},
  verbrauch:{q:[{k:"anbieter",label:"Wer soll die Pflegehilfsmittel liefern?",help:"Apotheke, Sanitätshaus oder Versandanbieter. Noch keinen? Überspringen.",ph:"Name des Anbieters"}],
-  ask:()=>`beantrage ich hiermit die Kostenübernahme für zum Verbrauch bestimmte Pflegehilfsmittel nach § 40 Abs. 2 SGB XI (z. B. Einmalhandschuhe, Desinfektion, Bettschutzeinlagen) bis zur Höhe von 42 Euro monatlich. Die Versorgung soll erfolgen durch: ${av("verbrauch","anbieter","Anbieter")}.`},
+  ask:()=>`beantrage ich hiermit die Kostenübernahme für zum Verbrauch bestimmte Pflegehilfsmittel nach § 40 Abs. 2 SGB XI (z. B. Einmalhandschuhe, Desinfektion, Bettschutzeinlagen) bis zur Höhe von ${VERBRAUCH} Euro monatlich. Die Versorgung soll erfolgen durch: ${av("verbrauch","anbieter","Anbieter")}.`},
  technisch:{q:[
    {k:"was",type:"multi",label:"Was wird gebraucht?",opts:OPT(["Hausnotruf","Pflegebett","Lagerungskissen","Duschstuhl","Badewannenlift","Anderes"])},
    {k:"anbieter",label:"Von welchem Anbieter gibt es ein Angebot?",ph:"z. B. Sanitätshaus Müller",help:"Noch keins? Überspringen."}],
@@ -796,7 +831,7 @@ function entlCard(){
   const k=entlKonto(); if(!k) return "";
   const pct=k.bisHeute?Math.min(100,(k.genutzt/(k.bisHeute+(k.vorjOffen||0)))*100):0;
   return `<section class="panel mini">
-    <div class="mini-head">${ic("receipt")}<div><h3>Entlastungsbetrag</h3><p class="small muted">131 € im Monat für Haushaltshilfe, Betreuung oder Tagespflege</p></div>
+    <div class="mini-head">${ic("receipt")}<div><h3>Entlastungsbetrag</h3><p class="small muted">${ENTLASTUNG} € im Monat für Haushaltshilfe, Betreuung oder Tagespflege</p></div>
       <div class="mini-num"><span class="small muted">jetzt frei</span><b>${eur(k.frei)}</b></div></div>
     <div class="meter"><div class="track"><i style="width:${pct}%"></i></div>
       <div class="nums"><span>${k.y} genutzt: <strong>${eur(k.genutzt,2)}</strong></span><span>Anspruch bis heute: <strong>${eur(k.bisHeute)}</strong></span></div></div>
@@ -864,7 +899,7 @@ function viewRechner(){
       <h2 class="wq">${e.grad?`Voraussichtlich Pflegegrad ${e.grad}`:"Voraussichtlich noch kein Pflegegrad"}</h2>
       <p class="whelp">${ic("info")}<span>Geschätzt ${String(e.summe.toFixed(1)).replace(".",",")} von 100 Punkten.${next?` Ab ${String(next).replace(".",",")} Punkten gäbe es Pflegegrad ${e.grad+1}.`:""} Das ist eine Schätzung. Die Entscheidung trifft der Medizinische Dienst bei einem Hausbesuch.</span></p>
       <div class="rbars">${bars.map(([k,l,mx,v])=>`<div><span>${l}</span><div class="track"><i style="width:${Math.round(v/mx*100)}%"></i></div><b>${String(v).replace(".",",")}</b></div>`).join("")}</div>
-      ${e.grad>=1&&(!aktuell||e.grad>aktuell)?`<p class="notice good">${ic("check")}<span>${aktuell?`Das wäre höher als der jetzige Pflegegrad ${aktuell}. Ein Antrag auf Höherstufung kann sich lohnen.`:"Ein Antrag auf einen Pflegegrad kann sich lohnen. Ab Pflegegrad 1 gibt es schon 131 € im Monat Entlastungsbetrag und mehr."}</span></p>`:""}
+      ${e.grad>=1&&(!aktuell||e.grad>aktuell)?`<p class="notice good">${ic("check")}<span>${aktuell?`Das wäre höher als der jetzige Pflegegrad ${aktuell}. Ein Antrag auf Höherstufung kann sich lohnen.`:`Ein Antrag auf einen Pflegegrad kann sich lohnen. Ab Pflegegrad 1 gibt es schon ${ENTLASTUNG} € im Monat Entlastungsbetrag und mehr.`}</span></p>`:""}
       <div class="btnrow big">${hat?(e.grad>=1&&(!aktuell||e.grad>aktuell)?`<button class="btn" type="button" data-act="r-antrag">${aktuell?"Höherstufung beantragen":"Pflegegrad beantragen"}</button>`:"")
         :`<button class="btn" type="button" data-act="r-konto">Antrag vorbereiten (kostenlos)</button>`}
         <button class="btn ghost" type="button" data-act="r-neu">Noch einmal</button></div>
@@ -1134,7 +1169,7 @@ function bruttoOf(j){ j=String(j); const bj=S.bruttoJahr||{}; if(bj[j]!=null&&bj
 function chronisch(){ if(S.chronisch) return S.chronisch==="ja"; return pg()>=3||gdb()>=60 }
 function zuz(jahr){
   const sum=BEL.filter(b=>KATS[b.kat]&&KATS[b.kat].zz&&String(b.jahr)===String(jahr)).reduce((s,b)=>s+(Number(b.betrag)||0),0);
-  const pct=chronisch()?1:2; const brutto=numDE(bruttoOf(jahr));
+  const pct=chronisch()?BETRAEGE.belastungsgrenzeChronischProzent:BETRAEGE.belastungsgrenzeProzent; const brutto=numDE(bruttoOf(jahr));
   return {sum,pct,brutto,grenze:brutto?brutto*pct/100:0};
 }
 
@@ -2532,7 +2567,7 @@ function eriCard(){
 }
 
 /* ---------- Fehlerprotokoll (ohne persönliche Daten), Feedback, Weiterempfehlen ---------- */
-const APP_VERSION="fb5c584a"; let errN=0;
+const APP_VERSION="0d111243"; let errN=0;
 function reportError(msg,stack){
   if(!sb||errN>=5) return; errN++;
   const clean=s=>String(s||"").replace(/[\w.+-]+@[\w-]+\.[\w.]+/g,"[mail]").replace(/\d{5,}/g,"[zahl]");
