@@ -59,6 +59,8 @@ async function newPage({ gast = null, stub = false } = {}) {
   page.on("pageerror", e => errors.push(e.message));
   return { page, ctx, errors, extern };
 }
+// wartet, bis fn() im Browser true liefert (ohne waitForFunction, das die Sicherheitsregeln der Seite blockieren)
+async function waitFor(page, fn, ms = 60000) { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (await page.evaluate(fn)) return true; await page.waitForTimeout(250) } throw new Error("Zeitüberschreitung beim Warten") }
 const GAST = { done: true, welcomeSeen: true, bereiche: { pflege: true, sb: false }, pg: "3", kasse: "aok", aokRegion: "bw", wohnen: "angehoerige", rolle: "angehoerig", step: 6, tab: "ansprueche", genutzt: { pflegegeld: true }, person: { name: "Testperson", ort: "70173 Stuttgart" } };
 
 // ---------- 1. Fragebogen von vorn ----------
@@ -118,12 +120,12 @@ console.log("Sammel-PDF mit mehreren Rechnungen");
   await page.goto(BASE); await page.waitForTimeout(600);
   await page.evaluate(() => { window.__up = []; ASSETS = { upload: async (b, { type }) => { window.__up.push(type); return { id: "f/" + window.__up.length, contentType: type } }, delete: async () => {} }; render() });
   await page.setInputFiles("#fileAny", PDF);
-  await page.waitForFunction(() => bulk && bulk.phase !== "lesen", null, { timeout: 60000 });
+  await waitFor(page, () => bulk && bulk.phase !== "lesen");
   const items = await page.evaluate(() => bulk.items.map(i => [i.pages.join("+"), i.kat, i.datum, i.betrag]));
   check("5 Rechnungen auf 6 Seiten erkannt", items.length === 5, JSON.stringify(items));
   const want = [["1", "apo", "2024-03-14", "10,00"], ["2", "entl", "2025-01-31", "130,00"], ["3+4", "vhp", "2025-06-12", "682,00"], ["5", "fahrt", "2026-02-03", "10,00"], ["6", "heil", "2026-04-20", "31,80"]];
   want.forEach((w, i) => check(`Rechnung ${i + 1}: Art, Datum, Betrag richtig`, JSON.stringify(items[i]) === JSON.stringify(w), JSON.stringify(items[i])));
-  await page.tap('[data-act="bulk-save"]'); await page.waitForFunction(() => !bulk, null, { timeout: 60000 });
+  await page.tap('[data-act="bulk-save"]'); await waitFor(page, () => !bulk);
   check("alle Belege gespeichert", await page.evaluate(() => BEL.length) === 5);
   check("Jahre 2024–2026 eingeblendet", await page.evaluate(() => ["2024", "2025", "2026"].every(y => S.belegFilter.jahre.includes(y))));
   check("keine Programmfehler", errors.length === 0, errors.join(" | "));
