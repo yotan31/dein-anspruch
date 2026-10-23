@@ -109,11 +109,8 @@ function renderHero(){
   const top=`<div class="topbar">${brand}${menuBtn}</div>${menu}`;
   const kopf=`<div class="hrow">${personBtn||'<span></span>'}${save}</div>`;
   if(Z.S.wiz||Z.RECHNER||(Z.S.done&&Z.S.tab!=="ansprueche")){ $("hero").innerHTML=top+(personBtn?`<div class="hsheet slim">${kopf}</div>`:""); return }
-  if(!Z.S.done){
-    $("hero").innerHTML=`${top}<div class="hsheet">${personBtn?kopf:""}
-     <p class="lead">Pflegegrad oder Schwerbehinderung: Wir prüfen, welche Leistungen 2026 noch offen sind, schreiben die Anträge vor, sortieren deine Belege und erinnern an Fristen.</p></div>`;
-    return;
-  }
+  // Anmeldung und Fragebogen erklären sich selbst; oben nur Marke und Menü (bei Konten zusätzlich die Person)
+  if(!Z.S.done){ $("hero").innerHTML=top+(personBtn?`<div class="hsheet slim">${kopf}</div>`:""); return }
   const s=sums(); const dl=deadlines(); const crit=dl.find(x=>x.main&&!x.ok&&urg(x.d)!=="ok") || dl.find(x=>urg(x.d)==="late");
   const next=dl[0];
   // Aufschlüsselung wie auf einem Auszug: die größten Posten, der Rest zusammengefasst

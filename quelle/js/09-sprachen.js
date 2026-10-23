@@ -4,6 +4,21 @@ import { ic } from "./03-hilfsmittel.js";
 const LANGS=[["de","Deutsch"],["tr","Türkçe"],["ru","Русский"],["ar","العربية"],["ti","ትግርኛ"]];
 // Reihenfolge je Eintrag: Türkisch, Russisch, Arabisch, Tigrinya
 const T={
+"Welche Hilfen stehen euch noch zu?":["Hangi yardımlara hâlâ hakkınız var?","На какую помощь вы ещё имеете право?","ما المساعدات التي ما زالت من حقكم؟","ገና እንታይ ሓገዝ ይግበኣኩም?"],
+"Kostenlos prüfen, ohne Anmeldung":["Ücretsiz kontrol edin, kayıt olmadan","Проверить бесплатно, без регистрации","تحقق مجانًا بدون تسجيل","ብነጻ ፈትሹ፣ ብዘይ ምዝገባ"],
+"Ansprüche finden":["Haklarınızı bulun","Найти положенное","اعثر على مستحقاتك","መሰላትኩም ርኸቡ"],
+"Anträge fertig":["Başvurular hazır","Заявления готовы","طلبات جاهزة","ድሉዋት ሕቶታት"],
+"Fristen im Blick":["Süreleri takip edin","Сроки под контролем","المواعيد النهائية تحت السيطرة","ግዜ ገደባት ኣብ ቁጽጽር"],
+"Schon dabei? Anmelden":["Hesabınız var mı? Giriş yapın","Уже есть аккаунт? Войти","لديك حساب؟ سجّل الدخول","ሕሳብ ኣለኩም? እተዉ"],
+"kostenlos":["ücretsiz","бесплатно","مجاني","ብነጻ"],
+"keine Werbung":["reklam yok","без рекламы","بلا إعلانات","ብዘይ መወዓውዒ"],
+"Daten in Frankfurt":["Veriler Frankfurt'ta","Данные во Франкфурте","البيانات في فرانكفورت","ዳታ ኣብ ፍራንክፉርት"],
+"Kostenlos":["Ücretsiz","Бесплатно","مجانًا","ብነጻ"],
+"Prüfen lohnt sich":["Kontrol etmeye değer","Стоит проверить","يستحق التحقق","ምፍታሽ ይጠቅም"],
+"Zuklappen":["Kapat","Свернуть","طيّ","ዕጸው"],
+"In Kalender eintragen":["Takvime ekle","Добавить в календарь","أضف إلى التقويم","ናብ ካሌንደር ወስኹ"],
+"Weitere Hilfen":["Diğer yardımlar","Другая помощь","مساعدات أخرى","ካልኦት ሓገዛት"],
+"Beleg eintragen":["Belge girin","Внести чек","أدخل الإيصال","ቅብሊት ኣእትዉ"],
 "Willkommen":["Hoş geldiniz","Добро пожаловать","مرحبًا","እንቋዕ ብደሓን መጻእኩም"],
 "Melde dich an, um deine Angaben und Belege zu sehen.":["Bilgilerinizi ve belgelerinizi görmek için giriş yapın.","Войдите, чтобы увидеть свои данные и документы.","سجّل الدخول لرؤية بياناتك ومستنداتك.","ሓበሬታኹምን ሰነዳትኩምን ንምርኣይ እተዉ።"],
 "Mit Google anmelden":["Google ile giriş yap","Войти через Google","تسجيل الدخول عبر Google","ብGoogle እተዉ"],

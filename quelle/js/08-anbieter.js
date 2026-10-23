@@ -1,5 +1,6 @@
 import { Z } from "./zustand.js";
 import { esc } from "./01-grundlagen.js";
+import { ic } from "./03-hilfsmittel.js";
 /* ---------- Anbieter vor Ort finden ---------- */
 const LOTSE="https://www.pflegelotse.de/";
 const FINDER={
@@ -20,7 +21,7 @@ export function finderHTML(k){
   const p=plz();
   return `<div><h4>In der Nähe finden</h4>
     ${p?"":`<div class="field" style="max-width:220px;margin-bottom:8px"><label for="plz-${k}">Deine Postleitzahl</label><input type="text" inputmode="numeric" id="plz-${k}" data-plz="1" maxlength="5" placeholder="z. B. 70173"></div>`}
-    <div class="btnrow">${L.map(([t,q])=>{const url=/^https?:/.test(q)?q:`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q+" "+(p||""))}`;return `<a class="btn small soft" href="${url}" target="_blank" rel="noopener">${esc(t)}</a>`}).join("")}</div>
+    <div class="extlinks">${L.map(([t,q])=>{const url=/^https?:/.test(q)?q:`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q+" "+(p||""))}`;return `<a class="extlink" href="${url}" target="_blank" rel="noopener">${esc(t)}${ic("ext")}</a>`}).join("")}</div>
     <p class="small muted">Neutral: Wir bekommen für diese Links kein Geld. Bei Anrufen „im Auftrag der Pflegekasse“ bitte vorsichtig sein.</p></div>`;
 }
 

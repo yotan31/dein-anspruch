@@ -22,8 +22,39 @@ const ICON={
  down:"M12 4v11 M7 10l5 5 5-5 M5 20h14",
  plus:"M12 5v14 M5 12h14",
  bell:"M6 16V11a6 6 0 0 1 12 0v5l2 2H4z M10 21h4",
+ chev:"M9 6l6 6-6 6",
+ shield:"M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z M9 12l2 2 4-4",
+ euro:"M17 6.5A6.5 6.5 0 1 0 17 17.5 M4 10h9 M4 14h9",
+ lock:"M6 11h12v10H6z M8 11V8a4 4 0 0 1 8 0v3",
+ ext:"M14 4h6v6 M20 4l-9 9 M18 14v6H4V6h6",
 };
 export function ic(n, c="i") { return `<svg class="${c}" viewBox="0 0 24 24" aria-hidden="true"><path d="${ICON[n]}"/></svg>`; }
+/* ---------- Illustrationen: ruhige Flächen in den Farben der App, passen sich dem dunklen Modus an ---------- */
+const BILD={
+ // Start: Unterlagen mit Haken, daneben ein Herz
+ start:`<rect x="20" y="22" width="92" height="116" rx="10" stroke-width="2" style="fill:var(--paper-2);stroke:var(--line)"/>
+  <rect x="34" y="12" width="92" height="116" rx="10" stroke-width="2" style="fill:var(--paper);stroke:var(--line)"/>
+  <path d="M50 42l6 6 12-12" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" style="stroke:var(--money);fill:none"/>
+  <rect x="76" y="38" width="36" height="8" rx="4" style="fill:var(--line)"/>
+  <path d="M50 72l6 6 12-12" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" style="stroke:var(--money);fill:none"/>
+  <rect x="76" y="68" width="30" height="8" rx="4" style="fill:var(--line)"/>
+  <circle cx="58" cy="104" r="9" stroke-width="4" style="fill:none;stroke:var(--accent)"/>
+  <rect x="76" y="98" width="36" height="8" rx="4" style="fill:var(--line)"/>
+  <circle cx="146" cy="104" r="32" style="fill:var(--money-soft)"/>
+  <path d="M146 123s-17-10.5-17-23a9.5 9.5 0 0 1 17-5.8 9.5 9.5 0 0 1 17 5.8c0 12.5-17 23-17 23z" style="fill:var(--money)"/>`,
+ // Belege: Quittung mit Kamera
+ belege:`<path d="M46 14h64v112l-10.7-7-10.6 7-10.7-7-10.7 7-10.6-7L46 126z" stroke-width="2" stroke-linejoin="round" style="fill:var(--paper);stroke:var(--line)"/>
+  <rect x="58" y="32" width="40" height="7" rx="3.5" style="fill:var(--line)"/><rect x="58" y="50" width="30" height="7" rx="3.5" style="fill:var(--line)"/>
+  <rect x="58" y="68" width="40" height="7" rx="3.5" style="fill:var(--line)"/><rect x="58" y="92" width="22" height="9" rx="4.5" style="fill:var(--money-3)"/>
+  <circle cx="132" cy="102" r="30" style="fill:var(--accent-soft)"/>
+  <path d="M117 95h7l4-6h10l4 6h7v20h-32z" stroke-width="3.5" stroke-linejoin="round" style="fill:none;stroke:var(--accent)"/><circle cx="133" cy="105" r="6" stroke-width="3.5" style="fill:none;stroke:var(--accent)"/>`,
+ // Alles erledigt: großer Haken im Kreis
+ fertig:`<circle cx="90" cy="70" r="52" style="fill:var(--money-soft)"/><circle cx="90" cy="70" r="36" style="fill:var(--money)"/>
+  <path d="M73 70l12 12 22-24" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" style="stroke:#fff;fill:none"/>
+  <circle cx="34" cy="30" r="5" style="fill:var(--money-3)"/><circle cx="150" cy="24" r="4" style="fill:var(--accent)"/><circle cx="156" cy="112" r="6" style="fill:var(--money-3)"/>`,
+};
+/** @param {"start"|"belege"|"fertig"} n */
+export function bild(n, c="bild") { return `<svg class="${c}" viewBox="0 0 180 140" aria-hidden="true" focusable="false">${BILD[n]}</svg>`; }
 export const AREA_ICON={Pflege:"heart",Pflegeperson:"user",Steuer:"form",Pflegeheim:"building",Krankenkasse:"cross",Schwerbehinderung:"access",Arbeit:"case"};
 
 /* ---------- Datum ---------- */

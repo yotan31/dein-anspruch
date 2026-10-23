@@ -1,6 +1,6 @@
 import { Z } from "./zustand.js";
 import { blank, esc } from "./01-grundlagen.js";
-import { ic } from "./03-hilfsmittel.js";
+import { bild, ic } from "./03-hilfsmittel.js";
 import { $, render, scrollTop } from "./11-darstellung.js";
 import { toast } from "./18-bedienung.js";
 import { lsGet, lsSet } from "./19-speicher.js";
@@ -11,7 +11,7 @@ export function viewNeuesPasswort(){
   return `<section class="panel auth">
     <h2>Neues Passwort festlegen</h2>
     <p class="muted">${bereit?`Für ${esc(Z.USER.email||"dein Konto")}. Wähle ein Passwort mit mindestens 8 Zeichen und gib es zur Sicherheit zweimal ein.`:"Einen Moment, der Link wird geprüft …"}</p>
-    <div class="field"><label for="au-pw">Neues Passwort</label><div class="euro"><input type="password" id="au-pw" autocomplete="new-password" ${bereit?"":"disabled"}><button type="button" class="btn small ghost" data-act="au-show">Zeigen</button></div></div>
+    <div class="field"><label for="au-pw">Neues Passwort</label><div class="pwrow"><input type="password" id="au-pw" autocomplete="new-password" ${bereit?"":"disabled"}><button type="button" class="btn small ghost" data-act="au-show">Zeigen</button></div></div>
     <div class="field"><label for="au-pw2">Neues Passwort wiederholen</label><input type="password" id="au-pw2" autocomplete="new-password" ${bereit?"":"disabled"}></div>
     ${Z.authMsg?`<p class="notice ${/gespeichert/.test(Z.authMsg)?"good":"bad"}">${ic("info")}<span>${esc(Z.authMsg)}</span></p>`:""}
     <button class="btn big" type="button" data-act="au-newpw" ${Z.authBusy||!bereit?"disabled":""}>${Z.authBusy?"Einen Moment …":"Neues Passwort speichern"}</button>
@@ -19,24 +19,37 @@ export function viewNeuesPasswort(){
   </section>`;
 }
 export function viewLogin(){
-  const reg=Z.authMode==="register", fg=Z.authMode==="forgot";
-  return `<section class="panel auth">
-    ${lsGet("da-einladung")?`<p class="notice good">${ic("user")}<span><strong>Du wurdest eingeladen.</strong> Melde dich an oder lege ein Konto an. Danach siehst du den gemeinsamen Fall.</span></p>`:""}
-    <h2>${reg?"Konto anlegen":fg?"Passwort vergessen":"Willkommen"}</h2>
-    <p class="muted">${reg?"Mit einem Konto sind deine Angaben und Belege sicher gespeichert und auf Handy und Computer gleich.":fg?"Gib deine E-Mail-Adresse ein. Wir schicken dir einen Link zum Zurücksetzen.":"Melde dich an, um deine Angaben und Belege zu sehen."}</p>
+  const reg=Z.authMode==="register", fg=Z.authMode==="forgot", login=!reg&&!fg;
+  const einladung=!!lsGet("da-einladung");
+  // Erster Eindruck: Was die App bringt, und der Weg ohne Konto als Hauptweg. Die Anmeldung steht daneben bzw. darunter.
+  const intro=login&&!einladung?`<section class="landing">
+    ${bild("start")}
+    <h1>Welche Hilfen stehen euch noch zu?</h1>
+    <p class="lead">Bei Pflegegrad oder Schwerbehinderung bleiben oft mehrere tausend Euro im Jahr ungenutzt. Wir zeigen, was offen ist, und schreiben die Anträge vor.</p>
+    <ul class="benefits">
+      <li>${ic("list")}<span><strong>Ansprüche finden</strong>Ein paar Fragen, etwa 3 Minuten</span></li>
+      <li>${ic("file")}<span><strong>Anträge fertig</strong>Schritt für Schritt ausgefüllt, als Text oder PDF</span></li>
+      <li>${ic("bell")}<span><strong>Fristen im Blick</strong>Belege sammeln, rechtzeitig erinnert werden</span></li>
+    </ul>
+    <button type="button" class="btn big" data-act="au-guest">Kostenlos prüfen, ohne Anmeldung</button>
+    <p class="trust"><span>${ic("check")}kostenlos</span><span>${ic("check")}keine Werbung</span><span>${ic("lock")}Daten in Frankfurt</span></p>
+    <button type="button" class="linkbtn" data-act="r-start">Erst Pflegegrad selbst einschätzen ${ic("chev")}</button>
+  </section>`:"";
+  return `${intro}<section class="panel auth${intro?" side":""}">
+    ${einladung?`<p class="notice good">${ic("user")}<span><strong>Du wurdest eingeladen.</strong> Melde dich an oder lege ein Konto an. Danach siehst du den gemeinsamen Fall.</span></p>`:""}
+    <h2>${reg?"Konto anlegen":fg?"Passwort vergessen":intro?"Schon dabei? Anmelden":"Anmelden"}</h2>
+    <p class="muted">${reg?"Mit einem Konto sind deine Angaben und Belege sicher gespeichert und auf Handy und Computer gleich.":fg?"Gib deine E-Mail-Adresse ein. Wir schicken dir einen Link zum Zurücksetzen.":"Mit Konto sind deine Angaben und Belege auf allen Geräten da."}</p>
     ${fg?"":`<button type="button" class="btn big gbtn" data-act="au-google"><svg viewBox="0 0 48 48" width="22" height="22" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>Mit Google anmelden</button>
     <div class="orline"><span>oder mit E-Mail</span></div>`}
     <div class="field"><label for="au-mail">E-Mail-Adresse</label><input type="email" id="au-mail" autocomplete="email" inputmode="email" value="${esc(lsGet("dein-anspruch-mail")||"")}"></div>
-    ${fg?"":`<div class="field"><label for="au-pw">Passwort${reg?" (mindestens 8 Zeichen)":""}</label><div class="euro"><input type="password" id="au-pw" autocomplete="${reg?"new-password":"current-password"}"><button type="button" class="btn small ghost" data-act="au-show">Zeigen</button></div></div>`}
+    ${fg?"":`<div class="field"><label for="au-pw">Passwort${reg?" (mindestens 8 Zeichen)":""}</label><div class="pwrow"><input type="password" id="au-pw" autocomplete="${reg?"new-password":"current-password"}"><button type="button" class="btn small ghost" data-act="au-show">Zeigen</button></div></div>`}
     ${Z.authMsg?`<p class="notice ${/fehl|falsch|nicht/i.test(Z.authMsg)?"bad":"info"}">${ic("info")}<span>${esc(Z.authMsg)}</span></p>`:""}
     <button class="btn big" type="button" data-act="${reg?"au-register":fg?"au-forgot":"au-login"}" ${Z.authBusy?"disabled":""}>${Z.authBusy?"Einen Moment …":reg?"Konto anlegen":fg?"Link schicken":"Anmelden"}</button>
-    <div class="btnrow">
+    <div class="authlinks">
       ${Z.authMode!=="login"?`<button type="button" class="linkbtn" data-act="au-mode" data-mode="login">Ich habe schon ein Konto</button>`:`<button type="button" class="linkbtn" data-act="au-mode" data-mode="register">Neu hier? Konto anlegen</button><button type="button" class="linkbtn" data-act="au-mode" data-mode="forgot">Passwort vergessen?</button>`}
     </div>
-    <hr style="border:0;border-top:1px solid var(--line);margin:4px 0">
-    <button type="button" class="btn ghost" data-act="au-guest">Ohne Konto ausprobieren</button>
-    <button type="button" class="linkbtn" data-act="r-start">Pflegegrad-Rechner: ohne Anmeldung einschätzen, welcher Pflegegrad in Frage kommt</button>
-    <p class="small muted">Ohne Konto bleiben deine Angaben nur in diesem Browser, und Belege-Fotos werden nicht gespeichert. Du kannst später jederzeit ein Konto anlegen, deine Angaben werden dann übernommen.</p>
+    ${intro?`<p class="small muted">Ohne Konto bleiben deine Angaben nur in diesem Browser. Du kannst später jederzeit ein Konto anlegen, deine Angaben werden dann übernommen.</p>`:`<hr class="sep">
+    <button type="button" class="btn ghost" data-act="au-guest">Ohne Konto ausprobieren</button>`}
   </section>`;
 }
 export async function authAction(a){

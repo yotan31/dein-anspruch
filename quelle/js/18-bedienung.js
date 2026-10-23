@@ -31,6 +31,9 @@ Z.tT = undefined; export function toast(m){const t=$("toast");t.textContent=tr(m
 export function start18() {
 /* ---------- Events ---------- */
 document.addEventListener("click", e=>{
+  // Menü schließt, wenn daneben getippt wird
+  const ziel=/** @type {HTMLElement} */(e.target);
+  if(Z.showMenu && !ziel.closest("#hmenu,[data-act=menu]")){ Z.showMenu=false; render() }
   const t=/** @type {HTMLElement} */(/** @type {HTMLElement} */(e.target).closest("[data-act],[data-open],[data-copy],[data-pdf],[data-resettx],[data-tab],[data-area],[data-kat],[data-del],[data-delyes],[data-delno],[data-sub-toggle],[data-view],[data-delown],[data-year],[data-befpdf],[data-befcopy],[data-edit],[data-wopen],[data-wnav],[data-font],[data-gotoclaim],[data-rmember]"));
   if(!t) return;
   const a=t.dataset.act;

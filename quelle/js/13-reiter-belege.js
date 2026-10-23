@@ -1,6 +1,6 @@
 import { Z } from "./zustand.js";
 import { esc, eur } from "./01-grundlagen.js";
-import { deD, ic, parseIso } from "./03-hilfsmittel.js";
+import { bild, deD, ic, parseIso } from "./03-hilfsmittel.js";
 import { KATS, bruttoOf, chronisch, selYears, zuz } from "./10-fragebogen-und-fristen.js";
 import { bulkView } from "./17-sammel-pdf.js";
 import { blobUrl } from "./19-speicher.js";
@@ -16,16 +16,16 @@ export function viewBelege(){
   return `
   <section class="panel">
     <h2>Belege</h2>
-    <div class="yearchips"><span class="small muted">Jahre anzeigen:</span>${belegYears().map(y=>`<button type="button" class="chip" data-year="${y}" aria-pressed="${years.includes(y)}">${y}</button>`).join("")}</div>
+    <div class="yearchips" role="group" aria-label="Jahre anzeigen"><span class="small muted">Jahre:</span>${belegYears().map(y=>`<button type="button" class="chip" data-year="${y}" aria-pressed="${years.includes(y)}">${y}</button>`).join("")}</div>
     ${Z.bulk?bulkView():Z.pending?pendingForm():`
     <div class="drop" id="drop">
-      ${ic("camera")}
-      <p><strong>Rezept, Quittung oder Rechnung erfassen</strong><br><span class="small muted">Fotografieren oder Datei (Bild/PDF) wählen. Auch ältere Belege, z. B. aus ${new Date().getFullYear()-2}: einfach das Datum vom Beleg eintragen.</span>${canFiles?`<br><span class="small"><strong>Neu:</strong> Eine PDF mit vielen Rechnungen? Die App erkennt jede Rechnung und sortiert sie nach Jahr.</span>`:""}</p>
+      ${bild("belege")}
+      <p><strong>${canFiles?"Rezept, Quittung oder Rechnung fotografieren":"Rezept, Quittung oder Rechnung erfassen"}</strong><br><span class="small muted">${canFiles?"Foto aufnehmen oder Datei (Bild/PDF) wählen. ":""}Auch ältere Belege, z. B. aus ${new Date().getFullYear()-2}: einfach das Datum vom Beleg eintragen.</span>${canFiles?`<br><span class="small"><strong>Neu:</strong> Eine PDF mit vielen Rechnungen? Die App erkennt jede Rechnung und sortiert sie nach Jahr.</span>`:""}</p>
       <div class="btnrow" style="justify-content:center">
         ${canFiles?`<button class="btn" type="button" data-act="cam">${ic("camera")}Foto aufnehmen</button><button class="btn soft" type="button" data-act="pick">${ic("file")}Datei wählen</button>`:""}
-        <button class="btn ${canFiles?"ghost":""}" type="button" data-act="manual">${ic("plus")}Ohne Foto erfassen</button>
+        <button class="btn ${canFiles?"ghost":""}" type="button" data-act="manual">${ic("plus")}${canFiles?"Ohne Foto erfassen":"Beleg eintragen"}</button>
       </div>
-      ${canFiles?"":`<p class="small muted">Fotos speichern geht nur mit Konto. Beträge kannst du trotzdem erfassen, sie bleiben aber nur bis zum Schließen der Seite.</p>`}
+      ${canFiles?"":`<p class="small muted">Fotos speichern geht nur mit Konto. Beträge kannst du trotzdem eintragen, sie bleiben aber nur bis zum Schließen der Seite. <button type="button" class="linkbtn" data-act="guest-register">Konto anlegen</button></p>`}
     </div>`}
   </section>
 

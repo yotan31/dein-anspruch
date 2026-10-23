@@ -13,7 +13,7 @@ export function viewTermine(){
   ${rel?`<section class="panel">
     <div class="section-title"><h2>Beratungsbesuch</h2><span class="small muted">§ 37 Abs. 3 SGB XI</span></div>
     <p class="muted small">Wer Pflegegeld bekommt, muss einmal in jedem Kalenderhalbjahr (Januar–Juni und Juli–Dezember) einen Beratungsbesuch durch einen Pflegedienst oder eine anerkannte Beratungsstelle nachweisen. Fehlt der Nachweis, kürzt die Pflegekasse das Pflegegeld, im Wiederholungsfall wird es gestrichen. Der Besuch ist kostenlos, jeder zweite darf per Video sein.</p>
-    <div class="halves">${halves.map((h,i)=>{const done=st.inH(h);const cls=done?"done":i===0?"miss":i===1?"open":"";return `<div class="half ${cls}"><b>${h.label}</b><span>${done?"erledigt":i===0?"kein Besuch eingetragen":i===1?`offen · bis ${deD(h.end)}`:`ab ${deD(h.start)}`}</span></div>`}).join("")}</div>
+    <div class="halves">${halves.map((h,i)=>{const done=st.inH(h);const cls=done?"done":i===0?"miss":i===1?"open":"";return `<div class="half ${cls}">${done?ic("check"):i===0?ic("alert"):i===1?ic("cal"):""}<b>${h.label}</b><span>${done?"erledigt":i===0?"kein Besuch eingetragen":i===1?`offen · bis ${deD(h.end)}`:`ab ${deD(h.start)}`}</span></div>`}).join("")}</div>
     <div class="grid2">
       <div class="field"><label for="tdienst">Pflegedienst / Beratungsstelle</label><input type="text" id="tdienst" value="${esc(Z.S.termine.dienst)}" placeholder="Name"></div>
       <div class="field"><label for="ttel">Telefon</label><input type="tel" id="ttel" value="${esc(Z.S.termine.tel)}"></div>
@@ -53,8 +53,7 @@ function dueHTML(x){
     <div class="d-t">${esc(x.t)} <span class="pill ${u}">${x.ok?"erledigt bis "+deD(beratungStatus().H.end):urgTxt(x.d)}</span></div>
     <div class="d-s">${esc(x.s)}</div>
     <div class="btnrow">
-      <a class="btn small soft" href="${gcal(x)}" target="_blank" rel="noopener">${ic("cal")}Google Kalender</a>
-      <a class="btn small ghost" href="${ocal(x)}" target="_blank" rel="noopener">Outlook</a>
+      <details class="calmenu"><summary class="btn small soft">${ic("cal")}In Kalender eintragen</summary><span class="calopts"><a class="btn small ghost" href="${gcal(x)}" target="_blank" rel="noopener">Google Kalender</a><a class="btn small ghost" href="${ocal(x)}" target="_blank" rel="noopener">Outlook</a></span></details>
       ${x.own?`<button type="button" class="btn small ghost" data-delown="${x.own}">Entfernen</button>`:""}
     </div>
   </div>`;
