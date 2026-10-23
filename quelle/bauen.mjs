@@ -42,7 +42,7 @@ writeFileSync(path.join(SITE, "index.html"), html.replaceAll("{{VERSION}}", vers
 // 1b. Service Worker (App ohne Internet öffnen): Grundgerüst vorab speichern
 const vorab = ["./", "index.html", `app.js?v=${version}`, `app.css?v=${version}`, "vendor/supabase.js?v=2.45.4", "vendor/jspdf.umd.min.js?v=4.2.1",
   "vendor/schrift/AtkinsonHyperlegible-Regular.woff2", "vendor/schrift/AtkinsonHyperlegible-Bold.woff2", "vendor/schrift/AtkinsonHyperlegible-Italic.woff2", "vendor/schrift/SourceSerif4.woff",
-  "manifest.webmanifest", "icon.svg", "icon-192.png", "icon-512.png", "datenschutz.html", "impressum.html", "nutzungsbedingungen.html"];
+  "manifest.webmanifest", "logo.png", "favicon.png", "icon-192.png", "icon-512.png", "datenschutz.html", "impressum.html", "nutzungsbedingungen.html"];
 const sw = readFileSync(path.join(Q, "sw.js"), "utf8").replace("__VERSION__", version).replace("__DATEIEN__", JSON.stringify(vorab, null, 1));
 await esbuild.transform(sw, { loader: "js" }); // bricht ab, falls der Service Worker fehlerhaft ist
 writeFileSync(path.join(SITE, "sw.js"), sw);

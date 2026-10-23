@@ -94,7 +94,7 @@ export function sums(){
 const MENU_ICON="M4 7h16 M4 12h16 M4 17h16";
 function renderHero(){
   const save=`<div class="savestate"><span class="dot ${Z.saveState.c}" id="savedot"></span><span id="savetxt">${esc(Z.saveState.t)}</span></div>`;
-  const brand=`<div class="brand"><span class="mark" aria-hidden="true">§</span><b>Dein Anspruch</b></div>`;
+  const brand=`<div class="brand"><img class="logo" src="logo.png" width="44" height="44" alt=""><b>Dein Anspruch</b></div>`;
   const curF = Z.USER && Z.FAELLE.find(f=>f.id===Z.FALL_ID);
   const personBtn = curF ? `<button type="button" class="acct person" data-act="persons" aria-expanded="${Z.showPersons}">${ic("user")}${esc(fallName(curF))} ▾</button>` : "";
   const fontsw=`<div class="fontsw" role="group" aria-label="Schriftgröße">${[["1","A"],["1.15","A+"],["1.3","A++"]].map(([v,t])=>`<button type="button" data-font="${v}" aria-pressed="${(Z.S.font||"1")===v}" aria-label="Schrift ${t}">${t}</button>`).join("")}</div>`;
