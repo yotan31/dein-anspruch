@@ -4,6 +4,7 @@ import { ic } from "./03-hilfsmittel.js";
 const LANGS=[["de","Deutsch"],["tr","Türkçe"],["ru","Русский"],["ar","العربية"],["ti","ትግርኛ"]];
 // Reihenfolge je Eintrag: Türkisch, Russisch, Arabisch, Tigrinya
 const T={
+"Jetzt kostenlos prüfen":["Şimdi ücretsiz kontrol edin","Проверить бесплатно","تحقق الآن مجانًا","ሕጂ ብነጻ ፈትሹ"],
 "Oder direkt: Was möchtest du beantragen?":["Ya da doğrudan: Neye başvurmak istiyorsunuz?","Или сразу: что вы хотите оформить?","أو مباشرة: ماذا تريد أن تطلب؟","ወይ ብቐጥታ: እንታይ ክትሓትቱ ትደልዩ?"],
 "Noch Fragen?":["Sorularınız mı var?","Остались вопросы?","هل لديك أسئلة؟","ሕቶታት ኣለኩም?"],
 "Hilfe und häufige Fragen":["Yardım ve sık sorulan sorular","Помощь и частые вопросы","المساعدة والأسئلة الشائعة","ሓገዝን ብተደጋጋሚ ዝሕተቱ ሕቶታትን"],

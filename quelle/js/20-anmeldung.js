@@ -34,8 +34,8 @@ export function viewLogin(){
       <li>${ic("bell")}<span><strong>Fristen im Blick</strong>Belege sammeln, rechtzeitig erinnert werden</span></li>
     </ul>
     <div class="startknopf">
-      <button type="button" class="btn big" data-act="au-guest">Kostenlos prüfen, ohne Anmeldung</button>
-      <span class="small muted">${ic("cal")}Etwa 3 Minuten. Danach siehst du alle offenen Ansprüche.</span>
+      <button type="button" class="btn big" data-act="au-guest">Jetzt kostenlos prüfen</button>
+      <span class="small muted">${ic("cal")}Ohne Anmeldung, etwa 3 Minuten. Danach siehst du alle offenen Ansprüche.</span>
     </div>
     <ul class="vertrauen">
       <li>${ic("shield")}<span><strong>Keine Vollmacht nötig</strong>Du schickst die Anträge selbst ab</span></li>
@@ -77,7 +77,7 @@ const SCHNELL=[
   ["technisch","bell","Hausnotruf & Hilfsmittel","Notrufknopf, Pflegebett und mehr"],
   ["verbrauch","case","Pflegehilfsmittel",`Handschuhe, Desinfektion: bis ${BETRAEGE.verbrauch} € im Monat`],
   ["entlastung","receipt","Entlastungsbetrag",`${BETRAEGE.entlastung} € im Monat für Haushaltshilfe`],
-  ["sb_antrag","access","Schwerbehinderten\u00ADausweis","Antrag beim Versorgungsamt"],
+  ["sb_antrag","access","Schwer\u00ADbehinderten\u00ADausweis","Antrag beim Versorgungsamt"],
 ];
 export async function authAction(a){
   const mail=($("au-mail")||{}).value?.trim()||"", pw=($("au-pw")||{}).value||"";
