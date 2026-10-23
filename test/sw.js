@@ -5,15 +5,15 @@
 // - Seite (HTML): erst aus dem Netz (damit Neuerungen sofort ankommen), ohne Netz aus dem Speicher
 // - Programm, Aussehen, Schriften, Bibliotheken: aus dem Speicher (Adressen enthalten die Version)
 // - Daten der Nutzer (Datenbank, Belege-Fotos) werden NIE zwischengespeichert
-const VERSION = "2ecc533d";
+const VERSION = "ea6c1903";
 // je Adresse eigener Speicher, damit echte App und Testversion sich nicht gegenseitig löschen
 const PREFIX = "dein-anspruch:" + new URL(self.registration.scope).pathname + ":";
 const CACHE = PREFIX + VERSION;
 const DATEIEN = [
  "./",
  "index.html",
- "app.js?v=2ecc533d",
- "app.css?v=2ecc533d",
+ "app.js?v=ea6c1903",
+ "app.css?v=ea6c1903",
  "vendor/supabase.js?v=2.45.4",
  "vendor/jspdf.umd.min.js?v=4.2.1",
  "vendor/schrift/AtkinsonHyperlegible-Regular.woff2",
