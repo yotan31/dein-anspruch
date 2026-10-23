@@ -4,6 +4,14 @@ import { ic } from "./03-hilfsmittel.js";
 const LANGS=[["de","Deutsch"],["tr","Türkçe"],["ru","Русский"],["ar","العربية"],["ti","ትግርኛ"]];
 // Reihenfolge je Eintrag: Türkisch, Russisch, Arabisch, Tigrinya
 const T={
+"Oder direkt: Was möchtest du beantragen?":["Ya da doğrudan: Neye başvurmak istiyorsunuz?","Или сразу: что вы хотите оформить?","أو مباشرة: ماذا تريد أن تطلب؟","ወይ ብቐጥታ: እንታይ ክትሓትቱ ትደልዩ?"],
+"Noch Fragen?":["Sorularınız mı var?","Остались вопросы?","هل لديك أسئلة؟","ሕቶታት ኣለኩም?"],
+"Hilfe und häufige Fragen":["Yardım ve sık sorulan sorular","Помощь и частые вопросы","المساعدة والأسئلة الشائعة","ሓገዝን ብተደጋጋሚ ዝሕተቱ ሕቶታትን"],
+"Hilfe und Fragen":["Yardım ve sorular","Помощь и вопросы","المساعدة والأسئلة","ሓገዝን ሕቶታትን"],
+"Keine Vollmacht nötig":["Vekâletname gerekmez","Доверенность не нужна","لا حاجة إلى توكيل","ውክልና ኣየድልን"],
+"Daten in Deutschland":["Veriler Almanya'da","Данные в Германии","البيانات في ألمانيا","ዳታ ኣብ ጀርመን"],
+"Alles auf einen Blick":["Her şey bir bakışta","Всё с первого взгляда","كل شيء في لمحة","ኩሉ ብሓደ ጠመተ"],
+"Persönliche Hilfe":["Kişisel yardım","Личная помощь","مساعدة شخصية","ውልቃዊ ሓገዝ"],
 "Welche Hilfen stehen euch noch zu?":["Hangi yardımlara hâlâ hakkınız var?","На какую помощь вы ещё имеете право?","ما المساعدات التي ما زالت من حقكم؟","ገና እንታይ ሓገዝ ይግበኣኩም?"],
 "Kostenlos prüfen, ohne Anmeldung":["Ücretsiz kontrol edin, kayıt olmadan","Проверить бесплатно, без регистрации","تحقق مجانًا بدون تسجيل","ብነጻ ፈትሹ፣ ብዘይ ምዝገባ"],
 "Ansprüche finden":["Haklarınızı bulun","Найти положенное","اعثر على مستحقاتك","መሰላትኩም ርኸቡ"],

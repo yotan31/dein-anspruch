@@ -36,7 +36,7 @@ export const MZ = {G:"G – erheblich gehbehindert",aG:"aG – außergewöhnlich
 export function blank() { return ({
   step:0, done:false, tab:"ansprueche", brutto:"", bruttoJahr:{}, chronisch:"", welcomeSeen:false, bescheid:null, entlSeit:"", ans:{}, sent:{}, wiz:null, font:"1", belegFilter:{jahre:[],kat:""},
   vhp:{grund:"urlaub",art:"tage",haupt:"",von:"",bis:"",stunden:"",ersatz:"angehoerig",eName:"",eAdresse:"",eBez:"",satz:"",rechnung:"",km:"",verdienst:"",verbraucht:"",auszahlung:"versicherte",iban:""}, termine:{dienst:"",tel:"",besuche:[],eigene:[],wertmarke:""},
-  rolle:"", bereiche:{pflege:true,sb:false},
+  rolle:"", bereiche:{pflege:true,sb:false}, ziel:"",
   kasse:"", aokRegion:"", kasseAndere:"",
   pg:"", wohnen:"", verschlechtert:false,
   pp:{vorhanden:true, stunden10:"", arbeit:""},

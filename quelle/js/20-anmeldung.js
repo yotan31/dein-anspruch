@@ -1,9 +1,11 @@
 import { Z } from "./zustand.js";
+import { BETRAEGE } from "./00-betraege.js";
 import { blank, esc } from "./01-grundlagen.js";
 import { bild, ic } from "./03-hilfsmittel.js";
 import { $, render, scrollTop } from "./11-darstellung.js";
 import { toast } from "./18-bedienung.js";
 import { lsGet, lsSet } from "./19-speicher.js";
+import { faqHTML } from "./25-hilfe.js";
 /* ---------- Anmeldung ---------- */
 /** Neues Passwort festlegen: nach dem Link aus der E-Mail „Passwort zurücksetzen“ oder über „Passwort ändern“. */
 export function viewNeuesPasswort(){
@@ -31,8 +33,16 @@ export function viewLogin(){
       <li>${ic("file")}<span><strong>Anträge fertig</strong>Schritt für Schritt ausgefüllt, als Text oder PDF</span></li>
       <li>${ic("bell")}<span><strong>Fristen im Blick</strong>Belege sammeln, rechtzeitig erinnert werden</span></li>
     </ul>
-    <button type="button" class="btn big" data-act="au-guest">Kostenlos prüfen, ohne Anmeldung</button>
-    <p class="trust"><span>${ic("check")}kostenlos</span><span>${ic("check")}keine Werbung</span><span>${ic("lock")}Daten in Frankfurt</span></p>
+    <div class="startknopf">
+      <button type="button" class="btn big" data-act="au-guest">Kostenlos prüfen, ohne Anmeldung</button>
+      <span class="small muted">${ic("cal")}Etwa 3 Minuten. Danach siehst du alle offenen Ansprüche.</span>
+    </div>
+    <ul class="vertrauen">
+      <li>${ic("shield")}<span><strong>Keine Vollmacht nötig</strong>Du schickst die Anträge selbst ab</span></li>
+      <li>${ic("check")}<span><strong>Kostenlos</strong>Ohne Abo und ohne Werbung</span></li>
+      <li>${ic("lock")}<span><strong>Daten in Deutschland</strong>Gespeichert in Frankfurt, nur für dich</span></li>
+      <li>${ic("list")}<span><strong>Alles auf einen Blick</strong>Nicht nur ein Antrag, sondern alle Ansprüche</span></li>
+    </ul>
     <button type="button" class="linkbtn" data-act="r-start">Erst Pflegegrad selbst einschätzen ${ic("chev")}</button>
   </section>`:"";
   return `${intro}<section class="panel auth${intro?" side":""}">
@@ -50,8 +60,25 @@ export function viewLogin(){
     </div>
     ${intro?`<p class="small muted">Ohne Konto bleiben deine Angaben nur in diesem Browser. Du kannst später jederzeit ein Konto anlegen, deine Angaben werden dann übernommen.</p>`:`<hr class="sep">
     <button type="button" class="btn ghost" data-act="au-guest">Ohne Konto ausprobieren</button>`}
-  </section>`;
+  </section>${intro?`
+  <section class="schnell">
+    <h2>Oder direkt: Was möchtest du beantragen?</h2>
+    <div class="kacheln">${SCHNELL.map(([k,i,t,u])=>`<button type="button" class="kachel" data-act="schnell" data-ziel="${k}">${ic(i)}<strong>${t}</strong><span>${u}</span></button>`).join("")}</div>
+  </section>
+  <section class="fragen">
+    <h2>Noch Fragen?</h2>
+    ${faqHTML()}
+  </section>`:""}`;
 }
+/** Schnellstart: häufige Anträge direkt von der Startseite aus */
+const SCHNELL=[
+  ["pg_antrag","form","Pflegegrad beantragen","Erstantrag bei der Pflegekasse"],
+  ["pg_hoch","heart","Pflegegrad erhöhen","Wenn mehr Hilfe nötig ist"],
+  ["technisch","bell","Hausnotruf & Hilfsmittel","Notrufknopf, Pflegebett und mehr"],
+  ["verbrauch","case","Pflegehilfsmittel",`Handschuhe, Desinfektion: bis ${BETRAEGE.verbrauch} € im Monat`],
+  ["entlastung","receipt","Entlastungsbetrag",`${BETRAEGE.entlastung} € im Monat für Haushaltshilfe`],
+  ["sb_antrag","access","Schwerbehinderten\u00ADausweis","Antrag beim Versorgungsamt"],
+];
 export async function authAction(a){
   const mail=($("au-mail")||{}).value?.trim()||"", pw=($("au-pw")||{}).value||"";
   if(a!=="au-newpw" && !/^\S+@\S+\.\S+$/.test(mail)){ Z.authMsg="Bitte eine gültige E-Mail-Adresse eingeben."; return render() }

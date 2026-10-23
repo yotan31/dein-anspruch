@@ -1,7 +1,7 @@
 import { installWeg, installieren } from "./24-app-installieren.js";
 import { Z } from "./zustand.js";
 import { blank, pg } from "./01-grundlagen.js";
-import { B } from "./02-leistungen.js";
+import { B, applicable } from "./02-leistungen.js";
 import { TODAY, addDays, isoD, parseIso } from "./03-hilfsmittel.js";
 import { makeQuittung } from "./04-verhinderungspflege.js";
 import { getQ, setQ, startWiz, wizSteps } from "./05-assistent.js";
@@ -20,6 +20,7 @@ import { authAction, googleLogin, logout } from "./20-anmeldung.js";
 import { backupData, restoreData, wipeAll } from "./21-sicherung-und-loeschen.js";
 import { setEri } from "./22-erinnerungen.js";
 import { closeFeedback, openFeedback, sendFeedback, shareApp } from "./23-feedback-und-fehler.js";
+import { closeHilfe, openHilfe } from "./25-hilfe.js";
 
 async function copy(text){
   try{await navigator.clipboard.writeText(text);toast("Text kopiert")}
@@ -67,7 +68,11 @@ document.addEventListener("click", e=>{
   if(t.dataset.resettx){delete Z.S.texte[t.dataset.resettx];delete Z.S.texte[t.dataset.resettx+"_sub"];save();render();return}
   switch(a){
     case "next": { if(t.dataset.ok==="0"){ const w=$("navwarn"); if(w){ w.hidden=false; w.scrollIntoView({block:"center"}) } break }
-      const vs=visSteps(); if(Z.S.step>=vs.length-1){Z.S.done=true;Z.S.tab="ansprueche"} else Z.S.step++; save();render();scrollTop();break }
+      const vs=visSteps(); if(Z.S.step>=vs.length-1){Z.S.done=true;Z.S.tab="ansprueche";
+        // Über eine Schnellstart-Kachel gekommen: direkt den gewählten Antrag öffnen, wenn er zur Lage passt
+        const ziel=Z.S.ziel; Z.S.ziel="";
+        if(ziel && applicable().some(b=>b.k===ziel && b.ask)){ Z.openKey=ziel; startWiz(ziel); break }
+      } else Z.S.step++; save();render();scrollTop();break }
     case "back": Z.S.step=Math.max(0,Z.S.step-1);save();render();scrollTop();break;
     case "menu": Z.showMenu=!Z.showMenu; render(); break;
     case "edit": Z.showMenu=false; Z.S.done=false;Z.S.step=0;save();render();scrollTop();break;
@@ -97,10 +102,17 @@ document.addEventListener("click", e=>{
     case "inst-weg": installWeg(); break;
     case "pw-aendern": Z.RECOVERY=true; Z.authMsg=""; render(); scrollTop(); break;
     case "au-guest": lsSet("dein-anspruch-modus","gast"); startGuest(); scrollTop(); break;
+    case "schnell": { const k=t.dataset.ziel||""; lsSet("dein-anspruch-modus","gast"); startGuest();
+      // Fragebogen schon ausgefüllt (früherer Besuch ohne Konto): gleich zum Antrag
+      if(Z.S.done && applicable().some(b=>b.k===k && b.ask)){ Z.S.tab="ansprueche"; Z.openKey=k; startWiz(k); break }
+      Z.S.ziel=k; Z.S.done=false; Z.S.step=0; if(/^sb_/.test(k)) Z.S.bereiche={pflege:false,sb:true}; else Z.S.bereiche.pflege=true;
+      save(); render(); scrollTop(); break }
+    case "hilfe-open": Z.showMenu=false; render(); openHilfe(); break;
+    case "hilfe-close": closeHilfe(); break;
     case "guest-register": Z.GUEST=false; Z.authMode="register"; Z.authMsg=""; lsSet("dein-anspruch-modus",""); render(); scrollTop(); break;
     case "logout": logout(); break;
     case "cs-yes": giveConsent(); break;
-    case "fb-open": openFeedback(); break;
+    case "fb-open": closeHilfe(); openFeedback(); break;
     case "fb-close": closeFeedback(); break;
     case "fb-send": sendFeedback(); break;
     case "teilen": shareApp(); break;

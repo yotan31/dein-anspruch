@@ -87,6 +87,27 @@ console.log("Fragebogen");
   check("keine Programmfehler", errors.length === 0, errors.join(" | "));
 }
 
+// ---------- 1b. Startseite: Schnellstart und Hilfe ----------
+console.log("Startseite: Schnellstart und Hilfe");
+{
+  const { page, errors } = await newPage();
+  await gehe(page, BASE, 600);
+  check("Startseite zeigt Schnellstart-Kacheln", (await page.locator('[data-act="schnell"]').count()) >= 4);
+  check("Startseite zeigt häufige Fragen", (await page.locator(".fragen .faq details").count()) >= 5);
+  await page.locator('footer [data-act="hilfe-open"]').tap(); await page.waitForTimeout(200);
+  check("Hilfe-Fenster öffnet sich", await page.locator("#hilfebox:not([hidden]) .faq").count() === 1);
+  await page.locator('[data-act="hilfe-close"]').tap(); await page.waitForTimeout(150);
+  check("Hilfe-Fenster schließt wieder", await page.locator("#hilfebox[hidden]").count() === 1);
+  await page.locator('[data-ziel="pg_antrag"]').tap(); await page.waitForTimeout(300);
+  check("Kachel führt in den Fragebogen mit Hinweis auf den Antrag", /Pflegegrad beantragen/.test(await page.textContent("#main .notice.info")));
+  for (let i = 0; i < 12; i++) {
+    const c = page.locator("#main .choice"); if (await c.count()) { await c.first().tap(); await page.waitForTimeout(120) }
+    const nx = page.locator('[data-act="next"]'); if (!(await nx.count())) break; await nx.tap(); await page.waitForTimeout(300);
+  }
+  check("nach dem Fragebogen öffnet sich direkt der gewählte Antrag", await page.evaluate(() => S.done && S.wiz && S.wiz.k === "pg_antrag" && !S.ziel));
+  check("keine Programmfehler", errors.length === 0, errors.join(" | "));
+}
+
 // ---------- 2. Ansprüche, Assistent, Reiter ----------
 console.log("Ansprüche und Antrag-Assistent");
 {

@@ -104,6 +104,7 @@ function renderHero(){
      <div><span>Sprache</span>${langSelect()}</div>
      <div><span>Schriftgröße</span>${fontsw}</div>
      ${Z.S.done&&!Z.S.wiz&&!Z.RECHNER?`<div><button type="button" class="linkbtn" data-act="edit">Angaben ändern</button></div>`:""}
+     <div><button type="button" class="linkbtn" data-act="hilfe-open">Hilfe und häufige Fragen</button></div>
      ${acct?`<div>${acct}</div>`:""}
    </div>`:"";
   const top=`<div class="topbar">${brand}${menuBtn}</div>${menu}`;
@@ -174,6 +175,7 @@ const VIEWS = {
      <p>Viele Familien nutzen nur das Pflegegeld. Dabei sind oft mehrere tausend Euro im Jahr zusätzlich drin, etwa für Haushaltshilfe, Ersatzpflege oder Hilfsmittel.</p>
      <p class="muted">Ein paar Fragen, etwa 3 Minuten. Danach siehst du deine offenen Ansprüche mit fertigen Anträgen.</p>
    </div>
+   ${zielHinweis()}
    <fieldset class="q"><legend>Für wen nutzt du die App?</legend><div class="choices">
      ${choice("rolle","selbst","Für mich selbst","ich bin pflegebedürftig oder schwerbehindert","radio",Z.S.rolle==="selbst")}
      ${choice("rolle","angehoerig","Für eine angehörige Person","ich pflege oder kümmere mich","radio",Z.S.rolle==="angehoerig")}
@@ -260,6 +262,11 @@ const VIEWS = {
    ${nav(true,"Ergebnis anzeigen")}
  </section>`},
 };
+/** Über eine Schnellstart-Kachel gekommen: sagen, wohin der Fragebogen führt. */
+function zielHinweis(){
+  const b=Z.S.ziel && B.find(x=>x.k===Z.S.ziel);
+  return b?`<p class="notice info">${ic("file")}<span>Erst ein paar kurze Fragen zu deiner Lage, damit der Antrag stimmt und an die richtige Stelle geht. Danach öffnet sich direkt <strong>${esc(b.t)}</strong>.</span></p>`:"";
+}
 function fld(k,label,v,type="text",ph=""){return `<div class="field"><label for="p-${k}">${label}</label><input type="${type}" id="p-${k}" data-p="${k}" value="${esc(v)}" placeholder="${esc(ph)}"></div>`}
 
 /** Wird beim Start der App einmal aufgerufen (siehe 99-start.js). */
