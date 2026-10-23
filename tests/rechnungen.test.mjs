@@ -230,3 +230,22 @@ test("Rechnung: Folgeseite wird an die Rechnung davor gehängt", () => {
   assert.deepEqual(g[0].pages, [1, 2]); assert.equal(g[0].betrag, "682,00"); assert.equal(g[0].datum, "2025-06-12");
   assert.deepEqual(g[1].pages, [3]); assert.equal(g[1].kat, "fahrt"); assert.equal(g[1].betrag, "10,00");
 });
+
+// ---------- Nur passende Leistungen je Pflegegrad ----------
+test("Pflegegrad 2: keine Leistungen, die erst ab Pflegegrad 3 gelten", () => {
+  const run = neu(undefined, { ...PFLEGE3, pg: "2" });
+  const k = run("applicable().map(b=>b.k)");
+  for (const x of ["fahrten", "chroniker"]) assert.ok(!k.includes(x), x);
+  assert.ok(k.includes("pflegegeld") && k.includes("pg_hoch"));
+});
+test("Pflegegrad 1: kein Pflegegeld, keine Sachleistung, keine Verhinderungspflege", () => {
+  const run = neu(undefined, { ...PFLEGE3, pg: "1" });
+  const k = run("applicable().map(b=>b.k)");
+  for (const x of ["pflegegeld", "sachleistung", "jahresbetrag", "tagespflege"]) assert.ok(!k.includes(x), x);
+  assert.ok(k.includes("entlastung"));
+});
+test("Krankenfahrten: Text passt zum Pflegegrad", () => {
+  const t = (pg) => neu(undefined, { ...PFLEGE3, pg })("txt(B.find(b=>b.k==='fahrten').short)");
+  assert.match(t("3"), /Genehmigung beantragen/);
+  assert.match(t("4"), /als genehmigt/);
+});

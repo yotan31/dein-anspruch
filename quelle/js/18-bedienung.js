@@ -35,7 +35,7 @@ document.addEventListener("click", e=>{
   // Menü schließt, wenn daneben getippt wird
   const ziel=/** @type {HTMLElement} */(e.target);
   if(Z.showMenu && !ziel.closest("#hmenu,[data-act=menu]")){ Z.showMenu=false; render() }
-  const t=/** @type {HTMLElement} */(/** @type {HTMLElement} */(e.target).closest("[data-act],[data-open],[data-copy],[data-pdf],[data-resettx],[data-tab],[data-area],[data-kat],[data-del],[data-delyes],[data-delno],[data-sub-toggle],[data-view],[data-delown],[data-year],[data-befpdf],[data-befcopy],[data-edit],[data-wopen],[data-wnav],[data-font],[data-gotoclaim],[data-rmember]"));
+  const t=/** @type {HTMLElement} */(/** @type {HTMLElement} */(e.target).closest("[data-act],[data-open],[data-copy],[data-pdf],[data-resettx],[data-tab],[data-area],[data-kat],[data-del],[data-delyes],[data-delno],[data-sub-toggle],[data-view],[data-delown],[data-year],[data-befpdf],[data-befcopy],[data-edit],[data-wopen],[data-wnav],[data-font],[data-gotoclaim],[data-rmember],[data-fbart]"));
   if(!t) return;
   const a=t.dataset.act;
   if(t.dataset.tab){if(t.classList.contains("howbtn"))Z.S.welcomeSeen=true;Z.S.tab=t.dataset.tab;Z.openKey=null;save();render();scrollTop();return}
@@ -46,6 +46,7 @@ document.addEventListener("click", e=>{
   if(t.dataset.font){ Z.S.font=t.dataset.font; save(); render(); return }
   if(t.dataset.edit){ editBeleg(t.dataset.edit); return }
   if(t.dataset.wopen){ startWiz(t.dataset.wopen); return }
+  if(t.dataset.fbart){ openFeedback(t.dataset.fbart); return }
   if(t.dataset.wnav){ const n=t.dataset.wnav; const len=wizSteps().list.length;
     if(n==="close"){ const k=Z.S.wiz.k; Z.S.wiz=null; Z.openKey=k; save(); render(); const el=$("it-"+k); el&&el.scrollIntoView({block:"start"}); return }
     if(n==="next") Z.S.wiz.i=Math.min(len-1,Z.S.wiz.i+1);

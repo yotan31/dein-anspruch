@@ -476,3 +476,12 @@ hr.sep{border:0;border-top:1px solid var(--line);margin:4px 0}
 .extlinks{display:flex;flex-direction:column;gap:2px;align-items:flex-start}
 .extlink{display:inline-flex;align-items:center;gap:6px;font-weight:700;padding:6px 0;min-height:36px}
 .extlink svg.i{width:16px;height:16px}
+/* Knopf „App verbessern“ oben rechts */
+.topright{display:flex;gap:8px;align-items:center}
+.ideebtn{height:46px;min-width:46px;border-radius:999px;border:1.5px solid #f2c14e;background:#fff8e6;color:#7a5200;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:0 12px;font:inherit;font-weight:700;font-size:.9rem;cursor:pointer}
+.ideebtn svg.i{width:22px;height:22px;color:#b07800}
+.ideebtn:hover{background:#ffefc2}
+@media (max-width:520px){.ideebtn{padding:0}.ideebtn .lbl{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}}
+:root[data-theme="dark"] .ideebtn{background:#2f2610;border-color:#6b5420;color:#f2c14e}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .ideebtn{background:#2f2610;border-color:#6b5420;color:#f2c14e}:root:not([data-theme="light"]) .ideebtn svg.i{color:#f2c14e}}
+#fb-h{display:flex;align-items:center;gap:8px}#fb-h svg.i{color:#b07800}

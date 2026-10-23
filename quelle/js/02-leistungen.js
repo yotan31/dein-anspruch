@@ -4,6 +4,8 @@ import { BEHPAUSCH, DIPA, DIPA_UL, ENTLASTUNG, JAHRESBETRAG, KASSEN, PG, VERBRAU
 import { vhpAsk, vhpDocs } from "./04-verhinderungspflege.js";
 /* ---------- Leistungskatalog ---------- */
 export const PK="pflegekasse", KK="krankenkasse", VA="versorgungsamt", FA="finanzamt";
+/** Krankenfahrten gelten ohne Einzelgenehmigung als genehmigt (Krankentransport-Richtlinie § 8 Abs. 3) */
+function fahrtGenehmigt(){ return pg()>=4 || mz("aG") || mz("Bl") || mz("H") }
 export const B = [
  {k:"pg_antrag", area:"Pflege", t:"Pflegegrad beantragen", p:"§ 14, § 18 SGB XI",
   when:()=>Z.S.bereiche.pflege && pg()===0, val:()=>null, short:"Ohne Pflegegrad gibt es keine Leistungen der Pflegekasse. Leistungen gelten ab dem Monat der Antragstellung.",
@@ -127,8 +129,11 @@ export const B = [
   to:PK, ask:"beantrage ich hiermit anteiliges Pflegegeld für die Tage der häuslichen Pflege außerhalb der Einrichtung [Name] (Nachweis liegt bei)."},
  {k:"fahrten", area:"Krankenkasse", t:"Fahrten zur ambulanten Behandlung", p:"§ 60 SGB V",
   when:()=>pg()>=3 || mz("aG") || mz("Bl") || mz("H"), val:()=>null,
-  short:"Bei Pflegegrad 4 oder 5 bzw. Merkzeichen aG, Bl oder H gelten Taxifahrten zu ambulanten Arztterminen als genehmigt. Bei Pflegegrad 3 mit dauerhaft eingeschränkter Mobilität auf Antrag.",
-  steps:["Ärztin oder Arzt stellt die Verordnung einer Krankenbeförderung aus.","Bei Pflegegrad 3 vorab Genehmigung bei der Krankenkasse holen.","Zuzahlung 10 %, mind. 5 €, max. 10 € je Fahrt (auf Belastungsgrenze anrechenbar)."],
+  // Text passend zur Lage: ab Pflegegrad 4 oder mit Merkzeichen gilt die Fahrt als genehmigt, bei Pflegegrad 3 nur auf Antrag
+  short:()=>fahrtGenehmigt()
+    ? "Taxi- oder Mietwagenfahrten zu ambulanten Arztterminen gelten bei euch als genehmigt. Es reicht die ärztliche Verordnung."
+    : "Bei Pflegegrad 3 übernimmt die Krankenkasse Fahrten zu ambulanten Arztterminen, wenn die Mobilität dauerhaft eingeschränkt ist. Dafür vorher die Genehmigung beantragen.",
+  get steps(){ return ["Ärztin oder Arzt stellt die Verordnung einer Krankenbeförderung aus.", ...(fahrtGenehmigt()?[]:["Vor der ersten Fahrt die Genehmigung bei der Krankenkasse holen (Antrag unten)."]), "Zuzahlung 10 %, mind. 5 €, max. 10 € je Fahrt (auf Belastungsgrenze anrechenbar)."] },
   docs:["Verordnung Krankenbeförderung","Pflegegrad-Bescheid oder Ausweis"],
   to:KK, ask:"beantrage ich hiermit die Genehmigung von Krankenfahrten zu ambulanten Behandlungen nach § 60 Abs. 1 SGB V. Die ärztliche Verordnung liegt bei."},
  {k:"chroniker", area:"Krankenkasse", t:"Zuzahlungen begrenzen (1 % statt 2 %)", p:"§ 62 SGB V",

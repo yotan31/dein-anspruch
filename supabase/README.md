@@ -13,6 +13,7 @@ Die Dateien in `migrations/` in der Reihenfolge ihrer Nummern ausführen (z. B. 
 | `…_mehrere_personen_und_familie.sql` | `fall`, `mitglied`, `einladung`, Zugriffsregeln je Fall, Einladungen |
 | `…_erinnerungen.sql` | E-Mail-Erinnerungen, Schema `intern`, täglicher Zeitplan |
 | `…_fehler_rueckmeldung_indizes.sql` | Fehlerprotokoll, Feedback, Indizes, Aufräum-Zeitplan |
+| `…_rueckmeldung_auswertung.sql` | Feedback mit Art (Idee, Fehler, Lob), Bereich der App und Stand der Bearbeitung (neu, geplant, erledigt, abgelehnt); Nutzer dürfen nur senden |
 
 ## Server-Funktionen (`functions/`)
 
@@ -27,3 +28,7 @@ Secrets für `erinnerungen` (im Supabase-Dashboard unter Edge Functions → Secr
 
 - Authentication → URL Configuration: Site URL und Redirect URL `https://yotan31.github.io/dein-anspruch/**`
 - Google-Anmeldung (sobald eingerichtet): Provider Google mit Client-ID und Secret
+
+## Rückmeldungen auswerten
+
+Der Knopf „App verbessern“ (Glühbirne oben rechts) speichert Nachrichten in `rueckmeldung` mit `art` und `bereich` (z. B. `antrag:pg_antrag`, `ansprueche:entlastung`). Einmal im Monat (am 1., 8:43 Uhr) startet eine geplante Claude-Sitzung, die alle neuen Rückmeldungen nach Themen zusammenfasst. Was entschieden wird, steht danach in `stand`, `notiz` und `bewertet_am`.

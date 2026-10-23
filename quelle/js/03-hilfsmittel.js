@@ -27,6 +27,7 @@ const ICON={
  euro:"M17 6.5A6.5 6.5 0 1 0 17 17.5 M4 10h9 M4 14h9",
  lock:"M6 11h12v10H6z M8 11V8a4 4 0 0 1 8 0v3",
  ext:"M14 4h6v6 M20 4l-9 9 M18 14v6H4V6h6",
+ idee:"M9 18h6 M10 21h4 M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.3 1.1 2.2h5c0-.9.4-1.6 1.1-2.2A6 6 0 0 0 12 3z",
 };
 export function ic(n, c="i") { return `<svg class="${c}" viewBox="0 0 24 24" aria-hidden="true"><path d="${ICON[n]}"/></svg>`; }
 /* ---------- Illustrationen: ruhige Flächen in den Farben der App, passen sich dem dunklen Modus an ---------- */

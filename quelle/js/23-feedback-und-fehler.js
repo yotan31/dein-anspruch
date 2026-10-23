@@ -1,5 +1,6 @@
 import { Z } from "./zustand.js";
 import { esc } from "./01-grundlagen.js";
+import { ic } from "./03-hilfsmittel.js";
 import { applyI18n } from "./09-sprachen.js";
 import { $, famKey } from "./11-darstellung.js";
 import { toast } from "./18-bedienung.js";
@@ -11,15 +12,28 @@ function reportError(msg,stack){
   let seite=""; try{ seite=famKey().split(":")[0] }catch(e){}
   try{ Z.sb.from("fehler").insert({meldung:clean(msg).slice(0,500)||"?",stelle:clean(stack).slice(0,1500),seite:seite.slice(0,100),version:APP_VERSION,geraet:navigator.userAgent.slice(0,200)}).then(()=>{},()=>{}) }catch(e){}
 }
-export function openFeedback(){
+const ARTEN=[["idee","Idee oder Wunsch","Was würde dir die App leichter machen? Was fehlt dir?"],["fehler","Etwas klappt nicht","Was hast du gemacht, und was ist passiert?"],["lob","Das gefällt mir","Was hilft dir besonders?"]];
+/** Wo in der App die Nachricht geschrieben wurde (ohne persönliche Angaben), damit sie sich zuordnen lässt */
+function bereich(){
+  if(Z.S.wiz) return "antrag:"+Z.S.wiz.k;
+  if(Z.RECHNER) return "rechner";
+  if(!Z.USER&&!Z.GUEST) return "start";
+  if(!Z.S.done) return "fragebogen";
+  return (Z.S.tab||"ansprueche")+(Z.openKey?":"+Z.openKey:"");
+}
+/** @param {string} [art] idee, fehler oder lob */
+export function openFeedback(art="idee"){
   let d=$("fbbox"); if(!d){ d=document.createElement("div"); d.id="fbbox"; d.className="overlay"; document.body.appendChild(d) }
   d.hidden=false;
+  const alt=($("fb-text")||{}).value||"";
+  const ph=(ARTEN.find(x=>x[0]===art)||ARTEN[0])[2];
   d.innerHTML=`<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="fb-h">
-    <h3 id="fb-h">Feedback geben</h3>
-    <p class="small muted">Was gefällt dir, was fehlt, was klappt nicht? Jede Nachricht wird gelesen. Bitte keine Gesundheitsdaten hineinschreiben.</p>
-    <div class="field"><label for="fb-text">Deine Nachricht</label><textarea id="fb-text" rows="5" maxlength="3000"></textarea></div>
+    <h3 id="fb-h">${ic("idee")}App verbessern</h3>
+    <p class="small muted">Jede Nachricht wird gelesen. Einmal im Monat gehen wir alle Wünsche durch und entscheiden, was als Nächstes verbessert wird. Bitte keine Namen oder Gesundheitsdaten hineinschreiben.</p>
+    <div class="filters" role="radiogroup" aria-label="Art der Rückmeldung">${ARTEN.map(([k,t])=>`<button type="button" class="chip" role="radio" data-fbart="${k}" aria-checked="${art===k}" aria-pressed="${art===k}">${t}</button>`).join("")}</div>
+    <div class="field"><label for="fb-text">Deine Nachricht</label><textarea id="fb-text" rows="5" maxlength="3000" placeholder="${esc(ph)}">${esc(alt)}</textarea></div>
     <div class="field"><label for="fb-kontakt">E-Mail für Rückfragen (freiwillig)</label><input type="email" id="fb-kontakt" value="${esc((Z.USER&&Z.USER.email)||"")}"></div>
-    <div class="btnrow"><button class="btn" type="button" data-act="fb-send">Senden</button><button class="btn ghost" type="button" data-act="fb-close">Abbrechen</button></div>
+    <div class="btnrow"><button class="btn" type="button" data-act="fb-send" data-art="${art}">Senden</button><button class="btn ghost" type="button" data-act="fb-close">Abbrechen</button></div>
   </div>`;
   try{ applyI18n(d) }catch(e){}
   setTimeout(()=>{ const t=$("fb-text"); if(t) try{ t.focus() }catch(e){} },60);
@@ -30,7 +44,9 @@ export async function sendFeedback(){
   if(!Z.sb){ toast("Keine Verbindung. Bitte später noch einmal versuchen."); return }
   const btn=document.querySelector('#fbbox [data-act="fb-send"]'); if(btn){ btn.disabled=true; btn.textContent="Wird gesendet …" }
   const kontakt=(($("fb-kontakt")||{}).value||"").trim().slice(0,200);
-  const {error}=await Z.sb.from("rueckmeldung").insert({text:t.slice(0,3000),kontakt:kontakt||null,version:APP_VERSION});
+  const art=(btn&&btn.getAttribute("data-art"))||"idee";
+  let wo=""; try{ wo=bereich().slice(0,40) }catch(e){}
+  const {error}=await Z.sb.from("rueckmeldung").insert({text:t.slice(0,3000),kontakt:kontakt||null,version:APP_VERSION,art,bereich:wo||null});
   if(error){ toast("Senden hat nicht geklappt. Bitte noch einmal versuchen."); if(btn){ btn.disabled=false; btn.textContent="Senden" } return }
   closeFeedback(); toast("Danke! Deine Nachricht ist angekommen.");
 }

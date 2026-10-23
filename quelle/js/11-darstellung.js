@@ -107,7 +107,8 @@ function renderHero(){
      <div><button type="button" class="linkbtn" data-act="hilfe-open">Hilfe und häufige Fragen</button></div>
      ${acct?`<div>${acct}</div>`:""}
    </div>`:"";
-  const top=`<div class="topbar">${brand}${menuBtn}</div>${menu}`;
+  const ideeBtn=`<button type="button" class="ideebtn" data-act="fb-open" title="App verbessern">${ic("idee")}<span class="lbl">App verbessern</span></button>`;
+  const top=`<div class="topbar">${brand}<div class="topright">${ideeBtn}${menuBtn}</div></div>${menu}`;
   const kopf=`<div class="hrow">${personBtn||'<span></span>'}${save}</div>`;
   if(Z.S.wiz||Z.RECHNER||(Z.S.done&&Z.S.tab!=="ansprueche")){ $("hero").innerHTML=top+(personBtn?`<div class="hsheet slim">${kopf}</div>`:""); return }
   // Anmeldung und Fragebogen erklären sich selbst; oben nur Marke und Menü (bei Konten zusätzlich die Person)
