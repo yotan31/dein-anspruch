@@ -5,7 +5,7 @@ import { B, FA, KK, PK, RECIP, empfAdresse, txt } from "./02-leistungen.js";
 import { deD, ic, parseIso } from "./03-hilfsmittel.js";
 import { KM_SATZ, numDE, vhpCalc } from "./04-verhinderungspflege.js";
 import { render, scrollTop } from "./11-darstellung.js";
-import { curLetter, docsFor, mailto } from "./12-reiter-ansprueche.js";
+import { curLetter, docsFor, gmailLink, mailto } from "./12-reiter-ansprueche.js";
 import { save } from "./19-speicher.js";
 /* ---------- Antrags-Assistent: Fragen je Anspruch ---------- */
 export function OPT(a) { return a.map(x=>typeof x==="string"?{v:x,t:x}:x); }
@@ -254,8 +254,10 @@ function viewDone(b){
     <div class="btnrow big">
       <button class="btn" type="button" data-pdf="${b.k}">${ic("down")}Als PDF speichern</button>
       <button class="btn soft" type="button" data-copy="${b.k}">Text kopieren</button>
-      ${r.mail?`<a class="btn ghost" href="${mailto(b,r.mail)}" target="_blank" rel="noopener">Per E-Mail öffnen</a>`:""}
+      ${r.mail?`<a class="btn ghost" href="${mailto(b,r.mail)}" target="_blank" rel="noopener" data-act="mail-offen" data-k="${b.k}">Per E-Mail öffnen</a>`:""}
+      ${b.to!==FA?`<a class="btn ghost" href="${gmailLink(b,r.mail)}" target="_blank" rel="noopener" data-act="mail-offen" data-k="${b.k}">${ic("mail")}In Gmail öffnen</a>`:""}
     </div>
+    ${b.to!==FA?`<p class="notice info" id="pdfhinweis">${ic("info")}<span><strong>Per E-Mail? Dann das PDF anhängen.</strong> Der Antragstext steht schon in der E-Mail. Tippe vorher auf „Als PDF speichern“ und hänge das PDF und die Unterlagen in der E-Mail an (Büroklammer).${r.mail?"":" Die E-Mail-Adresse der Kasse steht auf ihrer Webseite oder auf ihren Briefen."}</span></p>`:""}
     <div class="paper"><p class="subj">${esc(L.subject)}</p><p>${esc(L.body)}</p></div>
     ${/\[[^\]]+\]/.test(L.body)?`<p class="notice">${ic("alert")}<span>Stellen in [eckigen Klammern] bitte vor dem Abschicken von Hand ausfüllen oder oben unter „Angaben ändern“ nachtragen.</span></p>`:""}
     <h3>So schickst du ihn ab</h3>

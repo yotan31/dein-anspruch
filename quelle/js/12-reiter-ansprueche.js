@@ -106,5 +106,7 @@ function letter(b){
   return {subject, body};
 }
 export function curLetter(b){const L=letter(b);return {subject:Z.S.texte[b.k+"_sub"]??L.subject, body:Z.S.texte[b.k]??L.body}}
+/** Gmail-Schreibfenster mit Empfänger, Betreff und Antragstext. Anhänge kann ein Link nicht mitgeben. */
+export function gmailLink(b,addr){const L=curLetter(b);return `https://mail.google.com/mail/?view=cm&fs=1${addr?`&to=${encodeURIComponent(addr)}`:""}&su=${encodeURIComponent(L.subject)}&body=${encodeURIComponent(L.body)}`}
 export function mailto(b,addr){const L=curLetter(b);return `mailto:${addr}?subject=${encodeURIComponent(L.subject)}&body=${encodeURIComponent(L.body)}`}
 

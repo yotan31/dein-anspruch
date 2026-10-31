@@ -158,6 +158,7 @@ document.addEventListener("click", e=>{
     case "csv": makeCSV();break;
     case "addbesuch": { const v=$("tbesuch").value; if(!parseIso(v)){toast("Bitte ein Datum wählen");break} Z.S.termine.besuche=[...(Z.S.termine.besuche||[]),{d:v}];save();render();toast("Besuch eingetragen");break }
     case "copypd": copy(pdText());break;
+    case "mail-offen": zaehle("antrag_fertig",t.dataset.k||""); break;
     case "addown": { const tt=$("ownt").value.trim(), d=$("ownd").value; if(!tt||!parseIso(d)){toast("Bitte Text und Datum angeben");break} Z.S.termine.eigene=[...(Z.S.termine.eigene||[]),{id:String(Date.now()),t:tt,d}];save();render();toast("Erinnerung hinzugefügt");break }
   }
 });

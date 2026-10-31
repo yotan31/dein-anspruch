@@ -161,6 +161,11 @@ console.log("Antrag: Prüfhinweise und Anschrift");
   check("Anschrift wird gespeichert und für die Krankenkasse mitgenutzt", await page.evaluate(() => empfAdresse("pflegekasse").ort === "20457 Hamburg" && empfAdresse("krankenkasse").strasse === "Postfach 12 34 56"));
   await page.evaluate(() => { S.wiz.i = wizSteps().list.length - 1; render() }); await page.waitForTimeout(150);
   check("Fertiger Antrag nennt die Anschrift beim Abschicken", /20457 Hamburg/.test(await page.textContent(".howsend")));
+  const gm = await page.getAttribute('.wiz a[href^="https://mail.google.com/"]', "href");
+  check("Knopf „In Gmail öffnen“ mit Betreff und Antragstext (AOK: ohne feste E-Mail-Adresse)", !!gm && /view=cm/.test(gm) && !/&to=/.test(gm) && /&su=/.test(gm) && /&body=[\s\S]*Entlastungsbetrag/.test(decodeURIComponent(gm)), gm);
+  check("Hinweis: PDF in der E-Mail anhängen", /PDF anhängen/.test(await page.textContent("#pdfhinweis")));
+  const [popup] = await Promise.all([page.waitForEvent("popup", { timeout: 3000 }).catch(() => null), page.locator('.wiz a[href^="https://mail.google.com/"]').tap()]);
+  check("Gmail öffnet sich in einem neuen Fenster", !!popup);
   check("keine Programmfehler", errors.length === 0, errors.join(" | "));
 }
 

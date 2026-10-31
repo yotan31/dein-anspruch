@@ -4,6 +4,8 @@ import { ic } from "./03-hilfsmittel.js";
 const LANGS=[["de","Deutsch"],["tr","Türkçe"],["ru","Русский"],["ar","العربية"],["ti","ትግርኛ"]];
 // Reihenfolge je Eintrag: Türkisch, Russisch, Arabisch, Tigrinya
 const T={
+"In Gmail öffnen":["Gmail'de aç","Открыть в Gmail","افتح في Gmail","ብGmail ክፈት"],
+"Per E-Mail? Dann das PDF anhängen.":["E-posta ile mi? O zaman PDF'yi ekleyin.","По e-mail? Тогда приложите PDF.","عبر البريد الإلكتروني؟ أرفق ملف PDF.","ብኢመይል? ሽዑ PDF ኣተሓሕዙ።"],
 "App verbessern":["Uygulamayı geliştir","Улучшить приложение","حسّن التطبيق","ኣፕ ኣመሓይሹ"],
 "Idee oder Wunsch":["Fikir veya istek","Идея или пожелание","فكرة أو رغبة","ሓሳብ ወይ ድሌት"],
 "Etwas klappt nicht":["Bir şey çalışmıyor","Что-то не работает","شيء لا يعمل","ገለ ነገር ኣይሰርሕን"],
