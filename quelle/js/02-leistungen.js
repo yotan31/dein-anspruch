@@ -210,6 +210,10 @@ export const B = [
   ask:"bitte ich um eine Rentenauskunft und Beratung zur Altersrente für schwerbehinderte Menschen. Der GdB beträgt [GdB]."},
 ];
 
+/** Pflege- und Krankenkasse sitzen unter derselben Anschrift, alle anderen Stellen haben ihre eigene */
+export function empfKey(to){ return to===PK||to===KK ? "kasse" : String(to) }
+/** gespeicherte Anschrift der Stelle, an die der Antrag geht (Straße oder Postfach, PLZ und Ort) */
+export function empfAdresse(to){ Z.S.empfAdr=Z.S.empfAdr||{}; return (Z.S.empfAdr[empfKey(to)]=Z.S.empfAdr[empfKey(to)]||{strasse:"",ort:""}) }
 export const RECIP = {
   pflegekasse:()=>({name: kassePK(), hint: kasseMail()?`E-Mail: ${kasseMail()} (Adresse bitte prüfen). Sicherer: Upload über ${kasseInfo().app}.`:`Adresse steht auf deinem Bescheid oder der Webseite deiner Kasse. Sicher hochladen über ${kasseInfo().app}.`, mail:kasseMail()}),
   krankenkasse:()=>({name: kasseName(), hint: kasseMail()?`E-Mail: ${kasseMail()} (bitte prüfen) oder ${kasseInfo().app}.`:`Adresse steht auf deiner Versichertenkarte bzw. der Webseite deiner Kasse.`, mail:kasseMail()}),

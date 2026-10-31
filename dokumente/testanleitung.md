@@ -9,6 +9,7 @@ Danke, dass du die App testest! Es dauert etwa **20 Minuten**. Ziel ist, Fehler 
 - **Nur erfundene Angaben verwenden**, zum Beispiel „Erika Muster, Musterstraße 1, 12345 Musterstadt“. **Keine echten Namen, Versichertennummern oder Gesundheitsdaten**, auch nicht deine eigenen.
 - Am besten am **Handy** testen. Wer mag, danach noch einmal am Computer.
 - Öffne den Link in einem **privaten Fenster** (Inkognito), dann startest du ohne alte Daten.
+- Bitte **kein Konto anlegen**, einfach ohne Konto testen. Die Testversion nutzt dieselbe Datenbank wie die echte App.
 - **Jeden Fehler, jede unklare Stelle und jede Idee** meldest du sofort über die **gelbe Glühbirne oben rechts** („App verbessern“). Schreib dazu, was du gemacht hast, was passiert ist und welches Gerät du nutzt (zum Beispiel „iPhone 13, Safari“). Lieber zu viel melden als zu wenig.
 
 ## Aufgabe 1: Ansprüche finden
@@ -22,7 +23,7 @@ Danke, dass du die App testest! Es dauert etwa **20 Minuten**. Ziel ist, Fehler 
 ## Aufgabe 2: Einen Antrag erstellen
 
 1. Öffne in der Liste **„Entlastungsbetrag“** und tippe auf **„Antrag ausfüllen“**.
-2. Beantworte die Fragen bis zum Ende.
+2. Beantworte die Fragen bis zum Ende. Als Anschrift der Pflegekasse kannst du „Postfach 12 34 56, 20457 Hamburg“ nehmen, als Versichertennummer „A123456789“.
 3. Tippe auf **„Als PDF speichern“** und öffne das PDF.
 
 **Achte darauf:** Würdest du diesen Brief so abschicken? Ist etwas falsch, doppelt oder unhöflich formuliert?

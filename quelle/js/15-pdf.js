@@ -1,6 +1,6 @@
 import { Z } from "./zustand.js";
 import { eur } from "./01-grundlagen.js";
-import { B, RECIP, kasseName } from "./02-leistungen.js";
+import { B, RECIP, empfAdresse, kasseName } from "./02-leistungen.js";
 import { deD, parseIso } from "./03-hilfsmittel.js";
 import { KATS, selYears } from "./10-fragebogen-und-fristen.js";
 import { curLetter, docsFor, today } from "./12-reiter-ansprueche.js";
@@ -15,7 +15,8 @@ function drawLetter(doc,b){
   const abs=[a?p.absender:p.name, a?p.absStrasse:p.strasse, a?p.absOrt:p.ort].filter(Boolean).join(" · ")||"[Absender]";
   doc.text(abs,L0,47);
   doc.setFontSize(11);
-  doc.text([r.name,"[Straße / Postfach]","[PLZ Ort]"],L0,55);
+  const ea=empfAdresse(b.to);
+  doc.text([r.name,ea.strasse||"[Straße / Postfach]",ea.ort||"[PLZ Ort]"],L0,55);
   const ortName=((a?p.absOrt:p.ort)||"").replace(/^\d{5}\s*/,"");
   doc.text(`${ortName?ortName+", ":""}${today()}`,190,95,{align:"right"});
   doc.setFont("helvetica","bold"); y=105;

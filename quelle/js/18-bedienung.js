@@ -1,10 +1,10 @@
 import { installWeg, installieren } from "./24-app-installieren.js";
 import { Z } from "./zustand.js";
 import { blank, pg } from "./01-grundlagen.js";
-import { B, applicable } from "./02-leistungen.js";
+import { B, applicable, empfAdresse } from "./02-leistungen.js";
 import { TODAY, addDays, isoD, parseIso } from "./03-hilfsmittel.js";
 import { makeQuittung } from "./04-verhinderungspflege.js";
-import { getQ, setQ, startWiz, wizSteps } from "./05-assistent.js";
+import { getQ, pruefeAngabe, setQ, startWiz, wizSteps, wizTo } from "./05-assistent.js";
 import { saveBescheid, scanBescheid } from "./06-bescheid-entlastung.js";
 import { startRechner } from "./07-pflegegrad-rechner.js";
 import { tr } from "./09-sprachen.js";
@@ -50,6 +50,11 @@ document.addEventListener("click", e=>{
   if(t.dataset.fbart){ openFeedback(t.dataset.fbart); return }
   if(t.dataset.wnav){ const n=t.dataset.wnav; const len=wizSteps().list.length;
     if(n==="close"){ const k=Z.S.wiz.k; Z.S.wiz=null; Z.openKey=k; save(); render(); const el=$("it-"+k); el&&el.scrollIntoView({block:"start"}); return }
+    if(n==="next" && !t.classList.contains("ghost")){
+      // Tippfehler freundlich ansprechen: einmal hinweisen, beim zweiten Tippen auf „Weiter“ wird die Angabe trotzdem übernommen
+      const step=wizSteps().list[Z.S.wiz.i], v=step&&step.k?getQ(step):"", msg=step&&step.k?pruefeAngabe(step,v):"", key=(step&&step.k)+"|"+v;
+      if(msg && Z.warnKey!==key){ Z.warnKey=key; const w=$("wqwarn"); if(w){ w.querySelector("span").textContent=msg+" Stimmt es trotzdem? Dann noch einmal auf „Weiter“ tippen."; w.hidden=false; w.scrollIntoView({block:"center"}) } return }
+    }
     if(n==="next") Z.S.wiz.i=Math.min(len-1,Z.S.wiz.i+1);
     else if(n==="back") Z.S.wiz.i=Math.max(0,Z.S.wiz.i-1);
     else if(n.startsWith("goto:")) Z.S.wiz.i=Number(n.slice(5));
@@ -70,6 +75,10 @@ document.addEventListener("click", e=>{
   if(t.dataset.resettx){delete Z.S.texte[t.dataset.resettx];delete Z.S.texte[t.dataset.resettx+"_sub"];save();render();return}
   switch(a){
     case "next": { if(t.dataset.ok==="0"){ const w=$("navwarn"); if(w){ w.hidden=false; w.scrollIntoView({block:"center"}) } break }
+      { // Versichertennummer im Fragebogen: einmal freundlich auf einen möglichen Tippfehler hinweisen
+        const vs0=visSteps(), vnr=Z.S.person.vnr||"", msg=vs0[Z.S.step]&&vs0[Z.S.step].id==="daten"?pruefeAngabe({k:"vnr"},vnr):"";
+        if(msg && Z.warnKey!=="q|"+vnr){ Z.warnKey="q|"+vnr; const w=$("navwarn"); if(w){ w.querySelector("span").textContent=msg+" Stimmt es trotzdem? Dann noch einmal tippen."; w.hidden=false; w.scrollIntoView({block:"center"}) } break }
+      }
       if(Z.S.step===0) zaehle("fragebogen_begonnen");
       const vs=visSteps(); if(Z.S.step>=vs.length-1){Z.S.done=true;Z.S.tab="ansprueche";zaehle("fragebogen_fertig");
         // Über eine Schnellstart-Kachel gekommen: direkt den gewählten Antrag öffnen, wenn er zur Lage passt
@@ -196,6 +205,7 @@ document.addEventListener("input", e=>{
   if(t.dataset.bd && Z.bescheidDraft){ Z.bescheidDraft[t.dataset.bd]=t.value; return }
   if(t.dataset.bi && Z.bulk && Z.bulk.items && t.type!=="checkbox"){ const [i,f]=t.dataset.bi.split(":"); const it=Z.bulk.items[+i]; if(it) it[f]=t.value; return }
   if(t.dataset.wqp){ Z.S.person[t.dataset.wqp]=t.value; save(); return }
+  if(t.dataset.wqe){ empfAdresse(wizTo())[t.dataset.wqe]=t.value; save(); const sk=document.querySelector('.wiz [data-wnav="next"].ghost'); if(sk) sk.hidden=!!empfAdresse(wizTo()).ort.trim(); return }
   if(t.id==="kasseAndere"){Z.S.kasseAndere=t.value;save()}
   else if(t.dataset.p){Z.S.person[t.dataset.p]=t.value;save()}
   else if(t.dataset.tx){Z.S.texte[t.dataset.tx]=t.value;save()}

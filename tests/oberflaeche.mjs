@@ -138,6 +138,32 @@ console.log("Ansprüche und Antrag-Assistent");
   check("keine Programmfehler", errors.length === 0, errors.join(" | "));
 }
 
+// ---------- 2b. Antrag: Prüfhinweise und Anschrift der Kasse ----------
+console.log("Antrag: Prüfhinweise und Anschrift");
+{
+  const { page, errors } = await newPage({ gast: GAST });
+  await gehe(page, BASE, 600);
+  await page.evaluate(() => { startWiz("entlastung"); });
+  await page.waitForTimeout(200);
+  const geheZu = async k => { await page.evaluate(k => { S.wiz.i = wizSteps().list.findIndex(q => q.k === k); render() }, k); await page.waitForTimeout(150) };
+  await geheZu("vnr");
+  await page.fill("#wq-vnr", "Erika Muster");
+  await page.locator('.wiz .nav [data-wnav="next"]:not(.ghost)').tap(); await page.waitForTimeout(150);
+  const i1 = await page.evaluate(() => S.wiz.i);
+  check("Unplausible Versichertennummer: freundlicher Hinweis, Assistent bleibt stehen", await page.locator("#wqwarn:not([hidden])").count() === 1 && /10 Zeichen/.test(await page.textContent("#wqwarn")));
+  await page.locator('.wiz .nav [data-wnav="next"]:not(.ghost)').tap(); await page.waitForTimeout(150);
+  check("Beim zweiten Tippen wird die Angabe trotzdem übernommen", await page.evaluate(() => S.wiz.i) === i1 + 1);
+  await geheZu("absadresse");
+  check("Angehörige werden nach ihrer eigenen Anschrift als Absender gefragt", await page.locator("#wq-absstrasse").count() === 1 && await page.locator("#wq-absort").count() === 1);
+  await geheZu("empf");
+  check("Assistent fragt nach der Anschrift der Pflegekasse", await page.locator("#wq-estrasse").count() === 1);
+  await page.fill("#wq-estrasse", "Postfach 12 34 56"); await page.fill("#wq-eort", "20457 Hamburg");
+  check("Anschrift wird gespeichert und für die Krankenkasse mitgenutzt", await page.evaluate(() => empfAdresse("pflegekasse").ort === "20457 Hamburg" && empfAdresse("krankenkasse").strasse === "Postfach 12 34 56"));
+  await page.evaluate(() => { S.wiz.i = wizSteps().list.length - 1; render() }); await page.waitForTimeout(150);
+  check("Fertiger Antrag nennt die Anschrift beim Abschicken", /20457 Hamburg/.test(await page.textContent(".howsend")));
+  check("keine Programmfehler", errors.length === 0, errors.join(" | "));
+}
+
 // ---------- 3. Pflegegrad-Rechner ----------
 console.log("Pflegegrad-Rechner");
 {

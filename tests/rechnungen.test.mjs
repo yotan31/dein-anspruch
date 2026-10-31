@@ -249,3 +249,27 @@ test("Krankenfahrten: Text passt zum Pflegegrad", () => {
   assert.match(t("3"), /Genehmigung beantragen/);
   assert.match(t("4"), /als genehmigt/);
 });
+
+// ---------- Freundliche Prüfung von Eingaben ----------
+test("IBAN: Prüfziffer und Länge", () => {
+  const run = neu();
+  assert.equal(run("ibanOk('DE89 3704 0044 0532 0130 00')"), true);
+  assert.equal(run("ibanOk('DE89 3704 0044 0532 0130 01')"), false, "Tippfehler in der letzten Ziffer");
+  assert.equal(run("ibanOk('DE89 3704 0044 0532 0130')"), false, "zu kurz");
+  assert.equal(run("ibanOk('Erika Muster')"), false);
+});
+test("Versichertennummer und Betrag: Hinweis nur bei unplausiblen Angaben", () => {
+  const run = neu();
+  assert.equal(run("pruefeAngabe({k:'vnr'},'A123456789')"), "");
+  assert.equal(run("pruefeAngabe({k:'vnr'},'a 123 456 789')"), "");
+  assert.match(run("pruefeAngabe({k:'vnr'},'Erika Muster')"), /10 Zeichen/);
+  assert.equal(run("pruefeAngabe({k:'vnr'},'')"), "", "leer ist erlaubt (Lücke im Antrag)");
+  assert.match(run("pruefeAngabe({k:'betrag',type:'money'},'0')"), /0 €/);
+  assert.equal(run("pruefeAngabe({k:'betrag',type:'money'},'131,00')"), "");
+});
+test("Empfänger-Adresse: Pflege- und Krankenkasse teilen sich eine Anschrift", () => {
+  const run = neu(undefined, PFLEGE3);
+  run("empfAdresse('pflegekasse').ort='20457 Hamburg'");
+  assert.equal(run("empfAdresse('krankenkasse').ort"), "20457 Hamburg");
+  assert.equal(run("empfAdresse('versorgungsamt').ort"), "");
+});

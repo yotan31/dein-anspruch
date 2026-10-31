@@ -1,7 +1,7 @@
 import { Z } from "./zustand.js";
 import { zaehle } from "./26-zaehlung.js";
 import { VERBRAUCH, VHP_ERSATZ, esc, eur, gdb } from "./01-grundlagen.js";
-import { B, KK, PK, RECIP, txt } from "./02-leistungen.js";
+import { B, FA, KK, PK, RECIP, empfAdresse, txt } from "./02-leistungen.js";
 import { deD, ic, parseIso } from "./03-hilfsmittel.js";
 import { KM_SATZ, numDE, vhpCalc } from "./04-verhinderungspflege.js";
 import { render, scrollTop } from "./11-darstellung.js";
@@ -131,7 +131,9 @@ function personQs(b,a){
   if((b.to===PK||b.to===KK) && !p.vnr) L.push("vnr");
   if(!p.strasse||!p.ort) L.push("adresse");
   if(a && !p.absender) L.push("absender");
+  if(a && (!p.absStrasse||!p.absOrt)) L.push("absadresse");
   if(a && !p.beziehung) L.push("beziehung");
+  if(b.to!==FA && b.to!=="arbeitgeber" && !empfAdresse(b.to).ort) L.push("empf");
   return L;
 }
 function personQ(k){
@@ -141,13 +143,15 @@ function personQ(k){
     vnr:{k:"vnr",store:"person",label:"Wie lautet die Versichertennummer?",help:"Steht auf der Gesundheitskarte (Krankenkassenkarte). Sie beginnt mit einem Buchstaben, zum Beispiel A123456789.",ph:"z. B. A123456789"},
     adresse:{k:"adresse",store:"person",type:"addr",label:a?"Wo wohnt die Person?":"Wo wohnst du?"},
     absender:{k:"absender",store:"person",label:"Und wie heißt du?",help:"Du schreibst den Antrag für die Person. Dein Name steht unter dem Brief.",ph:"Vor- und Nachname"},
+    absadresse:{k:"absadresse",store:"person",type:"absaddr",label:"Und wo wohnst du?",help:"Deine Anschrift steht oben als Absender im Brief, damit die Kasse dir antworten kann."},
+    empf:{k:"empf",store:"empf",type:"empf",label:"An welche Adresse geht der Brief?",help:"Damit die Anschrift gleich im Brief steht. "+(RECIP[Z.S.wiz?(B.find(x=>x.k===Z.S.wiz.k)||{}).to:""]?.()?.hint||"")},
     beziehung:{k:"beziehung",store:"person",type:"choice",label:"Wie bist du mit der Person verbunden?",opts:OPT(["Tochter","Sohn","Ehefrau","Ehemann","Enkelin","Enkel","Rechtliche Betreuung","Andere"])},
   })[k];
 }
 export function wizSteps(){
   const w=Z.S.wiz, b=B.find(x=>x.k===w.k);
   // leichte Fragen zuerst, Adresse und Versichertennummer am Ende
-  const pq=w.pq||[], early=["name","beziehung"].filter(k=>pq.includes(k)), late=pq.filter(k=>!early.includes(k)).sort((x,y)=>["absender","adresse","vnr"].indexOf(x)-["absender","adresse","vnr"].indexOf(y));
+  const pq=w.pq||[], early=["name","beziehung"].filter(k=>pq.includes(k)), late=pq.filter(k=>!early.includes(k)).sort((x,y)=>["absender","absadresse","adresse","vnr","empf"].indexOf(x)-["absender","absadresse","adresse","vnr","empf"].indexOf(y));
   const qs=[...early.map(personQ), ...(b.q||[]).filter(q=>!q.show||q.show()), ...late.map(personQ)];
   return {b, list:[...qs,{type:"summary"},{type:"done"}]};
 }
@@ -157,11 +161,31 @@ export function startWiz(k){
   if(!b.q?.length && !Z.S.wiz.pq.length) Z.S.wiz.i=1; // direkt zur Prüfung
   save(); render(); scrollTop();
 }
-export function getQ(q){ if(q.store==="person") return Z.S.person[q.k]; return ansObj(Z.S.wiz.k)[q.k] }
+export function getQ(q){ if(q.store==="person") return Z.S.person[q.k]; if(q.store==="empf"){ const e=empfAdresse(wizTo()); return [e.strasse,e.ort].filter(Boolean).join(", ") } return ansObj(Z.S.wiz.k)[q.k] }
+/** Empfänger des laufenden Antrags (z. B. pflegekasse) */
+export function wizTo(){ const b=Z.S.wiz&&B.find(x=>x.k===Z.S.wiz.k); return b?b.to:"" }
+/** Freundliche Prüfung typischer Tippfehler. Gibt einen Hinweis zurück oder "" (dann ist alles plausibel). Die Angabe wird nie blockiert. */
+export function pruefeAngabe(q,v){
+  const s=String(v??"").trim(); if(!s||!q) return "";
+  if(q.k==="vnr"){ const n=s.replace(/\s+/g,"").toUpperCase(); return /^[A-Z]\d{9}$/.test(n)?"":"Die Versichertennummer hat normalerweise 10 Zeichen: einen Buchstaben und 9 Ziffern, zum Beispiel A123456789. Sie steht vorne auf der Gesundheitskarte." }
+  if(q.k==="iban"){ return ibanOk(s)?"":"Diese IBAN scheint nicht zu stimmen, vielleicht ein Tippfehler. Eine deutsche IBAN beginnt mit DE und hat 22 Zeichen." }
+  if(q.type==="money"){ const x=numDE(s); return x>0?"":"Der Betrag ist 0 € oder keine Zahl. Bitte den Betrag von der Rechnung eintragen, zum Beispiel 131,00." }
+  if(q.type==="empf"){ const e=empfAdresse(wizTo()); return !e.ort||/^\d{5}\s+\S/.test(e.ort.trim())?"":"Bei „PLZ und Ort“ bitte die fünfstellige Postleitzahl und den Ort eintragen, zum Beispiel 20457 Hamburg." }
+  return "";
+}
+/** IBAN mit Prüfziffer (ISO 13616); deutsche IBAN zusätzlich mit 22 Zeichen */
+export function ibanOk(v){
+  const n=String(v||"").replace(/\s+/g,"").toUpperCase();
+  if(!/^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/.test(n) || (n.startsWith("DE") && n.length!==22)) return false;
+  const r=(n.slice(4)+n.slice(0,4)).replace(/[A-Z]/g,c=>String(c.charCodeAt(0)-55));
+  let m=0; for(const ch of r) m=(m*10+Number(ch))%97; return m===1;
+}
 export function setQ(q,v){ if(q.store==="person") Z.S.person[q.k]=v; else ansObj(Z.S.wiz.k)[q.k]=v; delete Z.S.texte[Z.S.wiz.k]; delete Z.S.texte[Z.S.wiz.k+"_sub"]; save() }
 function lab(q) { return txt(q.label); }
 function showVal(q){
   if(q.type==="addr") return [Z.S.person.strasse,Z.S.person.ort].filter(Boolean).join(", ");
+  if(q.type==="empf") return getQ(q);
+  if(q.type==="absaddr") return [Z.S.person.absStrasse,Z.S.person.absOrt].filter(Boolean).join(", ");
   const v=getQ(q); if(Array.isArray(v)) return v.join(", ");
   if(v==null||String(v).trim()==="") return "";
   if(q.type==="date"){const d=parseIso(v);return d?deD(d):v}
@@ -173,6 +197,8 @@ function qInput(q){
   const v=getQ(q), id="wq-"+q.k;
   if(q.type==="choice") return `<div class="choices big">${q.opts.map(o=>`<label class="choice" for="${id}-${esc(o.v)}"><input type="radio" id="${id}-${esc(o.v)}" name="${id}" data-wq="${q.k}" value="${esc(o.v)}" ${v===o.v?"checked":""}><span>${esc(o.t)}${o.s?`<small>${esc(o.s)}</small>`:""}</span></label>`).join("")}</div>`;
   if(q.type==="multi"){ const arr=Array.isArray(v)?v:[]; return `<div class="choices big">${q.opts.map(o=>`<label class="choice" for="${id}-${esc(o.v)}"><input type="checkbox" id="${id}-${esc(o.v)}" data-wqm="${q.k}" value="${esc(o.v)}" ${arr.includes(o.v)?"checked":""}><span>${esc(o.t)}</span></label>`).join("")}</div>` }
+  if(q.type==="absaddr") return `<div class="grid2"><div class="field"><label for="wq-absstrasse">Straße und Hausnummer</label><input type="text" id="wq-absstrasse" data-wqp="absStrasse" value="${esc(Z.S.person.absStrasse)}" autocomplete="street-address"></div><div class="field"><label for="wq-absort">PLZ und Ort</label><input type="text" id="wq-absort" data-wqp="absOrt" value="${esc(Z.S.person.absOrt)}" autocomplete="address-level2"></div></div>`;
+  if(q.type==="empf"){ const e=empfAdresse(wizTo()); return `<div class="grid2"><div class="field"><label for="wq-estrasse">Straße oder Postfach</label><input type="text" id="wq-estrasse" data-wqe="strasse" value="${esc(e.strasse)}" placeholder="z. B. Postfach 12 34 56"></div><div class="field"><label for="wq-eort">PLZ und Ort</label><input type="text" id="wq-eort" data-wqe="ort" value="${esc(e.ort)}" placeholder="z. B. 20457 Hamburg"></div></div>` }
   if(q.type==="addr") return `<div class="grid2"><div class="field"><label for="wq-strasse">Straße und Hausnummer</label><input type="text" id="wq-strasse" data-wqp="strasse" value="${esc(Z.S.person.strasse)}" autocomplete="street-address"></div><div class="field"><label for="wq-ort">PLZ und Ort</label><input type="text" id="wq-ort" data-wqp="ort" value="${esc(Z.S.person.ort)}" placeholder="z. B. 70173 Stuttgart"></div></div>`;
   if(q.type==="long") return `<textarea id="${id}" data-wq="${q.k}" rows="4" placeholder="${esc(q.ph||"")}" style="min-height:120px">${esc(v||"")}</textarea>`;
   const t = q.type==="date"?"date":q.type==="tel"?"tel":"text";
@@ -200,6 +226,7 @@ export function viewWizard(){
     <h2 class="wq"><label for="wq-${step.k}">${esc(lab(step))}</label></h2>
     ${step.help?`<p class="whelp">${ic("info")}<span>${esc(step.help)}</span></p>`:""}
     ${qInput(step)}
+    <p class="notice" id="wqwarn" hidden>${ic("alert")}<span></span></p>
     <div class="nav big go">
       ${i>0?`<button class="btn ghost" type="button" data-wnav="back">Zurück</button>`:`<button class="btn ghost" type="button" data-wnav="close">Abbrechen</button>`}
       <span class="btnrow">${showVal(step)?"":`<button class="btn ghost" type="button" data-wnav="next">Weiß ich nicht</button>`}<button class="btn" type="button" data-wnav="next">Weiter</button></span>
@@ -235,7 +262,7 @@ function viewDone(b){
     <ol class="howsend">
       <li><strong>PDF ausdrucken und unterschreiben.</strong> Oder den Text in die App oder das Online-Postfach der Kasse kopieren.</li>
       ${docs.length?`<li><strong>Diese Unterlagen beilegen:</strong><ul class="checks">${docs.map((c,j)=>`<li><label><input type="checkbox" data-check="${b.k}:${j}" ${Z.S.checks[b.k+":"+j]?"checked":""}><span>${esc(c)}</span></label></li>`).join("")}</ul>${priv?`<button class="btn small soft" type="button" data-act="vhp-quittung" style="margin-top:8px">${ic("down")}${Z.S.vhp.ersatz==="angehoerig"?"Bestätigung":"Quittung"} zum Unterschreiben (PDF)</button>`:""}</li>`:""}
-      <li><strong>Abschicken an:</strong> ${esc(r.name)}.<br><span class="small muted">${esc(r.hint)}</span>${r.mail?`<br><span class="small">E-Mail: <code>${esc(r.mail)}</code></span>`:""}</li>
+      <li><strong>Abschicken an:</strong> ${esc([r.name,empfAdresse(b.to).strasse,empfAdresse(b.to).ort].filter(Boolean).join(", "))}.<br><span class="small muted">${esc(r.hint)}</span>${r.mail?`<br><span class="small">E-Mail: <code>${esc(r.mail)}</code></span>`:""}</li>
       <li><strong>Hier abhaken, wenn es raus ist.</strong> Wir erinnern dich in 4 Wochen, falls noch keine Antwort da ist.</li>
     </ol>
     ${st==="offen"?`<button class="btn big" type="button" data-act="sent" data-k="${b.k}">${ic("check")}Ich habe den Antrag abgeschickt</button>`:`<p class="notice good">${ic("check")}<span>Abgeschickt${Z.S.sent&&Z.S.sent[b.k]?" am "+deD(parseIso(Z.S.sent[b.k])):""}. Status: ${esc(st)}.</span></p>`}
