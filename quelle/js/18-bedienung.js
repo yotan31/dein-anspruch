@@ -32,6 +32,8 @@ Z.tT = undefined; export function toast(m){const t=$("toast");t.textContent=tr(m
 /** Wird beim Start der App einmal aufgerufen (siehe 99-start.js). */
 export function start18() {
 /* ---------- Events ---------- */
+// aufklappbare Bereiche merken, damit sie beim Neuzeichnen (z. B. nach dem Abhaken) offen bleiben
+document.addEventListener("toggle", e=>{ const d=/** @type {HTMLDetailsElement} */(e.target); if(d && d.dataset && d.dataset.akk){ Z.akk=Z.akk||{}; Z.akk[d.dataset.akk]=d.open } }, true);
 document.addEventListener("click", e=>{
   // Menü schließt, wenn daneben getippt wird
   const ziel=/** @type {HTMLElement} */(e.target);
@@ -189,7 +191,7 @@ document.addEventListener("change", e=>{
   else if(n==="mz") Z.S.sb.mz[t.value]=t.checked;
   else if(n==="sbx") Z.S.sb[t.value]=t.checked;
   else if(n==="genutzt") Z.S.genutzt[t.value]=t.checked;
-  else if(t.dataset.check){ Z.S.checks[t.dataset.check]=t.checked; save(); return }
+  else if(t.dataset.check){ Z.S.checks[t.dataset.check]=t.checked; save(); render(); return } // neu zeichnen, damit der Zähler „x von y erledigt“ stimmt
   else if(t.dataset.status) Z.S.status[t.dataset.status]=t.value;
   else if(t.dataset.gen) {Z.S.genutzt[t.dataset.gen]=t.checked; Z.openKey=null}
   else if(t.id==="chron") Z.S.chronisch=t.value;

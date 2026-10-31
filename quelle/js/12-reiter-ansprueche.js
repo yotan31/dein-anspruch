@@ -72,22 +72,32 @@ export function docsFor(b){
   if(Z.S.rolle==="angehoerig" && b.to!==FA && b.to!=="arbeitgeber" && !d.some(x=>/Vollmacht/.test(x))) d.push("Vollmacht oder Betreuungsurkunde");
   return d;
 }
+/** aufklappbarer Bereich in einer Leistung; ob er offen ist, merkt sich die App (bleibt beim Abhaken offen) */
+function akk(id,icon,titel,info,inhalt){
+  return `<details data-akk="${id}" ${Z.akk&&Z.akk[id]?"open":""}><summary>${ic(icon)}<span>${titel}</span>${info?`<small>${info}</small>`:""}${ic("chev")}</summary><div class="akk-body">${inhalt}</div></details>`;
+}
 function detailHTML(b){
   const checks = docsFor(b), st=Z.S.status[b.k]||"offen";
   const nQ=(b.q||[]).filter(q=>!q.show||q.show()).length;
+  const erledigt=checks.filter((c,i)=>Z.S.checks[b.k+":"+i]).length;
+  const naehe=finderHTML(b.k,false);
   return `<div class="detail">
-    <p class="para">${esc(b.area)} · Rechtsgrundlage ${esc(b.p)}</p>
     ${b.ask?`<div class="startbox">
         <button class="btn big" type="button" data-wopen="${b.k}">${ic("file")}${st==="offen"?"Antrag ausfüllen":"Antrag ansehen"}</button>
         ${["pg_antrag","pg_hoch"].includes(b.k)?`<button class="btn ghost" type="button" data-act="r-start">Erst selbst einschätzen: Pflegegrad-Rechner</button>`:""}
-        <p class="small muted">${nQ?`${nQ} einfache Fragen, Schritt für Schritt. Du kannst jederzeit zurück, nichts wird ohne dich abgeschickt.`:"Der Antrag ist schon fertig vorbereitet. Du musst nur noch prüfen."}</p>
+        <p class="small muted">${nQ?`${nQ} einfache Fragen. Nichts wird ohne dich abgeschickt.`:"Der Antrag ist schon vorbereitet. Du musst nur noch prüfen."}</p>
       </div>`:`<p class="notice info">${ic("info")}<span>Dafür ist kein Antrag nötig. Trage den Betrag einfach in der Steuererklärung ein (oder gib diese Info an deine Steuerberatung weiter).</span></p>`}
     <div><h4>So läuft es ab</h4><ol class="steps">${b.steps.map(s=>`<li>${esc(s)}</li>`).join("")}</ol></div>
-    ${finderHTML(b.k)}
-    ${checks.length?`<div><h4>Diese Unterlagen brauchst du</h4><ul class="checks">${checks.map((c,i)=>`<li><label><input type="checkbox" data-check="${b.k}:${i}" ${Z.S.checks[b.k+":"+i]?"checked":""}><span>${esc(c)}</span></label></li>`).join("")}</ul></div>`:""}
-    <div class="status"><label for="st-${b.k}"><strong>Stand:</strong></label><select id="st-${b.k}" data-status="${b.k}">${[["offen","noch nicht beantragt"],["beantragt","beantragt, warte auf Antwort"],["bewilligt","bewilligt"]].map(([v,t])=>`<option value="${v}" ${st===v?"selected":""}>${t}</option>`).join("")}</select>
-    <label class="choice" for="gn-${b.k}" style="padding:6px 10px"><input type="checkbox" id="gn-${b.k}" data-gen="${b.k}" ${Z.S.genutzt[b.k]?"checked":""}><span>bekommen wir schon</span></label></div>
-    <button type="button" class="linkbtn zu" data-open="${b.k}">Zuklappen</button>
+    <div class="akk">
+      ${naehe?akk(b.k+":naehe","pin","In der Nähe finden","",naehe):""}
+      ${checks.length?akk(b.k+":docs","list","Unterlagen",`${erledigt} von ${checks.length} erledigt`,`<ul class="checks">${checks.map((c,i)=>`<li><label><input type="checkbox" data-check="${b.k}:${i}" ${Z.S.checks[b.k+":"+i]?"checked":""}><span>${esc(c)}</span></label></li>`).join("")}</ul>`):""}
+      <div class="akk-row status">${ic("check")}<label for="st-${b.k}">Stand</label><select id="st-${b.k}" data-status="${b.k}">${[["offen","noch nicht beantragt"],["beantragt","beantragt, warte auf Antwort"],["bewilligt","bewilligt"]].map(([v,t])=>`<option value="${v}" ${st===v?"selected":""}>${t}</option>`).join("")}</select></div>
+    </div>
+    <div class="detail-fuss">
+      <label class="gen" for="gn-${b.k}"><input type="checkbox" id="gn-${b.k}" data-gen="${b.k}" ${Z.S.genutzt[b.k]?"checked":""}><span>Bekommen wir schon</span></label>
+      <button type="button" class="linkbtn zu" data-open="${b.k}">Zuklappen</button>
+    </div>
+    <p class="para">${esc(b.area)} · Rechtsgrundlage ${esc(b.p)}</p>
   </div>`;
 }
 export function today(){return new Date().toLocaleDateString("de-DE")}

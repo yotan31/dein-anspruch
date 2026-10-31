@@ -485,3 +485,33 @@ hr.sep{border:0;border-top:1px solid var(--line);margin:4px 0}
 :root[data-theme="dark"] .ideebtn{background:#2f2610;border-color:#6b5420;color:#f2c14e}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .ideebtn{background:#2f2610;border-color:#6b5420;color:#f2c14e}:root:not([data-theme="light"]) .ideebtn svg.i{color:#f2c14e}}
 #fb-h{display:flex;align-items:center;gap:8px}#fb-h svg.i{color:#b07800}
+/* Aufgeklappte Leistung: ruhiger, Zusatzinfos zum Aufklappen */
+.detail{gap:16px;padding:18px 18px 14px}
+.detail h4{font-size:.95rem;margin-bottom:8px}
+.detail .startbox .small{margin-top:2px}
+.steps li{font-size:.97rem;line-height:1.45;padding:0 0 12px 38px;min-height:24px}
+.steps li::before{width:24px;height:24px;font-size:.8rem;top:0}
+.steps li:not(:last-child)::after{left:11px;top:26px}
+.akk{border:1px solid var(--line);border-radius:12px;background:var(--paper);overflow:hidden}
+.akk>details,.akk>.akk-row{border-bottom:1px solid var(--line)}
+.akk>:last-child{border-bottom:0}
+.akk summary{display:flex;align-items:center;gap:10px;padding:12px 14px;min-height:50px;font-weight:700}
+.akk summary>span{flex:1}
+.akk summary small{color:var(--muted);font-weight:400;font-size:.85rem;white-space:nowrap}
+.akk summary>svg.i:first-child{color:var(--accent)}
+.akk summary>svg.i:last-child{width:18px;height:18px;color:var(--muted)}
+@media (prefers-reduced-motion:no-preference){.akk summary>svg.i:last-child{transition:transform .15s}}
+.akk details[open]>summary>svg.i:last-child{transform:rotate(90deg)}
+.akk-body{padding:0 14px 14px 44px;display:flex;flex-direction:column;gap:8px}
+.akk-body .extlink{font-size:.95rem;min-height:40px}
+.akk-body .small.muted{font-size:.8rem}
+.akk-row{display:flex;align-items:center;gap:10px;padding:8px 14px;min-height:50px}
+.akk-row>svg.i{color:var(--accent)}
+.akk-row label{font-weight:700}
+.akk-row select{flex:1;width:auto;min-width:0;margin-left:auto}
+.detail-fuss{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.detail-fuss .gen{display:inline-flex;align-items:center;gap:8px;font-size:.92rem;cursor:pointer;color:var(--muted)}
+.detail-fuss .gen input{width:18px;height:18px;accent-color:var(--accent)}
+.detail .para{font-size:.78rem}
+.akk-body .extlink{font-weight:600;text-decoration:none;font-size:.95rem;padding:4px 0}
+.akk-body .extlink:hover span,.akk-body .extlink:hover{text-decoration:underline}
