@@ -94,6 +94,7 @@ console.log("Startseite: Schnellstart und Hilfe");
   await gehe(page, BASE, 600);
   check("Startseite zeigt Schnellstart-Kacheln", (await page.locator('[data-act="schnell"]').count()) >= 4);
   check("Startseite zeigt häufige Fragen", (await page.locator(".fragen .faq details").count()) >= 5);
+  check("Google-Anmeldung ist ausgeblendet, solange sie nicht eingerichtet ist", (await page.locator('[data-act="au-google"]').count()) === 0);
   await page.locator('footer [data-act="hilfe-open"]').tap(); await page.waitForTimeout(200);
   check("Hilfe-Fenster öffnet sich", await page.locator("#hilfebox:not([hidden]) .faq").count() === 1);
   await page.locator('[data-act="hilfe-close"]').tap(); await page.waitForTimeout(150);

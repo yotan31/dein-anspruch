@@ -1,4 +1,5 @@
 import { Z } from "./zustand.js";
+import { zaehle } from "./26-zaehlung.js";
 import { VERBRAUCH, VHP_ERSATZ, esc, eur, gdb } from "./01-grundlagen.js";
 import { B, KK, PK, RECIP, txt } from "./02-leistungen.js";
 import { deD, ic, parseIso } from "./03-hilfsmittel.js";
@@ -151,7 +152,7 @@ export function wizSteps(){
   return {b, list:[...qs,{type:"summary"},{type:"done"}]};
 }
 export function startWiz(k){
-  const b=B.find(x=>x.k===k);
+  const b=B.find(x=>x.k===k); zaehle("antrag_geoeffnet",k);
   Z.S.wiz={k,i:0,pq:personQs(b,Z.S.rolle==="angehoerig")};
   if(!b.q?.length && !Z.S.wiz.pq.length) Z.S.wiz.i=1; // direkt zur Prüfung
   save(); render(); scrollTop();

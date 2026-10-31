@@ -9,12 +9,13 @@ Kostenlose Web-App für Menschen mit Pflegegrad oder Schwerbehinderung und ihre 
 
 | Ort | Inhalt |
 | --- | --- |
-| `quelle/js/` | das Programm als ES-Module: `main.js` (Einstieg), `zustand.js` (gemeinsamer Zustand `Z`), `00-betraege.js` … `23-feedback-und-fehler.js`, `99-start.js` (Startreihenfolge) |
+| `quelle/js/` | das Programm als ES-Module: `main.js` (Einstieg), `zustand.js` (gemeinsamer Zustand `Z`), `00-betraege.js` … `26-zaehlung.js`, `99-start.js` (Startreihenfolge) |
 | `quelle/stil.css`, `quelle/index.html` | Aussehen und Seitengerüst (Sicherheitsregeln/CSP) |
 | `quelle/bauen.mjs` | baut mit esbuild `site/app.js` (+ Source Map), `site/app.css`, `site/index.html` und die selbst gehostete Supabase-Bibliothek `site/vendor/supabase.js` |
 | `quelle/typen.d.ts`, `tsconfig.json` | Typprüfung des Codes mit TypeScript |
 | `site/` | statische Seiten (Datenschutz, Nutzungsbedingungen, Impressum), Bilder, `vendor/` (Schriften, pdf.js, jsPDF); die gebauten Dateien entstehen beim Bauen |
 | `tests/` | `rechnungen.test.mjs`: jede Berechnung und Erkennung ohne Browser · `oberflaeche.mjs`: Klick-Tests im Handy-Browser |
+| `dokumente/` | Unterlagen zum Start: Fragen für die rechtliche Prüfung, Testanleitung für Testerinnen und Tester, Anleitung Google-Anmeldung (jeweils als .md und .pdf) |
 | `supabase/` | Datenbank-Aufbau (`migrations/`) und Server-Funktionen (`functions/`), siehe `supabase/README.md` |
 
 **Beträge für ein neues Jahr** stehen ausschließlich in `quelle/js/00-betraege.js`. Nach einer Änderung die Erwartungen in `tests/rechnungen.test.mjs` anpassen.

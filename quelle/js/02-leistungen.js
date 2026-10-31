@@ -151,7 +151,7 @@ export const B = [
   to:VA, ask:"beantrage ich hiermit die Feststellung einer Behinderung und des Grades der Behinderung (GdB) nach § 152 SGB IX sowie die Ausstellung eines Schwerbehindertenausweises. Zudem beantrage ich die Prüfung folgender Merkzeichen: [z. B. G, B, H]. Eine Liste der behandelnden Ärztinnen und Ärzte liegt bei."},
  {k:"sb_neu", area:"Schwerbehinderung", t:"Höheren GdB oder Merkzeichen beantragen", p:"§ 152 SGB IX",
   when:()=>Z.S.bereiche.sb && Z.S.sb.status==="ja" && (gdb()<100 || (pg()>=4 && !mz("H"))), val:()=>null, opt:true,
-  short:()=> (pg()>=4 && !mz("H")) ? "Bei Pflegegrad 4 oder 5 lohnt sich oft der Antrag auf Merkzeichen H: kostenlose Wertmarke und Kfz-Steuerbefreiung." : "Haben sich Erkrankungen verschlechtert oder sind neue hinzugekommen, lohnt ein Neufeststellungsantrag.",
+  short:()=> (pg()>=4 && !mz("H")) ? "Bei Pflegegrad 4 oder 5 kommt das Merkzeichen H in Frage. Es bringt unter anderem eine kostenlose Wertmarke und eine Kfz-Steuerbefreiung." : "Haben sich Erkrankungen verschlechtert oder sind neue hinzugekommen, kommt ein Antrag auf Neufeststellung in Frage.",
   steps:["Neue Diagnosen und Befunde sammeln.","Neufeststellungsantrag beim Versorgungsamt stellen.","Gewünschte Merkzeichen ausdrücklich nennen."],
   docs:["neue Arztberichte","bisheriger Bescheid","Pflegegrad-Bescheid"],
   to:VA, ask:"beantrage ich hiermit die Neufeststellung des Grades der Behinderung wegen Verschlimmerung bzw. hinzugekommener Gesundheitsstörungen sowie die Prüfung folgender Merkzeichen: [z. B. H, G, B]. Aktuelle Befunde liegen bei."},

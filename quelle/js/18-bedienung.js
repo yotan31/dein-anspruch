@@ -21,6 +21,7 @@ import { backupData, restoreData, wipeAll } from "./21-sicherung-und-loeschen.js
 import { setEri } from "./22-erinnerungen.js";
 import { closeFeedback, openFeedback, sendFeedback, shareApp } from "./23-feedback-und-fehler.js";
 import { closeHilfe, openHilfe } from "./25-hilfe.js";
+import { zaehle } from "./26-zaehlung.js";
 
 async function copy(text){
   try{await navigator.clipboard.writeText(text);toast("Text kopiert")}
@@ -64,12 +65,13 @@ document.addEventListener("click", e=>{
   if(t.dataset.view){$("lbimg").src=blobUrl(t.dataset.view);$("lightbox").hidden=false;return}
   if(t.dataset.delown){Z.S.termine.eigene=(Z.S.termine.eigene||[]).filter(x=>x.id!==t.dataset.delown);save();render();return}
   if(t.dataset.open){Z.openKey = Z.openKey===t.dataset.open?null:t.dataset.open; render(); if(Z.openKey) reveal($("it-"+Z.openKey));return}
-  if(t.dataset.copy){const b=B.find(x=>x.k===t.dataset.copy);const L=curLetter(b);copy(`Betreff: ${L.subject}\n\n${L.body}`);return}
-  if(t.dataset.pdf){makePDF(B.find(x=>x.k===t.dataset.pdf));return}
+  if(t.dataset.copy){zaehle("antrag_fertig",t.dataset.copy);const b=B.find(x=>x.k===t.dataset.copy);const L=curLetter(b);copy(`Betreff: ${L.subject}\n\n${L.body}`);return}
+  if(t.dataset.pdf){zaehle("antrag_fertig",t.dataset.pdf);makePDF(B.find(x=>x.k===t.dataset.pdf));return}
   if(t.dataset.resettx){delete Z.S.texte[t.dataset.resettx];delete Z.S.texte[t.dataset.resettx+"_sub"];save();render();return}
   switch(a){
     case "next": { if(t.dataset.ok==="0"){ const w=$("navwarn"); if(w){ w.hidden=false; w.scrollIntoView({block:"center"}) } break }
-      const vs=visSteps(); if(Z.S.step>=vs.length-1){Z.S.done=true;Z.S.tab="ansprueche";
+      if(Z.S.step===0) zaehle("fragebogen_begonnen");
+      const vs=visSteps(); if(Z.S.step>=vs.length-1){Z.S.done=true;Z.S.tab="ansprueche";zaehle("fragebogen_fertig");
         // Über eine Schnellstart-Kachel gekommen: direkt den gewählten Antrag öffnen, wenn er zur Lage passt
         const ziel=Z.S.ziel; Z.S.ziel="";
         if(ziel && applicable().some(b=>b.k===ziel && b.ask)){ Z.openKey=ziel; startWiz(ziel); break }
@@ -78,7 +80,7 @@ document.addEventListener("click", e=>{
     case "menu": Z.showMenu=!Z.showMenu; render(); break;
     case "edit": Z.showMenu=false; Z.S.done=false;Z.S.step=0;save();render();scrollTop();break;
     case "reset": $("resetconfirm").hidden=false;break;
-    case "sent": { const k=t.dataset.k; Z.S.status[k]="beantragt"; Z.S.sent=Z.S.sent||{}; Z.S.sent[k]=isoD(TODAY()); const bb=B.find(x=>x.k===k);
+    case "sent": { const k=t.dataset.k; zaehle("antrag_abgeschickt",k); Z.S.status[k]="beantragt"; Z.S.sent=Z.S.sent||{}; Z.S.sent[k]=isoD(TODAY()); const bb=B.find(x=>x.k===k);
       Z.S.termine.eigene=[...(Z.S.termine.eigene||[]),{id:String(Date.now()),t:`Antwort auf Antrag „${bb?bb.t:k}“ da?`,d:isoD(addDays(TODAY(),28)),n:"Falls noch keine Antwort da ist: bei der Kasse nachfragen. Das Datum des Antrags steht in der App."}];
       save(); render(); toast("Super! Wir erinnern dich in 4 Wochen."); break }
     case "dropphoto": if(Z.pending){ if(Z.pending.preview&&Z.pending.preview.startsWith("blob:")) URL.revokeObjectURL(Z.pending.preview); Z.pending.file=null; Z.pending.preview=""; if(Z.pending.keepAsset) Z.pending.dropAsset=true; render() } break;

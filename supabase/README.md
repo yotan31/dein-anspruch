@@ -13,6 +13,7 @@ Die Dateien in `migrations/` in der Reihenfolge ihrer Nummern ausführen (z. B. 
 | `…_mehrere_personen_und_familie.sql` | `fall`, `mitglied`, `einladung`, Zugriffsregeln je Fall, Einladungen |
 | `…_erinnerungen.sql` | E-Mail-Erinnerungen, Schema `intern`, täglicher Zeitplan |
 | `…_fehler_rueckmeldung_indizes.sql` | Fehlerprotokoll, Feedback, Indizes, Aufräum-Zeitplan |
+| `…_schritt_zaehlung.sql`, `…_korrektur.sql` | anonyme Schritt-Zählung `zaehler` (nur Monat, Schritt, Antrag-Art, Anzahl) und Funktion `zaehlen()`; lesen nur über die Auswertung |
 | `…_rueckmeldung_auswertung.sql` | Feedback mit Art (Idee, Fehler, Lob), Bereich der App und Stand der Bearbeitung (neu, geplant, erledigt, abgelehnt); Nutzer dürfen nur senden |
 
 ## Server-Funktionen (`functions/`)

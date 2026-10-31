@@ -184,7 +184,7 @@ const T={
 "Pflegegrad beantragen":["Bakım derecesi başvurusu","Подать заявление на степень ухода","التقدم بطلب درجة رعاية","ደረጃ ክንክን ሕተት"],
 "Höherstufung beantragen":["Daha yüksek derece başvurusu","Подать на повышение степени","طلب رفع الدرجة","ልዕል ዝበለ ደረጃ ሕተት"],
 "Antrag vorbereiten (kostenlos)":["Başvuruyu hazırla (ücretsiz)","Подготовить заявление (бесплатно)","تحضير الطلب (مجانًا)","መመልከቲ ኣዳሉ (ብነጻ)"],
-"Ein Widerspruch kann sich lohnen.":["İtiraz etmek faydalı olabilir.","Возражение может иметь смысл.","قد يكون الاعتراض مجديًا.","ተቓውሞ ጠቓሚ ክኸውን ይኽእል።"],
+"Hinweis für einen möglichen Widerspruch:":["Olası bir itiraz için ipucu:","Подсказка для возможного возражения:","تلميح لاعتراض محتمل:","ሓበሬታ ንዝኽእል ተቓውሞ:"],
 "Widerspruch schreiben":["İtiraz yaz","Написать возражение","اكتب اعتراضًا","ተቓውሞ ጽሓፍ"],
 "Meine Daten endgültig löschen":["Verilerimi kalıcı olarak sil","Окончательно удалить мои данные","حذف بياناتي نهائيًا","ሓበሬታይ ብቐጻሊ ሰርዝ"],
 };

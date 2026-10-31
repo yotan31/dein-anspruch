@@ -60,14 +60,14 @@ export function bescheidCard(){
   const i=bescheidInfo();
   if(Z.bescheidDraft) return bescheidForm();
   if(!i) return `<section class="panel mini">
-     <div class="mini-head">${ic("file")}<div><h3>Bescheid oder Gutachten bekommen?</h3><p class="small muted">Foto machen: Wir prüfen, ob sich ein Widerspruch lohnt, und behalten die Frist im Blick.</p></div></div>
+     <div class="mini-head">${ic("file")}<div><h3>Bescheid oder Gutachten bekommen?</h3><p class="small muted">Foto machen: Die App liest die wichtigsten Angaben aus, zeigt Hinweise für einen möglichen Widerspruch und behält die Frist im Blick.</p></div></div>
      <div class="btnrow"><button class="btn small" type="button" data-act="bes-cam">${ic("camera")}Foto machen</button><button class="btn small ghost" type="button" data-act="bes-manual">Abtippen</button><button class="linkbtn" type="button" data-act="r-start">Pflegegrad selbst einschätzen</button></div>
    </section>`;
   const lohnt = (i.knapp||i.abgelehnt) && i.offen;
   return `<section class="panel mini ${lohnt?"warn":""}">
      <div class="mini-head">${ic("file")}<div><h3>Dein Bescheid${Z.S.bescheid.datum?` vom ${deD(parseIso(Z.S.bescheid.datum))}`:""}</h3>
        <p class="small">${i.g?`Pflegegrad ${i.g}`:"Kein Pflegegrad"}${i.hasPts?` · ${String(Z.S.bescheid.punkte).replace(".",",")} Punkte`:""}${i.fehlt!=null&&i.g<5?` · noch ${String(i.fehlt.toFixed(1)).replace(".",",")} Punkte bis Pflegegrad ${i.g+1}`:""}</p></div></div>
-     ${lohnt?`<p class="notice">${ic("alert")}<span><strong>Ein Widerspruch kann sich lohnen.</strong> ${i.abgelehnt?"Der Antrag wurde abgelehnt.":"Bis zum nächsten Pflegegrad fehlen nur wenige Punkte."} Frist: <strong>${deD(i.frist)}</strong> (${urgTxt(i.frist)}).</span></p>`
+     ${lohnt?`<p class="notice">${ic("alert")}<span><strong>Hinweis für einen möglichen Widerspruch:</strong> ${i.abgelehnt?"Der Antrag wurde abgelehnt.":"Bis zum nächsten Pflegegrad fehlen nur wenige Punkte."} Frist: <strong>${deD(i.frist)}</strong> (${urgTxt(i.frist)}). Ob ein Widerspruch im Einzelfall Erfolg hat, kann nur eine Beratung klären, zum Beispiel der Pflegestützpunkt, ein Sozialverband oder eine Anwältin für Sozialrecht.</span></p>`
        : i.offen ? `<p class="small muted">Widerspruch möglich bis ${deD(i.frist)} (${urgTxt(i.frist)}).</p>`
        : i.frist ? `<p class="small muted">Die Widerspruchsfrist ist abgelaufen. Wird es schlechter, geht jederzeit ein Antrag auf Höherstufung.</p>`:""}
      ${(Z.S.bescheid.hinweise||[]).length?`<p class="small">Im Gutachten erwähnt: ${Z.S.bescheid.hinweise.map(h=>{const [t,k]=h.split("|");return `<button type="button" class="chip" data-gotoclaim="${k}">${esc(t)}</button>`}).join(" ")}</p>`:""}
@@ -133,7 +133,7 @@ export function entlCard(){
 export function start06() {
 B.push({k:"widerspruch", area:"Pflege", t:"Widerspruch gegen den Pflegegrad-Bescheid", p:"§ 84 SGG, § 18 SGB XI",
   when:()=>false, val:()=>null, short:"", to:PK,
-  steps:["Fristwahrend reicht ein kurzer Widerspruch. Die ausführliche Begründung kannst du nachreichen.","Gutachten anfordern, falls es nicht beilag, und Punkt für Punkt prüfen, wo Hilfe zu niedrig bewertet wurde.","Pflegetagebuch über 1–2 Wochen führen und beilegen.","Bei der zweiten Begutachtung eine vertraute Person dabei haben."],
+  steps:["Fristwahrend reicht ein kurzer Widerspruch. Die ausführliche Begründung kannst du nachreichen.","Gutachten anfordern, falls es nicht beilag, und Punkt für Punkt prüfen, wo Hilfe zu niedrig bewertet wurde.","Pflegetagebuch über 1–2 Wochen führen und beilegen.","Bei der zweiten Begutachtung eine vertraute Person dabei haben.","Unsicher, ob ein Widerspruch Aussicht hat? Kostenlos beraten der Pflegestützpunkt und die Pflegeberatung der Kasse, Mitglieder auch VdK oder SoVD, sonst eine Anwältin oder ein Anwalt für Sozialrecht."],
   docs:["Kopie des Bescheids","Pflegetagebuch (wenn vorhanden)","Aktuelle Arztberichte"]});
 ASSIST.widerspruch={q:[
   {k:"grund",type:"multi",label:"Was wurde im Gutachten zu niedrig eingeschätzt?",help:"Alles ankreuzen, was zutrifft. Unsicher? Dann „Weiß ich nicht“ – der Widerspruch gilt trotzdem.",opts:OPT([...HILFE,"Der Gutachter war nur sehr kurz da","Es war ein „guter Tag“, sonst ist es schlechter"])},
