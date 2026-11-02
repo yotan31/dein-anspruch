@@ -32,6 +32,13 @@ Z.tT = undefined; export function toast(m){const t=$("toast");t.textContent=tr(m
 /** Wird beim Start der App einmal aufgerufen (siehe 99-start.js). */
 export function start18() {
 /* ---------- Events ---------- */
+// Handy: Eingabefeld beim Öffnen der Tastatur in den sichtbaren Bereich holen (nicht unter dem „Weiter“-Knopf)
+document.addEventListener("focusin", e=>{
+  const el=/** @type {HTMLElement} */(e.target);
+  if(!el.matches || !el.matches("input:not([type=checkbox]):not([type=radio]):not([type=file]),textarea") || innerWidth>700) return;
+  setTimeout(()=>{ const vv=window.visualViewport, h=vv?vv.height:innerHeight, r=el.getBoundingClientRect();
+    if(document.activeElement===el && (r.bottom>h-100 || r.top<60)) try{ el.scrollIntoView({block:"center"}) }catch(x){} },350);
+});
 // aufklappbare Bereiche merken, damit sie beim Neuzeichnen (z. B. nach dem Abhaken) offen bleiben
 document.addEventListener("toggle", e=>{ const d=/** @type {HTMLDetailsElement} */(e.target); if(d && d.dataset && d.dataset.akk){ Z.akk=Z.akk||{}; Z.akk[d.dataset.akk]=d.open } }, true);
 document.addEventListener("click", e=>{
@@ -41,12 +48,15 @@ document.addEventListener("click", e=>{
   const t=/** @type {HTMLElement} */(/** @type {HTMLElement} */(e.target).closest("[data-act],[data-open],[data-copy],[data-pdf],[data-resettx],[data-tab],[data-area],[data-kat],[data-del],[data-delyes],[data-delno],[data-sub-toggle],[data-view],[data-delown],[data-year],[data-befpdf],[data-befcopy],[data-edit],[data-wopen],[data-wnav],[data-font],[data-gotoclaim],[data-rmember],[data-fbart]"));
   if(!t) return;
   const a=t.dataset.act;
+  // Doppeltippen: Schritte und Downloads nur einmal ausführen (ein zweites, bewusstes Tippen danach geht weiter)
+  const einmal=t.dataset.wnav||t.dataset.pdf||t.dataset.copy||t.dataset.befpdf||(["next","back","sent","fb-send","addown","addbesuch","entl-add","manual","mappe","csv","backup","schnell","au-guest"].includes(a||"")?a:"");
+  if(einmal){ const jetzt=Date.now(); if(Z.letzterKlick && Z.letzterKlick.k===einmal && jetzt-Z.letzterKlick.t<350) return; Z.letzterKlick={k:einmal,t:jetzt} }
   if(t.dataset.tab){if(t.classList.contains("howbtn"))Z.S.welcomeSeen=true;Z.S.tab=t.dataset.tab;Z.openKey=null;save();render();scrollTop();return}
   if(t.dataset.area){Z.areaFilter=t.dataset.area;render();return}
   if(t.dataset.act!=="menu" && !t.closest("#hmenu .fontsw")) Z.showMenu=false;
   if(t.dataset.gotoclaim){ Z.S.tab="ansprueche"; Z.openKey=t.dataset.gotoclaim; render(); const el=$("it-"+Z.openKey); el&&el.scrollIntoView({block:"start"}); return }
   if(t.dataset.rmember){ removeMember(t.dataset.rmember); return }
-  if(t.dataset.font){ Z.S.font=t.dataset.font; save(); render(); return }
+  if(t.dataset.font){ Z.S.font=t.dataset.font; lsSet("da-font",t.dataset.font); save(); render(); return }
   if(t.dataset.edit){ editBeleg(t.dataset.edit); return }
   if(t.dataset.wopen){ startWiz(t.dataset.wopen); return }
   if(t.dataset.fbart){ openFeedback(t.dataset.fbart); return }

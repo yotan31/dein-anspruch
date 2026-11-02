@@ -25,7 +25,7 @@ function uiKey(){ return "da-ui-"+(Z.USER?Z.USER.id:"gast")+"-"+(Z.FALL_ID||"x")
 export function save(){
   if(!Z.canSave||!Z.ref) return;
   clearTimeout(Z.saveTimer); setSave("","Speichert …");
-  const ui={}; UI_KEYS.forEach(k=>ui[k]=Z.S[k]); lsSet(uiKey(),ui); lsSet("da-font",Z.S.font);
+  const ui={}; UI_KEYS.forEach(k=>ui[k]=Z.S[k]); lsSet(uiKey(),ui);
   Z.saveTimer=setTimeout(()=>{
     Z.saveTimer=null;
     const data=JSON.parse(JSON.stringify(Z.S)); data.updated=new Date().toISOString();

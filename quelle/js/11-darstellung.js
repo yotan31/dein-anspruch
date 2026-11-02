@@ -9,7 +9,7 @@ import { deadlines, urg, urgTxt, visSteps } from "./10-fragebogen-und-fristen.js
 import { viewAnsprueche } from "./12-reiter-ansprueche.js";
 import { viewBelege } from "./13-reiter-belege.js";
 import { viewTermine } from "./14-reiter-termine.js";
-import { consentNeeded, fallName, viewConsent, viewPersons } from "./19-speicher.js";
+import { consentNeeded, fallName, lsGet, viewConsent, viewPersons } from "./19-speicher.js";
 import { viewLogin, viewNeuesPasswort } from "./20-anmeldung.js";
 /* ---------- Rendering ---------- */
 /** @param {string} id @returns {any} Element der Seite (bewusst ohne genauen Typ, wird überall als Formularfeld oder Bereich genutzt) */
@@ -91,13 +91,15 @@ export function sums(){
   const frei=offen.filter(b=>b.frei).reduce((s,b)=>s+b.frei(),0);
   return {all,offen,cash,frei};
 }
+/** Schriftgröße ist eine Einstellung des Geräts: sie bleibt auch nach dem Abmelden und ohne Konto erhalten */
+export function schrift(){ return lsGet("da-font")||Z.S.font||"1" }
 const MENU_ICON="M4 7h16 M4 12h16 M4 17h16";
 function renderHero(){
   const save=`<div class="savestate"><span class="dot ${Z.saveState.c}" id="savedot"></span><span id="savetxt">${esc(Z.saveState.t)}</span></div>`;
   const brand=`<div class="brand"><img class="logo" src="logo.png" width="44" height="44" alt=""><b>Dein Anspruch</b></div>`;
   const curF = Z.USER && Z.FAELLE.find(f=>f.id===Z.FALL_ID);
   const personBtn = curF ? `<button type="button" class="acct person" data-act="persons" aria-expanded="${Z.showPersons}">${ic("user")}${esc(fallName(curF))} ▾</button>` : "";
-  const fontsw=`<div class="fontsw" role="group" aria-label="Schriftgröße">${[["1","A"],["1.15","A+"],["1.3","A++"]].map(([v,t])=>`<button type="button" data-font="${v}" aria-pressed="${(Z.S.font||"1")===v}" aria-label="Schrift ${t}">${t}</button>`).join("")}</div>`;
+  const fontsw=`<div class="fontsw" role="group" aria-label="Schriftgröße">${[["1","A"],["1.15","A+"],["1.3","A++"]].map(([v,t])=>`<button type="button" data-font="${v}" aria-pressed="${schrift()===v}" aria-label="Schrift ${t}">${t}</button>`).join("")}</div>`;
   const acct = Z.USER?`<button type="button" class="linkbtn danger" data-act="logout" title="${esc(Z.USER.email||"")}">Abmelden</button>`:Z.GUEST?`<button type="button" class="linkbtn" data-act="guest-register">Konto anlegen</button>`:"";
   const menuBtn=`<button type="button" class="menubtn" data-act="menu" aria-expanded="${!!Z.showMenu}" aria-controls="hmenu"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="${MENU_ICON}"/></svg><span class="sr">Menü: Sprache, Schriftgröße, Konto</span></button>`;
   const menu=Z.showMenu?`<div class="hmenu" id="hmenu">
@@ -145,7 +147,7 @@ function renderTabs(){
   t.innerHTML=T.map(([k,l,i,b])=>`<button type="button" role="tab" data-tab="${k}" aria-selected="${Z.S.tab===k}">${ic(i)}<span class="lbl">${l}</span>${b?`<span class="badge">${b}</span>`:""}</button>`).join("");
 }
 function renderMain(){
-  document.documentElement.style.setProperty("--fs", Z.S.font||"1");
+  document.documentElement.style.setProperty("--fs", schrift());
   if(!Z.loaded){ $("main").innerHTML=`<section class="panel"><p class="muted">Einen Moment, deine Daten werden geladen …</p></section>`; return }
   if(Z.RECOVERY){ $("main").innerHTML=viewNeuesPasswort(); return }
   if(Z.RECHNER){ $("main").innerHTML=viewRechner(); return }
