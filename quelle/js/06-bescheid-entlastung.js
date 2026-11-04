@@ -1,7 +1,7 @@
 import { Z } from "./zustand.js";
 import { ENTLASTUNG, esc, eur, isHome, pg } from "./01-grundlagen.js";
 import { B, PK } from "./02-leistungen.js";
-import { TODAY, daysUntil, deD, ic, isoD, parseIso } from "./03-hilfsmittel.js";
+import { TODAY, daysUntil, deD, ic, isoD, parseIso, infoBtn } from "./03-hilfsmittel.js";
 import { numDE } from "./04-verhinderungspflege.js";
 import { ASSIST, HILFE, OPT, ansObj, av, has } from "./05-assistent.js";
 import { urgTxt } from "./10-fragebogen-und-fristen.js";
@@ -60,7 +60,7 @@ export function bescheidCard(){
   const i=bescheidInfo();
   if(Z.bescheidDraft) return bescheidForm();
   if(!i) return `<section class="panel mini">
-     <div class="mini-head">${ic("file")}<div><h3>Bescheid oder Gutachten bekommen?</h3><p class="small muted">Foto machen: Die App liest die wichtigsten Angaben aus, zeigt Hinweise für einen möglichen Widerspruch und behält die Frist im Blick.</p></div></div>
+     <div class="mini-head">${ic("file")}<div class="titelzeile"><h3>Bescheid bekommen?</h3>${infoBtn("Bescheid oder Gutachten","Mach ein Foto vom Bescheid oder tippe die Angaben ab. Die App liest Pflegegrad, Punkte und Datum aus, zeigt Hinweise für einen möglichen Widerspruch und erinnert an die Frist von einem Monat.")}</div></div>
      <div class="btnrow"><button class="btn small" type="button" data-act="bes-cam">${ic("camera")}Foto machen</button><button class="btn small ghost" type="button" data-act="bes-manual">Abtippen</button><button class="linkbtn" type="button" data-act="r-start">Pflegegrad selbst einschätzen</button></div>
    </section>`;
   const lohnt = (i.knapp||i.abgelehnt) && i.offen;
@@ -118,12 +118,11 @@ export function entlCard(){
   const k=entlKonto(); if(!k) return "";
   const pct=k.bisHeute?Math.min(100,(k.genutzt/(k.bisHeute+(k.vorjOffen||0)))*100):0;
   return `<section class="panel mini">
-    <div class="mini-head">${ic("receipt")}<div><h3>Entlastungsbetrag</h3><p class="small muted">${ENTLASTUNG} € im Monat für Haushaltshilfe, Betreuung oder Tagespflege</p></div>
+    <div class="mini-head">${ic("receipt")}<div><div class="titelzeile"><h3>Entlastungsbetrag</h3>${infoBtn("Entlastungsbetrag",`${ENTLASTUNG} € im Monat für Haushaltshilfe, Alltagsbegleitung, Betreuung oder Tagespflege. Die Kasse erstattet das Geld gegen Rechnung.\n\nTrag jede Rechnung als Beleg „Entlastungsbetrag“ ein, dann rechnet die App automatisch mit. Nicht genutzte Beträge verfallen am 30. Juni des Folgejahres.`)}</div><p class="small muted">${ENTLASTUNG} € im Monat</p></div>
       <div class="mini-num"><span class="small muted">jetzt frei</span><b>${eur(k.frei)}</b></div></div>
     <div class="meter"><div class="track"><i style="width:${pct}%"></i></div>
       <div class="nums"><span>${k.y} genutzt: <strong>${eur(k.genutzt,2)}</strong></span><span>Anspruch bis heute: <strong>${eur(k.bisHeute)}</strong></span></div></div>
     ${k.vorjOffen>0?`<p class="notice ${daysUntil(k.verfall)<=60?"":"info"}">${ic("alert")}<span><strong>${eur(k.vorjOffen)} aus ${k.y-1}</strong> verfallen am 30.06.${k.y} (${urgTxt(k.verfall)}). Jetzt Hilfe organisieren und Rechnung einreichen.</span></p>`:""}
-    ${!k.belege?`<p class="small muted">Trag jede Rechnung als Beleg „Entlastungsbetrag“ ein, dann rechnet die App automatisch mit.</p>`:""}
     <div class="btnrow"><button class="btn small" type="button" data-act="entl-add">${ic("plus")}Rechnung erfassen</button><button class="btn small ghost" type="button" data-wopen="entlastung">Erstattung beantragen</button>
       <label class="small muted" style="display:flex;align-items:center;gap:6px">Pflegegrad seit <input type="month" id="entl-seit" value="${esc(Z.S.entlSeit||"")}" style="width:auto;padding:4px 8px"></label></div>
   </section>`;

@@ -1,6 +1,6 @@
 import { Z } from "./zustand.js";
 import { esc, eur } from "./01-grundlagen.js";
-import { bild, deD, ic, parseIso } from "./03-hilfsmittel.js";
+import { bild, deD, ic, parseIso, infoBtn } from "./03-hilfsmittel.js";
 import { KATS, bruttoOf, chronisch, selYears, zuz } from "./10-fragebogen-und-fristen.js";
 import { bulkView } from "./17-sammel-pdf.js";
 import { blobUrl } from "./19-speicher.js";
@@ -15,12 +15,12 @@ export function viewBelege(){
   const byYear={}; for(const b of shown){ const y=String(b.jahr); (byYear[y]=byYear[y]||{}); (byYear[y][b.kat]=byYear[y][b.kat]||[]).push(b) }
   return `
   <section class="panel">
-    <h2>Belege</h2>
+    <div class="titelzeile"><h2>Belege</h2>${infoBtn("Belege","Fotografiere Rezepte, Quittungen und Rechnungen gleich nach dem Bezahlen. Die App sortiert sie nach Jahr und Art, rechnet Zuzahlungen und den Entlastungsbetrag zusammen und erstellt eine Belegmappe als PDF.\n\nAuch ältere Belege, zum Beispiel aus "+(new Date().getFullYear()-2)+", kannst du eintragen: einfach das Datum vom Beleg nehmen."+(canFiles?"\n\nEine PDF mit vielen Rechnungen? Die App erkennt jede Rechnung einzeln und sortiert sie nach Jahr.":""))}</div>
     <div class="yearchips" role="group" aria-label="Jahre anzeigen"><span class="small muted">Jahre:</span>${belegYears().map(y=>`<button type="button" class="chip" data-year="${y}" aria-pressed="${years.includes(y)}">${y}</button>`).join("")}</div>
     ${Z.bulk?bulkView():Z.pending?pendingForm():`
     <div class="drop" id="drop">
       ${bild("belege")}
-      <p><strong>${canFiles?"Rezept, Quittung oder Rechnung fotografieren":"Rezept, Quittung oder Rechnung erfassen"}</strong><br><span class="small muted">${canFiles?"Foto aufnehmen oder Datei (Bild/PDF) wählen. ":""}Auch ältere Belege, z. B. aus ${new Date().getFullYear()-2}: einfach das Datum vom Beleg eintragen.</span>${canFiles?`<br><span class="small"><strong>Neu:</strong> Eine PDF mit vielen Rechnungen? Die App erkennt jede Rechnung und sortiert sie nach Jahr.</span>`:""}</p>
+      <p><strong>${canFiles?"Rezept, Quittung oder Rechnung fotografieren":"Rezept, Quittung oder Rechnung erfassen"}</strong></p>
       <div class="btnrow" style="justify-content:center">
         ${canFiles?`<button class="btn" type="button" data-act="cam">${ic("camera")}Foto aufnehmen</button><button class="btn soft" type="button" data-act="pick">${ic("file")}Datei wählen</button>`:""}
         <button class="btn ${canFiles?"ghost":""}" type="button" data-act="manual">${ic("plus")}${canFiles?"Ohne Foto erfassen":"Beleg eintragen"}</button>
@@ -30,8 +30,7 @@ export function viewBelege(){
   </section>
 
   <section class="panel">
-    <div class="section-title"><h3>Zuzahlungen und Belastungsgrenze</h3><span class="small muted">§ 62 SGB V</span></div>
-    <p class="small muted">Pro Jahr zahlt man höchstens 2 % der Bruttoeinnahmen des Haushalts zu, chronisch Kranke 1 %. Für Ehepartner und Kinder zieht die Kasse Freibeträge ab. Zuviel Gezahltes kann meist bis zu 4 Jahre rückwirkend erstattet werden, für jedes Jahr mit eigenem Antrag.</p>
+    <div class="titelzeile"><h3>Zuzahlungen begrenzen</h3>${infoBtn("Belastungsgrenze (§ 62 SGB V)","Pro Jahr zahlt man höchstens 2 % der Bruttoeinnahmen des Haushalts zu, chronisch Kranke 1 %. Für Ehepartner und Kinder zieht die Kasse Freibeträge ab.\n\nZu viel Gezahltes kann meist bis zu 4 Jahre rückwirkend erstattet werden, für jedes Jahr mit eigenem Antrag.")}</div>
     <div class="field" style="max-width:320px"><label for="chron">Schwerwiegend chronisch krank?</label><select id="chron"><option value="" ${!Z.S.chronisch?"selected":""}>Automatisch (${chronisch()?"ja":"nein"})</option><option value="ja" ${Z.S.chronisch==="ja"?"selected":""}>Ja, 1 %</option><option value="nein" ${Z.S.chronisch==="nein"?"selected":""}>Nein, 2 %</option></select></div>
     ${years.map(j=>{const z=zuz(j); const p=z.grenze?Math.min(100,z.sum/z.grenze*100):0; const reached=z.grenze&&z.sum>=z.grenze;
       return `<div class="meter" style="border-top:1px solid var(--line);padding-top:12px">
@@ -47,7 +46,7 @@ export function viewBelege(){
     <div class="section-title"><h3>Abgelegt: ${esc(label)}</h3><span class="small muted">${shown.length} Belege · ${eur(shown.reduce((s,b)=>s+(Number(b.betrag)||0),0),2)}</span></div>
     <div class="filters"><button type="button" class="chip" data-kat="" aria-pressed="${!kf}">Alle Arten</button>${Object.entries(KATS).filter(([k])=>inYears.some(b=>b.kat===k)).map(([k,v])=>`<button type="button" class="chip" data-kat="${k}" aria-pressed="${kf===k}">${esc(v.t)}</button>`).join("")}</div>
     ${shown.length?Object.keys(byYear).sort().reverse().map(y=>`${years.length>1?`<h3 style="margin-top:4px">${y}</h3>`:""}${Object.entries(byYear[y]).map(([k,arr])=>`<div class="group"><header><span>${esc((KATS[k]||KATS.sonst).t)}</span><span>${eur(arr.reduce((s,b)=>s+(Number(b.betrag)||0),0),2)}</span></header>${arr.map(belegRow).join("")}</div>`).join("")}`).join("")
-      :`<p class="notice info">${ic("receipt")}<span>Noch keine Belege für ${esc(label)}. Fotografiere jede Apotheken-Quittung mit Zuzahlung direkt nach dem Kauf, dann ist am Jahresende alles beisammen.</span></p>`}
+      :`<p class="notice info">${ic("receipt")}<span>Noch keine Belege für ${esc(label)}.</span></p>`}
     ${shown.length?`<div class="btnrow"><button class="btn small" type="button" data-act="mappe">${ic("down")}Belegmappe ${esc(label)} (PDF)</button><button class="btn small ghost" type="button" data-act="csv">Liste als Tabelle (CSV)</button></div>`:""}
   </section>`;
 }

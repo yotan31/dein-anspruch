@@ -2,11 +2,10 @@ import { installKarte } from "./24-app-installieren.js";
 import { Z } from "./zustand.js";
 import { esc, eur, pg } from "./01-grundlagen.js";
 import { FA, KK, PK, txt } from "./02-leistungen.js";
-import { AREA_ICON, bild, deD, ic } from "./03-hilfsmittel.js";
+import { AREA_ICON, CLAIM_ICON, bild, ic } from "./03-hilfsmittel.js";
 import { bescheidCard, entlCard } from "./06-bescheid-entlastung.js";
 import { finderHTML } from "./08-anbieter.js";
 import { langNotice } from "./09-sprachen.js";
-import { deadlines, urg, urgTxt } from "./10-fragebogen-und-fristen.js";
 import { sums } from "./11-darstellung.js";
 import { datenBox } from "./21-sicherung-und-loeschen.js";
 /* ---------- Reiter: Ansprüche ---------- */
@@ -17,10 +16,8 @@ export function viewAnsprueche(){
   if(!areas.includes(Z.areaFilter)) Z.areaFilter="Alle";
   const sorted = offen.filter(b=>Z.areaFilter==="Alle"||b.area===Z.areaFilter)
     .sort((a,b)=>(Number(!!a.opt)-Number(!!b.opt)) || ((b.val()||0)-(a.val()||0)) || ((b.mon?b.mon():0)-(a.mon?a.mon():0)));
-  const dl=deadlines().filter(x=>!x.ok && urg(x.d)!=="ok").slice(0,2);
   return `
    ${installKarte()}
-   ${dl.map(x=>`<p class="notice ${urg(x.d)==="late"?"bad":""}">${ic("bell")}<span><strong>${esc(x.t)}</strong> – Frist ${deD(x.d)} (${urgTxt(x.d)}). <button type="button" class="linkbtn" data-tab="termine">Zu den Terminen</button></span></p>`).join("")}
    ${!Z.S.welcomeSeen?`<section class="panel" style="gap:12px">
      <div class="section-title"><h2>Fertig! So geht's weiter</h2><button type="button" class="linkbtn" data-act="welcome-ok">Ausblenden</button></div>
      <div class="howto">
@@ -58,7 +55,7 @@ function itemHTML(b){
   const open = Z.openKey===b.k;
   return `<article class="item${open?" open":""}" id="it-${b.k}">
     <button class="head" type="button" data-open="${b.k}" aria-expanded="${open}">
-      <span class="ico a-${esc(b.area)}">${ic(AREA_ICON[b.area]||"heart")}</span>
+      <span class="ico a-${esc(b.area)}">${ic(CLAIM_ICON[b.k]||AREA_ICON[b.area]||"heart")}</span>
       <span class="ttl">${esc(b.t)}</span>${valueLabel(b)}
       <span class="chev">${ic("chev")}</span>
       <span class="short">${esc(txt(b.short))}</span>
@@ -82,6 +79,7 @@ function detailHTML(b){
   const erledigt=checks.filter((c,i)=>Z.S.checks[b.k+":"+i]).length;
   const naehe=finderHTML(b.k,false);
   return `<div class="detail">
+    <p class="kurz">${esc(txt(b.short))}</p>
     ${b.ask?`<div class="startbox">
         <button class="btn big" type="button" data-wopen="${b.k}">${ic("file")}${st==="offen"?"Antrag ausfüllen":"Antrag ansehen"}</button>
         ${["pg_antrag","pg_hoch"].includes(b.k)?`<button class="btn ghost" type="button" data-act="r-start">Erst selbst einschätzen: Pflegegrad-Rechner</button>`:""}

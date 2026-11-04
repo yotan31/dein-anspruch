@@ -518,3 +518,81 @@ hr.sep{border:0;border-top:1px solid var(--line);margin:4px 0}
 .detail .para{font-size:.86rem}
 .akk-body .extlink{font-weight:600;text-decoration:none;font-size:.95rem;padding:4px 0}
 .akk-body .extlink:hover span,.akk-body .extlink:hover{text-decoration:underline}
+
+/* ================= iOS-Stil =================
+   Systemschrift (auf iPhone/Mac San Francisco), gruppierter grauer Hintergrund, weiße Karten ohne Rahmen,
+   Trennlinien statt Kästen, durchscheinende Leisten, Fenster von unten. Farben bleiben die der App. */
+:root{
+  --f-body:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --f-display:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --bg:#f2f2f7; --paper:#ffffff; --paper-2:#f2f2f7; --ink:#1c1c1e; --muted:#6c6c70; --line:#e2e2e7; --tint:#eef6f9;
+  --r:14px; --shadow:none;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#000000; --paper:#1c1c1e; --paper-2:#2c2c2e; --ink:#ffffff; --muted:#a1a1a6; --line:#38383a; --tint:#0f1d24}}
+:root[data-theme="dark"]{--bg:#000000; --paper:#1c1c1e; --paper-2:#2c2c2e; --ink:#ffffff; --muted:#a1a1a6; --line:#38383a; --tint:#0f1d24}
+body{font-size:1.0625rem;letter-spacing:-.01em;-webkit-font-smoothing:antialiased}
+h1,h2,h3{font-weight:700;letter-spacing:-.02em}
+h1{font-size:clamp(1.9rem,8vw,2.4rem)}h2{font-size:1.45rem}h3{font-size:1.12rem}
+.hero .figure,.hpost b,.item .val,.mini-num b{font-family:var(--f-display);font-weight:700;letter-spacing:-.02em}
+/* Karten ohne Rahmen */
+.panel,.list,.hsheet,.faq,.vertrauen,.kachel,.due,.group,.akk,.hmenu,.tabs{border:0}
+.hsheet{border-radius:var(--r)}
+.kachel{border:1.5px solid transparent;box-shadow:none}
+.kachel:hover{border-color:var(--accent);transform:none}
+/* Liste wie eine iOS-Tabelle: Trennlinie beginnt erst nach dem Symbol */
+.item{border-bottom:0;position:relative}
+.item:not(:last-child)::after{content:"";position:absolute;left:66px;right:0;bottom:0;border-bottom:1px solid var(--line)}
+.item>button.head{padding:13px 16px;align-items:center}
+.item>button.head:hover{background:transparent}
+.item>button.head[aria-expanded="true"]{background:var(--paper)}
+.item .ico{width:34px;height:34px;border-radius:9px;background:var(--accent);color:#fff}
+.item .ico svg.i{width:19px;height:19px}
+.ico.a-Steuer{background:#e08a00;color:#fff}.ico.a-Krankenkasse{background:#2e9d5b;color:#fff}.ico.a-Schwerbehinderung,.ico.a-Arbeit{background:#5b6b80;color:#fff}.ico.a-Pflegeperson{background:#c2557a;color:#fff}.ico.a-Pflegeheim{background:#7a5fc2;color:#fff}
+.item .ttl{font-weight:600;font-size:1.02rem;line-height:1.3}
+.item .val{font-size:1rem!important;font-weight:600}
+.item .chev svg.i{color:#c4c4c7}
+.item .short{display:none!important}
+.detail{border-top:0;background:var(--paper)}
+.detail .kurz{color:var(--muted);font-size:.97rem;margin-top:-4px}
+/* Knöpfe: abgerundete Rechtecke wie bei iOS */
+.btn{border-radius:12px;font-weight:600}
+.btn.big{border-radius:14px;box-shadow:none}
+.btn.ghost{border-width:1.5px}
+.menubtn,.ideebtn{border:0;background:var(--paper)}
+.menubtn[aria-expanded="true"]{background:var(--ink)}
+.ideebtn{background:#fff3d6}
+/* Reiterleiste und Kopf durchscheinend */
+@media (max-width:700px){
+  .tabs{background:color-mix(in srgb,var(--paper) 82%,transparent);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-top:1px solid var(--line)!important}
+  .tabs button{border-top:0!important;font-weight:600}
+  .tabs button span.lbl{font-size:.72rem}
+  .nav.go{background:color-mix(in srgb,var(--paper) 88%,transparent);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px)}
+}
+.tabs button[aria-selected="true"]{border-top-color:transparent!important}
+/* Hinweise ruhiger */
+.notice{border-radius:12px}
+.whelp{background:transparent;padding:0;color:var(--muted);font-size:.95rem}
+.whelp svg{color:var(--muted)}
+/* ⓘ-Knopf */
+.infobtn{all:unset;box-sizing:border-box;display:inline-grid;place-items:center;width:28px;height:28px;border-radius:50%;color:var(--accent);cursor:pointer;vertical-align:middle;position:relative;flex:none}
+.infobtn::after{content:"";position:absolute;inset:-8px}
+.infobtn svg.i{width:22px;height:22px}
+.infobtn:focus-visible{outline:3px solid #f2b134}
+.titelzeile{display:flex;align-items:center;gap:6px}
+.titelzeile>h2,.titelzeile>h3{margin:0}
+/* Fenster von unten */
+.overlay{background:rgba(0,0,0,.35);align-items:flex-end;padding:0}
+.overlay .sheet{border-radius:16px 16px 0 0;max-width:640px;padding:10px 20px calc(20px + env(safe-area-inset-bottom,0px));margin:0;box-shadow:none}
+@media (min-width:701px){.overlay{align-items:center;padding:16px}.overlay .sheet{border-radius:16px}}
+@media (prefers-reduced-motion:no-preference){.overlay:not([hidden]) .sheet{animation:hoch .22s cubic-bezier(.2,.8,.2,1)}@keyframes hoch{from{transform:translateY(40px);opacity:0}}}
+.sheet .griff{display:block;width:38px;height:5px;border-radius:3px;background:var(--line);margin:0 auto 6px}
+.sheet.info p{color:var(--ink);line-height:1.5}
+.sheet.info .btn{margin-top:6px}
+/* Filter in einer Zeile zum Wischen */
+.filters{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin-inline:-16px;padding:2px 16px}
+.filters::-webkit-scrollbar{display:none}
+.filters .chip{flex:none}
+.section-title .filters{margin-inline:0;padding:0}
+/* Bereiche in der geöffneten Leistung: graue Gruppe wie in den iOS-Einstellungen */
+.detail .akk{background:var(--paper-2)}
+.akk-row select{font-size:.95rem;padding:8px 10px;min-height:40px;background:var(--paper)}

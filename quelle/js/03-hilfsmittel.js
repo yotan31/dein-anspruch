@@ -1,5 +1,5 @@
 import { Z } from "./zustand.js";
-import { eur } from "./01-grundlagen.js";
+import { esc, eur } from "./01-grundlagen.js";
 import { B, KK } from "./02-leistungen.js";
 import { zuz } from "./10-fragebogen-und-fristen.js";
 /* ---------- Icons ---------- */
@@ -28,6 +28,17 @@ const ICON={
  lock:"M6 11h12v10H6z M8 11V8a4 4 0 0 1 8 0v3",
  mail:"M3 6h18v12H3z M3 7l9 6 9-6",
  pin:"M12 21s-6-5.5-6-11a6 6 0 0 1 12 0c0 5.5-6 11-6 11z M12 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4",
+ home:"M4 11l8-7 8 7 M6 9.5V20h12V9.5 M10 20v-5h4v5",
+ car:"M5 16V11l2-5h10l2 5v5 M5 16h14 M7.5 16v2 M16.5 16v2 M5 11h14 M8 13.5h.01 M16 13.5h.01",
+ phone:"M8 3h8v18H8z M11 18h2",
+ sun:"M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8z M12 2v2 M12 20v2 M4.9 4.9l1.4 1.4 M17.7 17.7l1.4 1.4 M2 12h2 M20 12h2 M4.9 19.1l1.4-1.4 M17.7 6.3l1.4-1.4",
+ book:"M5 4h9a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z M5 17a3 3 0 0 1 3-3h9",
+ box:"M4 8l8-4 8 4v8l-8 4-8-4z M4 8l8 4 8-4 M12 12v8",
+ people:"M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M3 20a6 6 0 0 1 12 0 M16 11a3 3 0 1 0 0-6 M21 20a6 6 0 0 0-4-5.7",
+ card:"M3 6h18v12H3z M3 10h18 M7 15h4",
+ tv:"M4 6h16v11H4z M9 21h6 M12 17v4",
+ eye:"M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z",
+ shield2:"M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z",
  ext:"M14 4h6v6 M20 4l-9 9 M18 14v6H4V6h6",
  idee:"M9 18h6 M10 21h4 M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.3 1.1 2.2h5c0-.9.4-1.6 1.1-2.2A6 6 0 0 0 12 3z",
 };
@@ -58,6 +69,10 @@ const BILD={
 };
 /** @param {"start"|"belege"|"fertig"} n */
 export function bild(n, c="bild") { return `<svg class="${c}" viewBox="0 0 180 140" aria-hidden="true" focusable="false">${BILD[n]}</svg>`; }
+/** Kleiner ⓘ-Knopf: zeigt eine Erklärung erst, wenn man sie braucht (öffnet ein Fenster von unten) */
+export function infoBtn(titel, text){ return `<button type="button" class="infobtn" data-info="${esc(titel)}" data-infotext="${esc(text)}" aria-label="Mehr erfahren: ${esc(titel)}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="${ICON.info}"/></svg></button>` }
+/** eigenes Symbol je Leistung, damit man die Liste schneller erfasst */
+export const CLAIM_ICON={pg_antrag:"form",pg_hoch:"plus",pflegegeld:"euro",sachleistung:"user",entlastung:"heart",jahresbetrag:"cal",tagespflege:"sun",verbrauch:"box",technisch:"bell",wohnumfeld:"home",dipa:"phone",wg:"people",beratung:"info",pflegekurs:"book",rv:"shield2",pug:"case",pflegepausch:"form",stationaer:"building",zuschlag:"euro",hzp:"building",eingliederung:"building",fahrten:"car",chroniker:"cross",befreiung:"receipt",sb_antrag:"card",sb_neu:"plus",behpausch:"form",fahrtpausch:"car",wertmarke:"card",kfz:"car",park:"car",rundfunk:"tv",blind:"eye",urlaub:"sun",gleich:"access",rente:"shield2",widerspruch:"alert"};
 export const AREA_ICON={Pflege:"heart",Pflegeperson:"user",Steuer:"form",Pflegeheim:"building",Krankenkasse:"cross",Schwerbehinderung:"access",Arbeit:"case"};
 
 /* ---------- Datum ---------- */

@@ -1,7 +1,7 @@
 import { Z } from "./zustand.js";
 import { AOK_REGIONEN, KASSEN, MZ, WOHNEN, esc, eur } from "./01-grundlagen.js";
 import { B, applicable } from "./02-leistungen.js";
-import { ic } from "./03-hilfsmittel.js";
+import { ic, infoBtn } from "./03-hilfsmittel.js";
 import { viewWizard } from "./05-assistent.js";
 import { viewRechner } from "./07-pflegegrad-rechner.js";
 import { applyI18n, langSelect } from "./09-sprachen.js";
@@ -174,9 +174,8 @@ function nav(canNext=true,nextLabel="Weiter",why="Bitte beantworte zuerst die Fr
 const VIEWS = {
  start:()=>`<section class="panel">${stepper()}
    <div class="intro">
-     <h2>Welche Hilfen stehen dir noch zu?</h2>
-     <p>Viele Familien nutzen nur das Pflegegeld. Dabei sind oft mehrere tausend Euro im Jahr zusätzlich drin, etwa für Haushaltshilfe, Ersatzpflege oder Hilfsmittel.</p>
-     <p class="muted">Ein paar Fragen, etwa 3 Minuten. Danach siehst du deine offenen Ansprüche mit fertigen Anträgen.</p>
+     <div class="titelzeile"><h2>Welche Hilfen stehen dir noch zu?</h2>${infoBtn("Warum diese Fragen?","Viele Familien nutzen nur das Pflegegeld. Dabei sind oft mehrere tausend Euro im Jahr zusätzlich drin, etwa für Haushaltshilfe, Ersatzpflege oder Hilfsmittel.\n\nNach ein paar Fragen siehst du deine offenen Ansprüche mit fertigen Anträgen.")}</div>
+     <p class="muted">Ein paar Fragen, etwa 3 Minuten.</p>
    </div>
    ${zielHinweis()}
    <fieldset class="q"><legend>Für wen nutzt du die App?</legend><div class="choices">
@@ -190,14 +189,12 @@ const VIEWS = {
    ${nav(Z.S.rolle && (Z.S.bereiche.pflege||Z.S.bereiche.sb),"Los geht's", !Z.S.rolle?"Bitte wähle zuerst oben aus, für wen du die App nutzt.":"Bitte wähle mindestens ein Thema aus: Pflegegrad oder Schwerbehinderung.")}
  </section>`,
  kasse:()=>`<section class="panel">${stepper()}
-   <h2>Bei welcher Krankenkasse ${Z.S.rolle==="angehoerig"?"ist die Person":"bist du"} versichert?</h2>
-   <p class="muted">Die Pflegekasse gehört immer zur Krankenkasse. Dorthin gehen die Anträge.</p>
+   <div class="titelzeile"><h2>Bei welcher Krankenkasse ${Z.S.rolle==="angehoerig"?"ist die Person":"bist du"} versichert?</h2>${infoBtn("Krankenkasse und Pflegekasse","Die Pflegekasse gehört immer zur Krankenkasse. Dorthin gehen die Anträge.\n\nPrivat versichert? Die Leistungen der Pflegepflichtversicherung sind gleich hoch, Anträge gehen dann an die private Pflegeversicherung. Wähle „Andere“.")}</div>
    <fieldset class="q"><legend class="sr">Krankenkasse</legend><div class="choices">
      ${Object.entries(KASSEN).map(([k,v])=>choice("kasse",k,v.name,"","radio",Z.S.kasse===k)).join("")}
    </div></fieldset>
    ${Z.S.kasse==="aok"?`<div class="field"><label for="aokRegion">Welche AOK?</label><select id="aokRegion"><option value="">Bitte wählen</option>${AOK_REGIONEN.map(r=>`<option ${Z.S.aokRegion===r?"selected":""}>${r}</option>`).join("")}</select></div>`:""}
    ${Z.S.kasse==="andere"?`<div class="field"><label for="kasseAndere">Name der Kasse</label><input type="text" id="kasseAndere" value="${esc(Z.S.kasseAndere)}" placeholder="z. B. KNAPPSCHAFT, SBK"></div>`:""}
-   <p class="notice info">${ic("info")}<span>Privat versichert? Die Leistungen der Pflegepflichtversicherung sind gleich hoch, Anträge gehen dann an die private Pflegeversicherung. Wähle „Andere“.</span></p>
    ${nav(!!Z.S.kasse && (Z.S.kasse!=="aok"||Z.S.aokRegion))}
  </section>`,
  pflege:()=>`<section class="panel">${stepper()}
@@ -212,8 +209,7 @@ const VIEWS = {
    ${nav(Z.S.pg!=="" && (Z.S.wohnen || Z.S.pg==="0"))}
  </section>`,
  pp:()=>`<section class="panel">${stepper()}
-   <h2>Wer pflegt im Alltag?</h2>
-   <p class="muted">Pflegende Angehörige haben eigene Ansprüche, etwa Rentenpunkte und Freistellung vom Job.</p>
+   <div class="titelzeile"><h2>Wer pflegt im Alltag?</h2>${infoBtn("Pflegende Angehörige","Pflegende Angehörige haben eigene Ansprüche, etwa Rentenpunkte und Freistellung vom Job.")}</div>
    <fieldset class="q"><legend>Pflegt eine Angehörige oder ein Angehöriger mindestens 10 Stunden pro Woche, verteilt auf mindestens 2 Tage?</legend><div class="choices">
      ${choice("stunden10","ja","Ja","","radio",Z.S.pp.stunden10==="ja")}${choice("stunden10","nein","Nein","","radio",Z.S.pp.stunden10==="nein")}${choice("stunden10","unklar","Weiß nicht","","radio",Z.S.pp.stunden10==="unklar")}
    </div></fieldset>
@@ -249,8 +245,8 @@ const VIEWS = {
  </section>`},
  daten:()=>{const p=Z.S.person, a=Z.S.rolle==="angehoerig";
    return `<section class="panel">${stepper()}
-   <h2>Angaben für die Anträge</h2>
-   <p class="muted">Damit füllen wir die Schreiben vor. Felder dürfen leer bleiben. Die Daten liegen nur in deinem privaten Bereich.</p>
+   <div class="titelzeile"><h2>Angaben für die Anträge</h2>${infoBtn("Wofür diese Angaben?","Damit füllt die App die Schreiben vor. Felder dürfen leer bleiben, dann steht im Antrag eine Lücke. Die Daten liegen nur in deinem privaten Bereich.")}</div>
+   <p class="muted">Alles freiwillig.</p>
    <h3>${a?"Pflegebedürftige bzw. schwerbehinderte Person":"Deine Daten"}</h3>
    <div class="grid2">
      ${fld("name","Vor- und Nachname",p.name)}${fld("geb","Geburtsdatum",p.geb,"text","TT.MM.JJJJ")}
@@ -261,7 +257,7 @@ const VIEWS = {
      ${fld("absender","Dein Name",p.absender)}${fld("beziehung","Beziehung",p.beziehung,"text","z. B. Tochter, Ehemann")}
      ${fld("absStrasse","Straße, Hausnr.",p.absStrasse)}${fld("absOrt","PLZ, Ort",p.absOrt)}
      ${fld("tel","Telefon",p.tel,"tel")}${fld("mail","E-Mail",p.mail,"email")}</div>
-     <p class="notice">${ic("info")}<span>Wenn du für eine andere Person Anträge stellst, braucht die Kasse eine Vollmacht oder Betreuungsurkunde. Wir setzen sie automatisch auf die Checkliste.</span></p>`:""}
+     <p class="small muted">${ic("info")} Für Anträge im Namen einer anderen Person braucht die Kasse eine Vollmacht. Sie steht automatisch auf der Checkliste.</p>`:""}
    ${nav(true,"Ergebnis anzeigen")}
  </section>`},
 };

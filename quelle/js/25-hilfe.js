@@ -34,3 +34,18 @@ export function openHilfe(){
   setTimeout(()=>{ const b=d.querySelector('[data-act="hilfe-close"]'); if(b) try{ b.focus() }catch(e){} },60);
 }
 export function closeHilfe(){ const d=$("hilfebox"); if(d) d.hidden=true }
+
+/** Erklärung zu einem ⓘ-Knopf als Fenster von unten (wie bei iOS) */
+export function openInfo(titel, text){
+  let d=$("infobox"); if(!d){ d=document.createElement("div"); d.id="infobox"; d.className="overlay"; document.body.appendChild(d) }
+  d.hidden=false;
+  d.innerHTML=`<div class="sheet info" role="dialog" aria-modal="true" aria-labelledby="info-h">
+    <span class="griff" aria-hidden="true"></span>
+    <h3 id="info-h">${esc(titel)}</h3>
+    ${String(text).split(/\n\n/).map(t=>`<p>${esc(t)}</p>`).join("")}
+    <button class="btn" type="button" data-act="info-close">Verstanden</button>
+  </div>`;
+  try{ applyI18n(d) }catch(e){}
+  setTimeout(()=>{ const b=d.querySelector('[data-act="info-close"]'); if(b) try{ b.focus({preventScroll:true}) }catch(e){} },60);
+}
+export function closeInfo(){ const d=$("infobox"); if(d) d.hidden=true }

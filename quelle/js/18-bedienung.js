@@ -20,7 +20,7 @@ import { authAction, googleLogin, logout } from "./20-anmeldung.js";
 import { backupData, restoreData, wipeAll } from "./21-sicherung-und-loeschen.js";
 import { setEri } from "./22-erinnerungen.js";
 import { closeFeedback, openFeedback, sendFeedback, shareApp } from "./23-feedback-und-fehler.js";
-import { closeHilfe, openHilfe } from "./25-hilfe.js";
+import { closeHilfe, closeInfo, openHilfe, openInfo } from "./25-hilfe.js";
 import { zaehle } from "./26-zaehlung.js";
 
 async function copy(text){
@@ -42,10 +42,12 @@ document.addEventListener("focusin", e=>{
 // aufklappbare Bereiche merken, damit sie beim Neuzeichnen (z. B. nach dem Abhaken) offen bleiben
 document.addEventListener("toggle", e=>{ const d=/** @type {HTMLDetailsElement} */(e.target); if(d && d.dataset && d.dataset.akk){ Z.akk=Z.akk||{}; Z.akk[d.dataset.akk]=d.open } }, true);
 document.addEventListener("click", e=>{
+  // Fenster von unten: Tippen auf den dunklen Hintergrund schließt sie
+  const ov=/** @type {HTMLElement} */(e.target); if(ov.classList && ov.classList.contains("overlay")){ ov.hidden=true; return }
   // Menü schließt, wenn daneben getippt wird
   const ziel=/** @type {HTMLElement} */(e.target);
   if(Z.showMenu && !ziel.closest("#hmenu,[data-act=menu]")){ Z.showMenu=false; render() }
-  const t=/** @type {HTMLElement} */(/** @type {HTMLElement} */(e.target).closest("[data-act],[data-open],[data-copy],[data-pdf],[data-resettx],[data-tab],[data-area],[data-kat],[data-del],[data-delyes],[data-delno],[data-sub-toggle],[data-view],[data-delown],[data-year],[data-befpdf],[data-befcopy],[data-edit],[data-wopen],[data-wnav],[data-font],[data-gotoclaim],[data-rmember],[data-fbart]"));
+  const t=/** @type {HTMLElement} */(/** @type {HTMLElement} */(e.target).closest("[data-act],[data-open],[data-copy],[data-pdf],[data-resettx],[data-tab],[data-area],[data-kat],[data-del],[data-delyes],[data-delno],[data-sub-toggle],[data-view],[data-delown],[data-year],[data-befpdf],[data-befcopy],[data-edit],[data-wopen],[data-wnav],[data-font],[data-gotoclaim],[data-rmember],[data-fbart],[data-info]"));
   if(!t) return;
   const a=t.dataset.act;
   // Doppeltippen: Schritte und Downloads nur einmal ausführen (ein zweites, bewusstes Tippen danach geht weiter)
@@ -60,6 +62,7 @@ document.addEventListener("click", e=>{
   if(t.dataset.edit){ editBeleg(t.dataset.edit); return }
   if(t.dataset.wopen){ startWiz(t.dataset.wopen); return }
   if(t.dataset.fbart){ openFeedback(t.dataset.fbart); return }
+  if(t.dataset.info){ openInfo(t.dataset.info, t.dataset.infotext||""); return }
   if(t.dataset.wnav){ const n=t.dataset.wnav; const len=wizSteps().list.length;
     if(n==="close"){ const k=Z.S.wiz.k; Z.S.wiz=null; Z.openKey=k; save(); render(); const el=$("it-"+k); el&&el.scrollIntoView({block:"start"}); return }
     if(n==="next" && !t.classList.contains("ghost")){
@@ -133,6 +136,7 @@ document.addEventListener("click", e=>{
       save(); render(); scrollTop(); break }
     case "hilfe-open": Z.showMenu=false; render(); openHilfe(); break;
     case "hilfe-close": closeHilfe(); break;
+    case "info-close": closeInfo(); break;
     case "guest-register": Z.GUEST=false; Z.authMode="register"; Z.authMsg=""; lsSet("dein-anspruch-modus",""); render(); scrollTop(); break;
     case "logout": logout(); break;
     case "cs-yes": giveConsent(); break;
@@ -233,7 +237,7 @@ document.addEventListener("dragleave", e=>{const tg=/** @type {HTMLElement} */(e
 document.addEventListener("drop", e=>{const tg=/** @type {HTMLElement} */(e.target); const d=tg.closest&&tg.closest("#drop"); if(d&&Z.ASSETS){e.preventDefault();const f=e.dataTransfer.files[0]; if(f) startPending(f)}});
 $("lbclose").onclick=()=>{$("lightbox").hidden=true};
 $("lightbox").onclick=e=>{if(/** @type {HTMLElement} */(e.target).id==="lightbox") $("lightbox").hidden=true};
-document.addEventListener("keydown",e=>{ const tg=/** @type {HTMLElement} */(e.target);if(e.key==="Escape"){ $("lightbox").hidden=true; const fb=$("fbbox"); if(fb) fb.hidden=true }
+document.addEventListener("keydown",e=>{ const tg=/** @type {HTMLElement} */(e.target);if(e.key==="Escape"){ $("lightbox").hidden=true; for(const id of ["fbbox","hilfebox","infobox"]){ const o=$(id); if(o) o.hidden=true } }
   if(e.key==="Enter" && tg.closest && tg.closest(".auth") && tg.tagName==="INPUT"){ e.preventDefault(); const b=document.querySelector('.auth .btn.big'); b&&b.click(); return }
   if(e.key==="Enter" && Z.S.wiz && tg.matches && tg.matches(".wiz input")){ e.preventDefault(); const nx=document.querySelector('.wiz .nav [data-wnav="next"]:not(.ghost)'); nx&&nx.click() }});
 }

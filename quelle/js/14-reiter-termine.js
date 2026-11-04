@@ -1,7 +1,7 @@
 import { Z } from "./zustand.js";
 import { esc, mz, pg } from "./01-grundlagen.js";
 import { kassePK } from "./02-leistungen.js";
-import { MON, TODAY, deD, ic, isoD, parseIso } from "./03-hilfsmittel.js";
+import { MON, TODAY, deD, ic, isoD, parseIso, infoBtn } from "./03-hilfsmittel.js";
 import { beratungRelevant, beratungStatus, besuche, deadlines, gcal, ocal, urg, urgTxt } from "./10-fragebogen-und-fristen.js";
 import { eriCard } from "./22-erinnerungen.js";
 /* ---------- Reiter: Termine ---------- */
@@ -11,8 +11,8 @@ export function viewTermine(){
   return `
   ${eriCard()}
   ${rel?`<section class="panel">
-    <div class="section-title"><h2>Beratungsbesuch</h2><span class="small muted">§ 37 Abs. 3 SGB XI</span></div>
-    <p class="muted small">Wer Pflegegeld bekommt, muss einmal in jedem Kalenderhalbjahr (Januar–Juni und Juli–Dezember) einen Beratungsbesuch durch einen Pflegedienst oder eine anerkannte Beratungsstelle nachweisen. Fehlt der Nachweis, kürzt die Pflegekasse das Pflegegeld, im Wiederholungsfall wird es gestrichen. Der Besuch ist kostenlos, jeder zweite darf per Video sein.</p>
+    <div class="titelzeile"><h2>Beratungsbesuch</h2>${infoBtn("Beratungsbesuch (§ 37 Abs. 3 SGB XI)","Wer Pflegegeld bekommt, muss einmal in jedem Kalenderhalbjahr (Januar bis Juni und Juli bis Dezember) einen Beratungsbesuch durch einen Pflegedienst oder eine anerkannte Beratungsstelle nachweisen.\n\nFehlt der Nachweis, kürzt die Pflegekasse das Pflegegeld, im Wiederholungsfall wird es gestrichen. Der Besuch ist kostenlos, jeder zweite darf per Video sein.")}</div>
+    <p class="small muted">Pflicht, solange Pflegegeld gezahlt wird.</p>
     <div class="halves">${halves.map((h,i)=>{const done=st.inH(h);const cls=done?"done":i===0?"miss":i===1?"open":"";return `<div class="half ${cls}">${done?ic("check"):i===0?ic("alert"):i===1?ic("cal"):""}<b>${h.label}</b><span>${done?"erledigt":i===0?"kein Besuch eingetragen":i===1?`offen · bis ${deD(h.end)}`:`ab ${deD(h.start)}`}</span></div>`}).join("")}</div>
     <div class="grid2">
       <div class="field"><label for="tdienst">Pflegedienst / Beratungsstelle</label><input type="text" id="tdienst" value="${esc(Z.S.termine.dienst)}" placeholder="Name"></div>
@@ -23,12 +23,11 @@ export function viewTermine(){
       <div><button class="btn" type="button" data-act="addbesuch">${ic("check")}Besuch eintragen</button></div>
     </div>
     ${besuche().length?`<p class="small muted">Eingetragene Besuche: ${besuche().map(s=>deD(parseIso(s))).join(", ")}. Den Nachweis kannst du unter Belege als „Nachweis Beratungsbesuch“ ablegen.</p>`:""}
-    <div class="recip"><span><strong>Text für den Pflegedienst</strong></span><span class="small" id="pdtext">${esc(pdText())}</span><span class="btnrow"><button class="btn small soft" type="button" data-act="copypd">Text kopieren</button></span></div>
+    <div class="akk"><details data-akk="pdtext" ${Z.akk&&Z.akk.pdtext?"open":""}><summary>${ic("file")}<span>Text für den Pflegedienst</span>${ic("chev")}</summary><div class="akk-body"><span class="small" id="pdtext">${esc(pdText())}</span><span class="btnrow"><button class="btn small soft" type="button" data-act="copypd">Text kopieren</button></span></div></details></div>
   </section>`:""}
 
   <section style="display:flex;flex-direction:column;gap:10px">
-    <div class="section-title"><h2>Fristen und Erinnerungen</h2></div>
-    <p class="small muted">Trage Erinnerungen mit einem Klick in deinen Kalender ein. Der Kalender meldet sich dann auch, wenn die App geschlossen ist.</p>
+    <div class="titelzeile"><h2>Fristen</h2>${infoBtn("Fristen und Erinnerungen","Trage Fristen mit einem Tippen in deinen Kalender ein. Der Kalender meldet sich dann auch, wenn die App geschlossen ist. Mit Konto kann die App dich zusätzlich per E-Mail erinnern.")}</div>
     ${dl.length?dl.map(dueHTML).join(""):`<p class="muted">Keine Fristen für deine Situation.</p>`}
   </section>
 
