@@ -122,7 +122,9 @@ document.addEventListener("click", e=>{
     case "r-konto": Z.RECHNER=null; if(typeof Z.authMode!=="undefined"){ Z.authMode="register"; Z.authMsg="Lege ein kostenloses Konto an. Danach hilft dir die App Schritt für Schritt beim Antrag." } render(); scrollTop(); break;
     case "au-google": googleLogin(); break;
     case "au-login": case "au-register": case "au-forgot": case "au-newpw": authAction(a); break;
-    case "au-mode": Z.authMode=t.dataset.mode; Z.authMsg=""; render(); break;
+    case "au-mode": Z.authMode=t.dataset.mode; Z.authMsg=""; Z.zeigeAnmeldung=true; render(); break;
+    case "au-zeigen": Z.authMode="login"; Z.authMsg=""; Z.zeigeAnmeldung=true; Z.showMenu=false; render(); scrollTop(); setTimeout(()=>{ const m=$("au-mail"); if(m&&!m.value) try{ m.focus() }catch(e){} },80); break;
+    case "au-start": Z.authMode="login"; Z.authMsg=""; Z.zeigeAnmeldung=false; Z.einladungSpaeter=true; render(); scrollTop(); break;
     case "au-show": { const p=$("au-pw"), p2=$("au-pw2"); if(p){ p.type=p.type==="password"?"text":"password"; if(p2) p2.type=p.type; t.textContent=p.type==="password"?"Zeigen":"Verbergen" } break }
     case "au-newpw-abbruch": Z.RECOVERY=false; Z.authMsg=""; try{ history.replaceState(null,"",location.pathname) }catch(e){} render(); scrollTop(); break;
     case "inst-ja": installieren(); break;

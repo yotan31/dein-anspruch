@@ -110,7 +110,8 @@ function renderHero(){
      ${acct?`<div>${acct}</div>`:""}
    </div>`:"";
   const ideeBtn=`<button type="button" class="ideebtn" data-act="fb-open" title="App verbessern">${ic("idee")}<span class="lbl">App verbessern</span></button>`;
-  const top=`<div class="topbar">${brand}<div class="topright">${ideeBtn}${menuBtn}</div></div>${menu}`;
+  const anmelden=!Z.USER&&!Z.GUEST&&!Z.RECOVERY&&!Z.RECHNER&&Z.loaded&&!Z.zeigeAnmeldung&&(Z.authMode||"login")==="login"&&!Z.authMsg?`<button type="button" class="btn small ghost kopf-anmelden" data-act="au-zeigen">Anmelden</button>`:"";
+  const top=`<div class="topbar">${brand}<div class="topright">${anmelden}${ideeBtn}${menuBtn}</div></div>${menu}`;
   const kopf=`<div class="hrow">${personBtn||'<span></span>'}${save}</div>`;
   if(Z.S.wiz||Z.RECHNER||(Z.S.done&&Z.S.tab!=="ansprueche")){ $("hero").innerHTML=top+(personBtn?`<div class="hsheet slim">${kopf}</div>`:""); return }
   // Anmeldung und Fragebogen erklären sich selbst; oben nur Marke und Menü (bei Konten zusätzlich die Person)

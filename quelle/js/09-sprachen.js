@@ -4,6 +4,19 @@ import { ic } from "./03-hilfsmittel.js";
 const LANGS=[["de","Deutsch"],["tr","Türkçe"],["ru","Русский"],["ar","العربية"],["ti","ትግርኛ"]];
 // Reihenfolge je Eintrag: Türkisch, Russisch, Arabisch, Tigrinya
 const T={
+"Alle Hilfen, die euch bei Pflege zustehen. Mit fertigen Anträgen.":["Bakımda hakkınız olan tüm yardımlar. Hazır başvurularla.","Вся помощь по уходу, которая вам положена. С готовыми заявлениями.","كل المساعدات التي تستحقونها في الرعاية. مع طلبات جاهزة.","ኩሉ ሓገዝ ናይ ክንክን ዝግባእኩም። ምስ ድሉዋት ሕቶታት።"],
+"Pflegegrad einschätzen":["Bakım derecesini tahmin et","Оценить степень ухода","قدّر درجة الرعاية","ደረጃ ክንክን ገምግሙ"],
+"In drei Schritten zu euren Leistungen":["Üç adımda haklarınıza","В три шага к вашим выплатам","في ثلاث خطوات إلى مستحقاتكم","ብሰለስተ ስጉምቲ ናብ መሰላትኩም"],
+"Fragen beantworten":["Soruları yanıtlayın","Ответить на вопросы","أجب عن الأسئلة","ሕቶታት መልሱ"],
+"Ansprüche sehen":["Haklarınızı görün","Увидеть положенное","اطلع على مستحقاتك","መሰላት ርኣዩ"],
+"Antrag abschicken":["Başvuruyu gönderin","Отправить заявление","أرسل الطلب","ሕቶ ስደዱ"],
+"Für alle, die sich um Pflege kümmern":["Bakımla ilgilenen herkes için","Для всех, кто заботится об уходе","لكل من يهتم بالرعاية","ንኹሎም ብክንክን ዝሻቐሉ"],
+"Pflegebedürftige":["Bakıma muhtaç kişiler","Нуждающиеся в уходе","المحتاجون إلى الرعاية","ክንክን ዘድልዮም"],
+"Pflegende Angehörige":["Bakım veren yakınlar","Ухаживающие родственники","الأقارب مقدمو الرعاية","ዝከናኸኑ ቤተሰብ"],
+"Menschen mit Schwerbehinderung":["Ağır engelli kişiler","Люди с тяжёлой инвалидностью","الأشخاص ذوو الإعاقة الشديدة","ሰባት ምስ ከቢድ ስንክልና"],
+"Welcher Pflegegrad kommt in Frage?":["Hangi bakım derecesi mümkün?","Какая степень ухода возможна?","ما درجة الرعاية الممكنة؟","ኣየናይ ደረጃ ክንክን ይኽእል?"],
+"In wenigen Minuten wisst ihr, was euch zusteht.":["Birkaç dakikada neye hakkınız olduğunu öğrenin.","За несколько минут вы узнаете, что вам положено.","في دقائق تعرفون ما تستحقونه.","ኣብ ውሑዳት ደቓይቕ እንታይ ከም ዝግባእኩም ትፈልጡ።"],
+"Zur Startseite":["Ana sayfaya","На главную","إلى الصفحة الرئيسية","ናብ መበገሲ ገጽ"],
 "In Gmail öffnen":["Gmail'de aç","Открыть в Gmail","افتح في Gmail","ብGmail ክፈት"],
 "Per E-Mail? Dann das PDF anhängen.":["E-posta ile mi? O zaman PDF'yi ekleyin.","По e-mail? Тогда приложите PDF.","عبر البريد الإلكتروني؟ أرفق ملف PDF.","ብኢመይል? ሽዑ PDF ኣተሓሕዙ።"],
 "App verbessern":["Uygulamayı geliştir","Улучшить приложение","حسّن التطبيق","ኣፕ ኣመሓይሹ"],
