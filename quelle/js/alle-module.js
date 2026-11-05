@@ -1,5 +1,5 @@
 // Sammelt alle Programmteile an einer Stelle. Daraus entstehen window.__da (Zugriff für Tests und Fehlersuche)
-// und das Paket für die Rechen-Tests (tests/lade-app.mjs). Neue Datei? Hier eintragen.
+// und das Paket für die Rechen-Tests (tests/lade-app.mjs). Neue Datei? Hier eintragen – ein Test prüft, dass keine fehlt.
 import * as m_config_betraege from "./config/betraege.js";
 import * as m_config_stammdaten from "./config/stammdaten.js";
 import * as m_config_supabase from "./config/supabase.js";
@@ -34,7 +34,19 @@ import * as m_services_speicher from "./services/speicher.js";
 import * as m_services_zaehlung from "./services/zaehlung.js";
 import * as m_state_angaben from "./state/angaben.js";
 import * as m_state_zustand from "./state/zustand.js";
-import * as m_ui_aktionen from "./ui/aktionen.js";
+import * as m_ui_aktionen_antrag from "./ui/aktionen/antrag.js";
+import * as m_ui_aktionen_attribute from "./ui/aktionen/attribute.js";
+import * as m_ui_aktionen_belege from "./ui/aktionen/belege.js";
+import * as m_ui_aktionen_bescheid from "./ui/aktionen/bescheid.js";
+import * as m_ui_aktionen_daten from "./ui/aktionen/daten.js";
+import * as m_ui_aktionen_eingaben from "./ui/aktionen/eingaben.js";
+import * as m_ui_aktionen_fragebogen from "./ui/aktionen/fragebogen.js";
+import * as m_ui_aktionen_hilfe from "./ui/aktionen/hilfe.js";
+import * as m_ui_aktionen_konto from "./ui/aktionen/konto.js";
+import * as m_ui_aktionen_personen from "./ui/aktionen/personen.js";
+import * as m_ui_aktionen_rechner from "./ui/aktionen/rechner.js";
+import * as m_ui_aktionen_termine from "./ui/aktionen/termine.js";
+import * as m_ui_bedienung from "./ui/bedienung.js";
 import * as m_ui_components_anbieter from "./ui/components/anbieter.js";
 import * as m_ui_components_bescheid_karte from "./ui/components/bescheid-karte.js";
 import * as m_ui_components_datenbox from "./ui/components/datenbox.js";
@@ -102,7 +114,19 @@ Object.defineProperty(globalThis, "__da", {
       m_services_zaehlung,
       m_state_angaben,
       m_state_zustand,
-      m_ui_aktionen,
+      m_ui_aktionen_antrag,
+      m_ui_aktionen_attribute,
+      m_ui_aktionen_belege,
+      m_ui_aktionen_bescheid,
+      m_ui_aktionen_daten,
+      m_ui_aktionen_eingaben,
+      m_ui_aktionen_fragebogen,
+      m_ui_aktionen_hilfe,
+      m_ui_aktionen_konto,
+      m_ui_aktionen_personen,
+      m_ui_aktionen_rechner,
+      m_ui_aktionen_termine,
+      m_ui_bedienung,
       m_ui_components_anbieter,
       m_ui_components_bescheid_karte,
       m_ui_components_datenbox,

@@ -354,3 +354,15 @@ test("Empfänger-Adresse: Pflege- und Krankenkasse teilen sich eine Anschrift", 
   assert.equal(run("empfAdresse('krankenkasse').ort"), "20457 Hamburg");
   assert.equal(run("empfAdresse('versorgungsamt').ort"), "");
 });
+
+// ---------- Aufbau ----------
+test("alle-module.js führt jede Programmdatei auf (sonst fehlt sie in Tests und Fehlersuche)", async () => {
+  const { readdirSync, readFileSync } = await import("node:fs");
+  const path = await import("node:path");
+  const dir = path.join(path.dirname(new URL(import.meta.url).pathname), "..", "quelle", "js");
+  const dateien = readdirSync(dir, { recursive: true })
+    .map(String)
+    .filter((f) => f.endsWith(".js") && !["alle-module.js", "main.js", "start.js"].includes(f));
+  const index = readFileSync(path.join(dir, "alle-module.js"), "utf8");
+  for (const f of dateien) assert.ok(index.includes(`"./${f.replaceAll("\\", "/")}"`), f);
+});

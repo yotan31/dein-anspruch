@@ -4,7 +4,7 @@
 import { ergaenzeBefreiungsantrag, ergaenzeWiderspruch, verbindeAssistenten } from "./logic/antraege.js";
 import { ladeSprache } from "./i18n/sprachen.js";
 import { aktiviereSanftesNeuzeichnen } from "./ui/morph.js";
-import { verbindeBedienung } from "./ui/aktionen.js";
+import { verbindeBedienung } from "./ui/bedienung.js";
 import { initStore, startSpeicher } from "./services/speicher.js";
 import { startFehlerprotokoll } from "./services/fehlerprotokoll.js";
 import { startInstallation } from "./services/installieren.js";
