@@ -29,8 +29,21 @@ const SUPABASE_VERSION = JSON.parse(readFileSync(path.join(ROOT, "package.json")
 const SUPABASE_URL = `vendor/supabase.js?v=${SUPABASE_VERSION}`;
 const JSPDF_URL = "vendor/jspdf.umd.min.js?v=4.2.1";
 
+// Setzt die jsPDF-Adresse schon beim Einlesen in den Quelltext ein (nicht erst ins fertige app.js),
+// damit die Source Map stimmt und Fehlermeldungen auf die richtige Stelle zeigen.
+const setzeJsPdfAdresse = {
+  name: "jspdf-adresse",
+  setup(b) {
+    b.onLoad({ filter: /services[\\/]pdf\.js$/ }, (args) => ({
+      contents: readFileSync(args.path, "utf8").replace("__JSPDF_URL__", JSPDF_URL),
+      loader: "js",
+    }));
+  },
+};
+
 // 1. Programm
 const app = await esbuild.build({
+  plugins: [setzeJsPdfAdresse],
   entryPoints: [path.join(Q, "js", "main.js")],
   bundle: true,
   format: "iife",
@@ -54,9 +67,9 @@ const map = app.outputFiles.find((f) => f.path.endsWith(".map")).text;
 const version = createHash("sha1")
   .update(js + css + html)
   .digest("hex")
-  .slice(0, 8);
-// Platzhalter im Programm durch die zentral gepflegten Werte ersetzen
-js = js.replace("__APPVERSION__", version).replace("__JSPDF_URL__", JSPDF_URL) + "\n//# sourceMappingURL=app.js.map\n";
+  .slice(0, "__APPVERSION__".length);
+// Gleich lang wie der Platzhalter: So verschiebt das Ersetzen nichts, und die Source Map bleibt gültig
+js = js.replace("__APPVERSION__", version) + "\n//# sourceMappingURL=app.js.map\n";
 writeFileSync(path.join(SITE, "app.js"), js);
 writeFileSync(path.join(SITE, "app.js.map"), map);
 writeFileSync(
