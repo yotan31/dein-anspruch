@@ -25,7 +25,7 @@ export function viewTermine() {
       .map((h, i) => {
         const done = st.inH(h);
         const cls = done ? "done" : i === 0 ? "miss" : i === 1 ? "open" : "";
-        return `<div class="half ${cls}">${done ? ic("check") : i === 0 ? ic("alert") : i === 1 ? ic("cal") : ""}<b>${h.label}</b><span>${done ? "erledigt" : i === 0 ? "kein Besuch eingetragen" : i === 1 ? `offen · bis ${deD(h.end)}` : `ab ${deD(h.start)}`}</span></div>`;
+        return `<div class="half ${cls}">${done ? ic("check") : i === 0 ? ic("alert") : i === 1 ? ic("cal") : ""}<b>${h.label}</b><span>${done ? "erledigt" : i === 0 ? "kein Besuch eingetragen" : i === 1 ? `offen bis ${deD(h.end)}` : `ab ${deD(h.start)}`}</span></div>`;
       })
       .join("")}</div>
     <div class="grid2">

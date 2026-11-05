@@ -55,7 +55,7 @@ export async function sendFeedback() {
 export async function shareApp() {
   const url = "https://yotan31.github.io/dein-anspruch/";
   const text =
-    "Schau mal: Mit „Dein Anspruch“ siehst du kostenlos, welche Pflege-Leistungen euch noch zustehen. Mit fertigen Anträgen und Erinnerung an Fristen.";
+    "Schau mal: Mit „Dein Anspruch“ siehst du kostenlos, welche Pflege-Leistungen dir und deiner Familie noch zustehen. Mit fertigen Anträgen und Erinnerung an Fristen.";
   if (navigator.share) {
     try {
       await navigator.share({ title: "Dein Anspruch", text, url });

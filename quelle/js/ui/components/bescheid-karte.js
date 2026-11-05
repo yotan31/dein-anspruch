@@ -19,7 +19,7 @@ export function bescheidCard() {
   const lohnt = (i.knapp || i.abgelehnt) && i.offen;
   return `<section class="panel mini ${lohnt ? "warn" : ""}">
      <div class="mini-head">${ic("file")}<div><h3>Dein Bescheid${Z.S.bescheid.datum ? ` vom ${deD(parseIso(Z.S.bescheid.datum))}` : ""}</h3>
-       <p class="small">${i.g ? `Pflegegrad ${i.g}` : "Kein Pflegegrad"}${i.hasPts ? ` · ${String(Z.S.bescheid.punkte).replace(".", ",")} Punkte` : ""}${i.fehlt != null && i.g < 5 ? ` · noch ${String(i.fehlt.toFixed(1)).replace(".", ",")} Punkte bis Pflegegrad ${i.g + 1}` : ""}</p></div></div>
+       <p class="small">${i.g ? `Pflegegrad ${i.g}` : "Kein Pflegegrad"}${i.hasPts ? `, ${String(Z.S.bescheid.punkte).replace(".", ",")} Punkte` : ""}${i.fehlt != null && i.g < 5 ? `, noch ${String(i.fehlt.toFixed(1)).replace(".", ",")} Punkte bis Pflegegrad ${i.g + 1}` : ""}</p></div></div>
      ${
        lohnt
          ? `<p class="notice">${ic("alert")}<span><strong>Hinweis für einen möglichen Widerspruch:</strong> ${i.abgelehnt ? "Der Antrag wurde abgelehnt." : "Bis zum nächsten Pflegegrad fehlen nur wenige Punkte."} Frist: <strong>${deD(i.frist)}</strong> (${urgTxt(i.frist)}). Ob ein Widerspruch im Einzelfall Erfolg hat, kann nur eine Beratung klären, zum Beispiel der Pflegestützpunkt, ein Sozialverband oder eine Anwältin für Sozialrecht.</span></p>`
@@ -52,7 +52,7 @@ function bescheidForm() {
       <div class="field"><label for="bd-pg">Festgestellter Pflegegrad</label><select id="bd-pg" data-bd="pg"><option value="0" ${d.pg === "0" ? "selected" : ""}>Abgelehnt / keiner</option>${[1, 2, 3, 4, 5].map((n) => `<option value="${n}" ${String(d.pg) === String(n) ? "selected" : ""}>Pflegegrad ${n}</option>`).join("")}</select></div>
       <div class="field"><label for="bd-pt">Gesamtpunkte (im Gutachten)</label><input type="text" inputmode="decimal" id="bd-pt" data-bd="punkte" value="${esc(d.punkte || "")}" placeholder="z. B. 44,25"></div>
       <div class="field"><label for="bd-dat">Datum des Bescheids</label><input type="date" id="bd-dat" data-bd="datum" value="${esc(d.datum || "")}"></div>
-      <div class="field"><label for="bd-ein">Wann kam er bei euch an?</label><input type="date" id="bd-ein" data-bd="eingang" value="${esc(d.eingang || isoD(TODAY()))}"></div>
+      <div class="field"><label for="bd-ein">Wann kam er bei dir an?</label><input type="date" id="bd-ein" data-bd="eingang" value="${esc(d.eingang || isoD(TODAY()))}"></div>
     </div>
     <p class="small muted">Die Punktzahl steht im Gutachten des Medizinischen Dienstes, meist als „Gesamtpunkte“. Fehlt das Gutachten, darfst du es bei der Pflegekasse anfordern.</p>
     <div class="nav"><button class="btn ghost" type="button" data-act="bes-cancel">Abbrechen</button><button class="btn" type="button" data-act="bes-save" ${Z.ocrBusy ? "disabled" : ""}>Speichern</button></div>

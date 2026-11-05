@@ -10,7 +10,7 @@ export const LANGS = [
 
 // Reihenfolge je Eintrag: Türkisch, Russisch, Arabisch, Tigrinya
 export const T = {
-  "Alle Hilfen, die euch bei Pflege zustehen. Mit fertigen Anträgen.": [
+  "Alle Hilfen, die dir und deiner Familie bei Pflege zustehen. Mit fertigen Anträgen.": [
     "Bakımda hakkınız olan tüm yardımlar. Hazır başvurularla.",
     "Вся помощь по уходу, которая вам положена. С готовыми заявлениями.",
     "كل المساعدات التي تستحقونها في الرعاية. مع طلبات جاهزة.",
@@ -22,7 +22,7 @@ export const T = {
     "قدّر درجة الرعاية",
     "ደረጃ ክንክን ገምግሙ",
   ],
-  "In drei Schritten zu euren Leistungen": [
+  "In drei Schritten zu deinen Leistungen": [
     "Üç adımda haklarınıza",
     "В три шага к вашим выплатам",
     "في ثلاث خطوات إلى مستحقاتكم",
@@ -51,7 +51,7 @@ export const T = {
     "ما درجة الرعاية الممكنة؟",
     "ኣየናይ ደረጃ ክንክን ይኽእል?",
   ],
-  "In wenigen Minuten wisst ihr, was euch zusteht.": [
+  "In wenigen Minuten weißt du, was dir zusteht.": [
     "Birkaç dakikada neye hakkınız olduğunu öğrenin.",
     "За несколько минут вы узнаете, что вам положено.",
     "في دقائق تعرفون ما تستحقونه.",
@@ -77,7 +77,7 @@ export const T = {
     "أو مباشرة: ماذا تريد أن تطلب؟",
     "ወይ ብቐጥታ: እንታይ ክትሓትቱ ትደልዩ?",
   ],
-  "Noch Fragen?": ["Sorularınız mı var?", "Остались вопросы?", "هل لديك أسئلة؟", "ሕቶታት ኣለኩም?"],
+  "Häufige Fragen": ["Sık sorulan sorular", "Частые вопросы", "الأسئلة الشائعة", "ብተደጋጋሚ ዝሕተቱ ሕቶታት"],
   "Hilfe und häufige Fragen": [
     "Yardım ve sık sorulan sorular",
     "Помощь и частые вопросы",
@@ -219,8 +219,7 @@ export const T = {
   Speichern: ["Kaydet", "Сохранить", "حفظ", "ኣቐምጥ"],
   Abbrechen: ["İptal", "Отмена", "إلغاء", "ሰርዝ"],
   Schließen: ["Kapat", "Закрыть", "إغلاق", "ዕጸው"],
-  "← Schließen": ["← Kapat", "← Закрыть", "← إغلاق", "← ዕጸው"],
-  "← Zur Übersicht": ["← Genel bakış", "← К обзору", "← إلى النظرة العامة", "← ናብ ሓፈሻዊ"],
+  "Zur Übersicht": ["Genel bakış", "К обзору", "إلى النظرة العامة", "ናብ ሓፈሻዊ"],
   "Ergebnis anzeigen": ["Sonucu göster", "Показать результат", "عرض النتيجة", "ውጽኢት ኣርኢ"],
   "Pflegegrad und Wohnsituation": [
     "Bakım derecesi ve yaşam durumu",
@@ -275,11 +274,11 @@ export const T = {
   Nein: ["Hayır", "Нет", "لا", "ኣይፋል"],
   "Weiß nicht": ["Bilmiyorum", "Не знаю", "لا أعرف", "ኣይፈልጥን"],
   Schwerbehinderung: ["Ağır engellilik", "Инвалидность", "الإعاقة الشديدة", "ከቢድ ስንክልና"],
-  "Was bekommt ihr schon?": [
-    "Şu an neler alıyorsunuz?",
-    "Что вы уже получаете?",
-    "ماذا تحصلون عليه بالفعل؟",
-    "ሕጂ እንታይ ትረኽቡ?",
+  "Was bekommt die Person schon?": [
+    "Kişi şu an neler alıyor?",
+    "Что человек уже получает?",
+    "ماذا يحصل عليه الشخص بالفعل؟",
+    "እቲ ሰብ ሕጂ እንታይ ይረኽብ?",
   ],
   "Was bekommst du schon?": [
     "Şu an neler alıyorsunuz?",

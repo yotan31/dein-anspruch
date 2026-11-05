@@ -102,7 +102,7 @@ export const VIEWS = {
       (b) => !["beratung", "pg_antrag", "pg_hoch", "sb_antrag", "sb_neu", "hzp", "pug"].includes(b.k),
     );
     return `<section class="panel">${stepper()}
-   <h2>Was ${Z.S.rolle === "angehoerig" ? "bekommt ihr" : "bekommst du"} schon?</h2>
+   <h2>Was ${Z.S.rolle === "angehoerig" ? "bekommt die Person" : "bekommst du"} schon?</h2>
    <p class="muted">Kreuze an, was bereits genutzt wird. Alles andere zeigen wir als offenen Anspruch.</p>
    ${list.length ? `<div class="choices">${list.map((b) => choice("genutzt", b.k, b.t, b.p, "checkbox", !!Z.S.genutzt[b.k])).join("")}</div>` : `<p class="notice info">${ic("info")}<span>Für diese Situation gibt es noch keine laufenden Leistungen.</span></p>`}
    ${nav(true)}

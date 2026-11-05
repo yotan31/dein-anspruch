@@ -80,7 +80,7 @@ export function viewWizard() {
   Z.S.wiz.i = i;
   const step = list[i],
     nQ = list.length - 2;
-  const top = `<div class="wiztop"><button type="button" class="btn small ghost" data-wnav="close">← Zur Übersicht</button><span class="small muted">${esc(b.t)}</span></div>`;
+  const top = `<div class="wiztop"><button type="button" class="btn small ghost" data-wnav="close">Zur Übersicht</button><span class="small muted">${esc(b.t)}</span></div>`;
   if (step.type === "summary") {
     const qs = list.slice(0, -2);
     const missing = qs.filter((q) => !showVal(q)).length;
@@ -124,7 +124,7 @@ function vhpSummary() {
      ${c.pflege ? `<div><span>Ersatzpflege${c.gekappt ? " (auf Höchstbetrag gekürzt)" : ""}</span><b>${eur(c.pflege, 2)}</b></div>` : ""}
      ${c.fahrt ? `<div><span>Fahrtkosten (${eur(KM_SATZ, 2)} pro km)</span><b>${eur(c.fahrt, 2)}</b></div>` : ""}
      ${c.verd ? `<div><span>Verdienstausfall</span><b>${eur(c.verd, 2)}</b></div>` : ""}
-     <div class="tot"><span>Voraussichtlich bekommt ihr</span><b>${c.total ? eur(c.total, 2) : "–"}</b></div></div>
+     <div class="tot"><span>Voraussichtliche Erstattung</span><b>${c.total ? eur(c.total, 2) : "–"}</b></div></div>
      <p class="small muted">${v.art === "stunden" ? "Weil es nur stundenweise war, läuft das Pflegegeld ungekürzt weiter." : "In dieser Zeit gibt es das halbe Pflegegeld (am ersten und letzten Tag das volle)."}</p>`;
 }
 
@@ -135,7 +135,7 @@ function viewDone(b) {
     st = Z.S.status[b.k] || "offen";
   const priv = b.k === "jahresbetrag" && ["angehoerig", "privat"].includes(Z.S.vhp.ersatz);
   return `<section class="panel wiz">
-    <div class="wiztop"><button type="button" class="btn small ghost" data-wnav="back">← Angaben ändern</button><button type="button" class="btn small ghost" data-wnav="close">Zur Übersicht</button></div>
+    <div class="wiztop"><button type="button" class="btn small ghost" data-wnav="back">Angaben ändern</button><button type="button" class="btn small ghost" data-wnav="close">Zur Übersicht</button></div>
     <h2 class="wq">${ic("check")} Dein Antrag ist fertig</h2>
     <div class="btnrow big">
       <button class="btn" type="button" data-pdf="${b.k}">${ic("down")}Als PDF speichern</button>

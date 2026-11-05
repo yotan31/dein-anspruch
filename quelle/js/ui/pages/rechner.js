@@ -33,7 +33,7 @@ export function viewRechner() {
       [6, "Alltag und Kontakte", 15, e.gew[6]],
     ];
     return `<section class="panel wiz">
-      <div class="wiztop"><button type="button" class="btn small ghost" data-act="r-close">← Schließen</button><span class="small muted">Pflegegrad-Rechner</span></div>
+      <div class="wiztop"><button type="button" class="btn small ghost" data-act="r-close">Schließen</button><span class="small muted">Pflegegrad-Rechner</span></div>
       <h2 class="wq">${e.grad ? `Voraussichtlich Pflegegrad ${e.grad}` : "Voraussichtlich noch kein Pflegegrad"}</h2>
       <p class="whelp">${ic("info")}<span>Geschätzt ${String(e.summe.toFixed(1)).replace(".", ",")} von 100 Punkten.${next ? ` Ab ${String(next).replace(".", ",")} Punkten gäbe es Pflegegrad ${e.grad + 1}.` : ""} Das ist eine Schätzung. Die Entscheidung trifft der Medizinische Dienst bei einem Hausbesuch.</span></p>
       <div class="rbars">${bars.map(([k, l, mx, v]) => `<div><span>${l}</span><div class="track"><i style="width:${Math.round((v / mx) * 100)}%"></i></div><b>${String(v).replace(".", ",")}</b></div>`).join("")}</div>
@@ -51,7 +51,7 @@ export function viewRechner() {
   }
   const q = RQ[R.i];
   return `<section class="panel wiz">
-    <div class="wiztop"><button type="button" class="btn small ghost" data-act="r-close">← Schließen</button><span class="small muted">Pflegegrad-Rechner · ${MOD[q.m].n}</span></div>
+    <div class="wiztop"><button type="button" class="btn small ghost" data-act="r-close">Schließen</button><span class="small muted">${MOD[q.m].n}</span></div>
     ${bar(R.i + 1, n, `Frage ${R.i + 1} von ${n}`)}
     ${R.i === 0 ? `<p class="small muted">Beantworte die Fragen so, wie es an einem normalen Tag ist, nicht an einem besonders guten.</p>` : ""}
     <h2 class="wq">${esc(q.q)}</h2>

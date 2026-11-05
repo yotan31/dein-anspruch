@@ -423,7 +423,7 @@ export const B = [
     // Text passend zur Lage: ab Pflegegrad 4 oder mit Merkzeichen gilt die Fahrt als genehmigt, bei Pflegegrad 3 nur auf Antrag
     short: () =>
       fahrtGenehmigt()
-        ? "Taxi- oder Mietwagenfahrten zu ambulanten Arztterminen gelten bei euch als genehmigt. Es reicht die ärztliche Verordnung."
+        ? "Mit Pflegegrad 4 oder 5 oder den Merkzeichen aG, Bl oder H gelten Taxi- oder Mietwagenfahrten zu ambulanten Arztterminen als genehmigt. Es reicht die ärztliche Verordnung."
         : "Bei Pflegegrad 3 übernimmt die Krankenkasse Fahrten zu ambulanten Arztterminen, wenn die Mobilität dauerhaft eingeschränkt ist. Dafür vorher die Genehmigung beantragen.",
     get steps() {
       return [

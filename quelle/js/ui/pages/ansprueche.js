@@ -119,6 +119,6 @@ function detailHTML(b) {
       <label class="gen" for="gn-${b.k}"><input type="checkbox" id="gn-${b.k}" data-gen="${b.k}" ${Z.S.genutzt[b.k] ? "checked" : ""}><span>Bekommen wir schon</span></label>
       <button type="button" class="linkbtn zu" data-open="${b.k}">Zuklappen</button>
     </div>
-    <p class="para">${esc(b.area)} · Rechtsgrundlage ${esc(b.p)}</p>
+    <p class="para">Rechtsgrundlage: ${esc(b.p)} (Bereich ${esc(b.area)})</p>
   </div>`;
 }

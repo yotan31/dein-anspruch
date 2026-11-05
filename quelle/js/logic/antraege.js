@@ -796,7 +796,7 @@ export function ergaenzeWiderspruch() {
       {
         k: "gutachten",
         type: "choice",
-        label: "Liegt euch das Gutachten vor?",
+        label: "Liegt dir das Gutachten vor?",
         opts: OPT([
           { v: "ja", t: "Ja" },
           { v: "nein", t: "Nein", s: "wir fordern es im Widerspruch mit an" },

@@ -75,7 +75,7 @@ export function viewBelege() {
   </section>
 
   <section class="stapel-12">
-    <div class="section-title"><h3>Abgelegt: ${esc(label)}</h3><span class="small muted">${shown.length} Belege · ${eur(
+    <div class="section-title"><h3>Abgelegt: ${esc(label)}</h3><span class="small muted">${shown.length} Belege, zusammen ${eur(
       shown.reduce((s, b) => s + (Number(b.betrag) || 0), 0),
       2,
     )}</span></div>
@@ -121,7 +121,7 @@ function belegRow(b) {
     : `<span class="thumb">${ic("receipt")}</span>`;
   const d = parseIso(b.datum);
   return `<div class="beleg">${thumb}
-    <div class="min-w-0"><div class="b-t">${esc(b.titel || (KATS[b.kat] || KATS.sonst).t)}</div><div class="b-m">${d ? deD(d) : "ohne Datum"}${b.eingereicht ? ' · <span class="betrag-fett">eingereicht</span>' : ""}</div></div>
+    <div class="min-w-0"><div class="b-t">${esc(b.titel || (KATS[b.kat] || KATS.sonst).t)}</div><div class="b-m">${d ? deD(d) : "ohne Datum"}${b.eingereicht ? ', <span class="betrag-fett">eingereicht</span>' : ""}</div></div>
     <div class="b-v">${b.betrag !== "" && b.betrag != null ? eur(Number(b.betrag), 2) : "–"}</div>
     <div class="b-a">${
       Z.delAsk === b.id

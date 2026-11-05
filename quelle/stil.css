@@ -102,7 +102,10 @@ body {
   position: relative;
 }
 /* Der Inhalt bekommt von Anfang an mindestens eine Bildschirmhöhe, damit der Fußbereich beim Laden nicht nach unten springt (CLS) */
-#main {
+/* Nur solange die App lädt: hält den Fußbereich unten, damit er beim Laden nicht springt (CLS).
+   Danach bestimmt der Inhalt die Höhe, sonst bliebe unter kurzen Seiten eine leere Fläche. */
+#main:empty,
+#main:has(> .laden) {
   min-height: 100vh;
 }
 h1,
@@ -155,7 +158,7 @@ svg.i {
 .menubtn {
   width: 46px;
   height: 46px;
-  border-radius: 10px;
+  border-radius: var(--r-mittel);
   border: 1px solid var(--line);
   background: var(--paper);
   color: var(--ink);
@@ -175,7 +178,7 @@ svg.i {
 .hmenu {
   background: var(--paper);
   border: 1px solid var(--line);
-  border-radius: var(--r);
+  border-radius: var(--r-gross);
   display: flex;
   flex-direction: column;
   position: absolute;
@@ -236,7 +239,7 @@ svg.i {
   display: flex;
   gap: 2px;
   height: 12px;
-  border-radius: 6px;
+  border-radius: var(--r-rund);
   overflow: hidden;
 }
 .hero .track i {
@@ -303,7 +306,7 @@ button.hpost:focus-visible {
   gap: 8px;
   cursor: pointer;
   font-size: 0.95rem;
-  border-radius: 8px;
+  border-radius: var(--r-mittel);
   padding: 8px 12px;
 }
 .halert {
@@ -335,7 +338,7 @@ button.hpost:focus-visible {
 .brand .logo {
   width: 44px;
   height: 44px;
-  border-radius: 12px;
+  border-radius: var(--r-mittel);
   background: #fff;
   flex: none;
 }
@@ -420,7 +423,7 @@ button.stat {
   color: var(--warn) !important;
   font-weight: 700;
   padding: 4px 10px;
-  border-radius: 6px;
+  border-radius: var(--r-mittel);
 }
 .stat.alert svg.i {
   color: var(--warn);
@@ -431,7 +434,7 @@ button.stat {
   gap: 0;
   background: var(--paper);
   border: 1px solid var(--line);
-  border-radius: var(--r);
+  border-radius: var(--r-gross);
   padding: 0;
   overflow: hidden;
   position: sticky;
@@ -463,7 +466,7 @@ button.stat {
 .tabs .badge {
   background: var(--warn);
   color: #fff;
-  border-radius: 999px;
+  border-radius: var(--r-rund);
   font-size: 0.72rem;
   padding: 0 6px;
   line-height: 1.5;
@@ -480,7 +483,7 @@ button.stat {
 .panel {
   background: var(--paper);
   border: 1px solid var(--line);
-  border-radius: var(--r);
+  border-radius: var(--r-gross);
   padding: 20px;
   display: flex;
   flex-direction: column;
@@ -495,14 +498,14 @@ button.stat {
 .stepper .bar {
   height: 6px;
   background: var(--line);
-  border-radius: 6px;
+  border-radius: var(--r-rund);
   overflow: hidden;
 }
 .stepper .bar i {
   display: block;
   height: 100%;
   background: var(--accent);
-  border-radius: 6px;
+  border-radius: var(--r-rund);
   transition: width 0.3s;
 }
 .stepper .meta {
@@ -539,7 +542,7 @@ button.stat {
   gap: 10px;
   align-items: flex-start;
   border: 1.5px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--r-mittel);
   padding: 11px 13px;
   cursor: pointer;
   background: var(--paper);
@@ -583,7 +586,7 @@ textarea {
   color: var(--ink);
   background: var(--paper);
   border: 1.5px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--r-mittel);
   padding: 9px 11px;
   width: 100%;
   min-width: 0;
@@ -693,7 +696,7 @@ textarea {
 }
 .howto div {
   background: var(--paper-2);
-  border-radius: 12px;
+  border-radius: var(--r-mittel);
   padding: 12px 14px;
   display: flex;
   flex-direction: column;
@@ -712,7 +715,7 @@ textarea {
   cursor: pointer;
   background: var(--paper-2);
   border: 1.5px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--r-mittel);
   padding: 12px 14px;
   display: flex;
   flex-direction: column;
@@ -737,7 +740,7 @@ textarea {
   gap: 12px;
   background: var(--paper);
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--r-mittel);
   padding: 14px;
 }
 .vhp h4 {
@@ -745,7 +748,7 @@ textarea {
 }
 .calc {
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--r-mittel);
   overflow: hidden;
   font-size: 0.93rem;
 }
@@ -769,7 +772,7 @@ textarea {
   display: flex;
   background: var(--paper-2);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--r-mittel);
   padding: 2px;
 }
 .fontsw button {
@@ -781,7 +784,7 @@ textarea {
   padding: 8px 12px;
   min-width: 44px;
   min-height: 40px;
-  border-radius: 6px;
+  border-radius: calc(var(--r-mittel) - 4px); /* innen = außen minus Abstand */
   cursor: pointer;
   font-size: 0.9rem;
 }
@@ -824,7 +827,7 @@ h2.wq label {
   display: flex;
   gap: 10px;
   align-items: flex-start;
-  border-radius: 12px;
+  border-radius: var(--r-mittel);
 }
 .whelp svg {
   margin-top: 3px;
@@ -871,7 +874,7 @@ dl.sum {
   display: flex;
   flex-direction: column;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--r-mittel);
   overflow: hidden;
 }
 dl.sum > div {
@@ -908,7 +911,7 @@ dl.sum .open {
   background: #fff;
   color: #1a1a1a;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--r-mittel);
   padding: 22px;
   font-family: var(--f-display);
   font-size: 1rem;
@@ -993,7 +996,7 @@ ol.howsend {
 }
 .rbars .track {
   height: 10px;
-  border-radius: 10px;
+  border-radius: var(--r-rund);
   background: var(--line);
   overflow: hidden;
 }
@@ -1011,7 +1014,7 @@ ol.howsend {
   background: var(--paper-2);
   color: var(--ink);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--r-mittel);
   padding: 4px 10px;
   font-size: 0.82rem;
   font-weight: 700;
@@ -1088,7 +1091,7 @@ ol.howsend {
   border: 1.5px solid var(--line);
   background: var(--paper);
   color: var(--ink);
-  border-radius: 999px;
+  border-radius: var(--r-rund);
   padding: 8px 16px;
   font: inherit;
   font-size: 0.92rem;
@@ -1107,7 +1110,7 @@ ol.howsend {
   gap: 0;
   background: var(--paper);
   border: 1px solid var(--line);
-  border-radius: var(--r);
+  border-radius: var(--r-gross);
   overflow: hidden;
   box-shadow: var(--shadow);
 }
@@ -1187,7 +1190,7 @@ ol.howsend {
 .ico {
   width: 38px;
   height: 38px;
-  border-radius: 10px;
+  border-radius: var(--r-mittel);
   display: grid;
   place-items: center;
   background: var(--accent-soft);
@@ -1212,7 +1215,7 @@ ol.howsend {
   background: var(--accent-soft);
   font-weight: 700;
   font-size: 0.8rem !important;
-  border-radius: 999px;
+  border-radius: var(--r-rund);
   padding: 2px 10px;
   justify-self: end;
 }
@@ -1235,7 +1238,7 @@ ol.howsend {
 }
 .tag {
   font-size: 0.8rem;
-  border-radius: 999px;
+  border-radius: var(--r-rund);
   padding: 1px 10px;
   background: var(--paper-2);
   color: var(--muted);
@@ -1328,7 +1331,7 @@ ol.howsend {
 .recip {
   background: var(--paper);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--r-mittel);
   padding: 10px 12px;
   font-size: 0.93rem;
   display: flex;
@@ -1387,7 +1390,7 @@ details[open].used summary svg.i {
   display: block;
   width: 90px;
   height: 8px;
-  border-radius: 8px;
+  border-radius: var(--r-rund);
   background: var(--line);
   overflow: hidden;
 }
@@ -1395,7 +1398,7 @@ details[open].used summary svg.i {
   display: block;
   height: 100%;
   background: var(--money);
-  border-radius: 8px;
+  border-radius: var(--r-rund);
 }
 .endnav {
   align-items: center;
@@ -1421,7 +1424,7 @@ details[open].used summary svg.i {
 }
 .meter .track {
   height: 12px;
-  border-radius: 12px;
+  border-radius: var(--r-rund);
   background: var(--line);
   overflow: hidden;
 }
@@ -1429,7 +1432,7 @@ details[open].used summary svg.i {
   display: block;
   height: 100%;
   background: var(--money);
-  border-radius: 12px;
+  border-radius: var(--r-rund);
 }
 .meter .track i.over {
   background: var(--warn);
@@ -1444,7 +1447,7 @@ details[open].used summary svg.i {
 }
 .drop {
   border: 2px dashed var(--line);
-  border-radius: var(--r);
+  border-radius: var(--r-gross);
   padding: 18px;
   display: flex;
   flex-direction: column;
@@ -1470,7 +1473,7 @@ details[open].used summary svg.i {
 .thumb {
   width: 56px;
   height: 68px;
-  border-radius: 8px;
+  border-radius: var(--r-mittel);
   background: var(--paper-2);
   border: 1px solid var(--line);
   object-fit: cover;
@@ -1519,7 +1522,7 @@ details[open].used summary svg.i {
 }
 .group {
   border: 1px solid var(--line);
-  border-radius: var(--r);
+  border-radius: var(--r-gross);
   background: var(--paper);
   overflow: hidden;
 }
@@ -1573,7 +1576,7 @@ details[open].used summary svg.i {
 .lightbox img {
   max-height: 85vh;
   max-width: 100%;
-  border-radius: 8px;
+  border-radius: var(--r-mittel);
 }
 .lightbox button {
   position: absolute;
@@ -1587,14 +1590,14 @@ details[open].used summary svg.i {
   gap: 4px 14px;
   padding: 14px 16px;
   border: 1px solid var(--line);
-  border-radius: var(--r);
+  border-radius: var(--r-gross);
   background: var(--paper);
   box-shadow: var(--shadow);
   align-items: start;
 }
 .due .cal {
   width: 54px;
-  border-radius: 10px;
+  border-radius: var(--r-mittel);
   overflow: hidden;
   text-align: center;
   border: 1px solid var(--line);
@@ -1637,7 +1640,7 @@ details[open].used summary svg.i {
 }
 .pill {
   display: inline-block;
-  border-radius: 999px;
+  border-radius: var(--r-rund);
   padding: 1px 10px;
   font-size: 0.78rem;
   font-weight: 700;
@@ -1663,7 +1666,7 @@ details[open].used summary svg.i {
 }
 .half {
   border: 1.5px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--r-mittel);
   padding: 10px 12px;
   display: flex;
   flex-direction: column;
@@ -1733,7 +1736,7 @@ details[open].used summary svg.i {
   background: var(--ink);
   color: var(--bg);
   padding: 10px 18px;
-  border-radius: 10px;
+  border-radius: var(--r-mittel);
   font-size: 0.95rem;
   max-width: calc(100% - 32px);
   z-index: 30;
@@ -1807,7 +1810,7 @@ footer {
   font: inherit;
   padding: 10px;
   border: 1.5px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--r-mittel);
   background: var(--paper);
   color: var(--ink);
   box-sizing: border-box;
@@ -1835,7 +1838,7 @@ footer {
   grid-template-columns: 96px 1fr;
   gap: 12px;
   border: 1.5px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--r-mittel);
   padding: 12px;
   background: var(--paper);
   transition:
@@ -1861,7 +1864,7 @@ footer {
 .bulkitem .bthumb {
   width: 96px;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--r-mittel);
   background: #fff;
   align-self: start;
 }
@@ -2012,7 +2015,7 @@ label {
     padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
     background: var(--paper);
     border-top: 1px solid var(--line);
-    border-radius: 0 0 var(--r) var(--r);
+    border-radius: 0 0 var(--r-gross) var(--r-gross);
   }
   .nav.go:last-child {
     margin-bottom: -22px;
@@ -2055,7 +2058,7 @@ label {
   font: inherit;
   font-size: 0.85rem;
   font-weight: 700;
-  border-radius: 8px;
+  border-radius: var(--r-mittel);
   padding: 4px 12px;
   cursor: pointer;
 }
@@ -2138,7 +2141,7 @@ label {
   justify-content: space-between;
   gap: 10px;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--r-mittel);
   padding: 8px 12px;
   flex-wrap: wrap;
 }
@@ -2172,7 +2175,7 @@ hr.sep {
   gap: 16px;
   padding: 22px 18px;
   margin-inline: -6px;
-  border-radius: 22px;
+  border-radius: var(--r-gross);
   background: linear-gradient(160deg, var(--tint) 0%, var(--accent-soft) 55%, var(--money-soft) 100%);
 }
 .landing .bild {
@@ -2205,7 +2208,7 @@ hr.sep {
   width: 40px;
   height: 40px;
   padding: 9px;
-  border-radius: 12px;
+  border-radius: var(--r-mittel);
   background: var(--accent-soft);
   color: var(--accent);
 }
@@ -2245,7 +2248,7 @@ hr.sep {
   gap: 12px 18px;
   background: var(--paper);
   border: 1px solid var(--line);
-  border-radius: var(--r);
+  border-radius: var(--r-gross);
 }
 .vertrauen li {
   display: flex;
@@ -2312,7 +2315,7 @@ hr.sep {
 }
 .fragen {
   background: var(--tint);
-  border-radius: 22px;
+  border-radius: var(--r-gross);
   padding: 22px 18px;
   margin-inline: -6px;
 }
@@ -2330,7 +2333,7 @@ hr.sep {
   cursor: pointer;
   min-width: 0;
   background: var(--paper);
-  border-radius: var(--r);
+  border-radius: var(--r-gross);
   padding: 14px;
   display: flex;
   flex-direction: column;
@@ -2345,13 +2348,10 @@ hr.sep {
   outline-offset: 2px;
 }
 .kachel > svg.i {
-  width: 36px;
-  height: 36px;
-  padding: 8px;
-  border-radius: 10px;
-  background: var(--accent-soft);
+  width: 24px;
+  height: 24px;
   color: var(--accent);
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 .kachel strong {
   font-size: 1rem;
@@ -2371,7 +2371,7 @@ hr.sep {
   flex-direction: column;
   background: var(--paper);
   border: 1px solid var(--line);
-  border-radius: var(--r);
+  border-radius: var(--r-gross);
 }
 .faq details {
   border-bottom: 1px solid var(--line);
@@ -2513,7 +2513,7 @@ hr.sep {
 .ideebtn {
   height: 46px;
   min-width: 46px;
-  border-radius: 999px;
+  border-radius: var(--r-rund);
   border: 1.5px solid #f2c14e;
   color: #7a5200;
   display: inline-flex;
@@ -2599,7 +2599,7 @@ hr.sep {
 }
 .akk {
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--r-mittel);
   background: var(--paper);
   overflow: hidden;
 }
@@ -2721,7 +2721,10 @@ hr.sep {
   --muted: #6c6c70;
   --line: #e2e2e7;
   --tint: #eef6f9;
-  --r: 14px;
+  /* Drei Rundungen, nach Größe: Flächen und Fenster, Bedienelemente, Balken und Chips */
+  --r-gross: 16px;
+  --r-mittel: 12px;
+  --r-rund: 999px;
   --shadow: none;
 }
 @media (prefers-color-scheme: dark) {
@@ -2787,7 +2790,7 @@ h3 {
   border: 0;
 }
 .hsheet {
-  border-radius: var(--r);
+  border-radius: var(--r-gross);
 }
 .kachel {
   box-sizing: border-box;
@@ -2824,7 +2827,7 @@ h3 {
 .item .ico {
   width: 34px;
   height: 34px;
-  border-radius: 9px;
+  border-radius: var(--r-mittel);
   background: var(--accent);
   color: #fff;
 }
@@ -2879,11 +2882,11 @@ h3 {
 }
 /* Knöpfe: abgerundete Rechtecke wie bei iOS */
 .btn {
-  border-radius: 12px;
+  border-radius: var(--r-mittel);
   font-weight: 600;
 }
 .btn.big {
-  border-radius: 14px;
+  border-radius: var(--r-mittel);
   box-shadow: none;
 }
 .btn.ghost {
@@ -2926,7 +2929,7 @@ h3 {
 }
 /* Hinweise ruhiger */
 .notice {
-  border-radius: 12px;
+  border-radius: var(--r-mittel);
 }
 .whelp {
   background: transparent;
@@ -2980,7 +2983,7 @@ h3 {
   padding: 0;
 }
 .overlay .sheet {
-  border-radius: 16px 16px 0 0;
+  border-radius: var(--r-gross) var(--r-gross) 0 0;
   max-width: 640px;
   padding: 10px 20px calc(20px + env(safe-area-inset-bottom, 0px));
   margin: 0;
@@ -2992,7 +2995,7 @@ h3 {
     padding: 16px;
   }
   .overlay .sheet {
-    border-radius: 16px;
+    border-radius: var(--r-gross);
   }
 }
 @media (prefers-reduced-motion: no-preference) {
@@ -3010,7 +3013,7 @@ h3 {
   display: block;
   width: 38px;
   height: 5px;
-  border-radius: 3px;
+  border-radius: var(--r-rund);
   background: var(--line);
   margin: 0 auto 6px;
 }
@@ -3083,13 +3086,6 @@ body {
   line-height: 1.15;
   max-width: 22ch;
 }
-.lp-kicker {
-  color: var(--accent);
-  font-weight: 700;
-  font-size: 0.9rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
 /* Kopfbereich */
 .lp-hero {
   background: linear-gradient(180deg, var(--tint) 0%, var(--bg) 100%);
@@ -3102,21 +3098,88 @@ body {
   flex-direction: column;
   gap: 18px;
 }
-.lp-eyebrow {
-  display: inline-flex;
+/* Fertiger Antrag als Brief (Startseite): Papier mit Falz- und Lochmarke wie ein echter Geschäftsbrief.
+   Bleibt auch im dunklen Modus weiß, weil Papier nun einmal weiß ist. Schrift wie im erzeugten PDF. */
+.lp-brief {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 6px;
-  align-self: flex-start;
-  background: var(--paper);
-  color: var(--accent);
-  font-weight: 700;
-  font-size: 0.85rem;
-  padding: 6px 12px;
-  border-radius: 999px;
+  gap: 16px;
 }
-.lp-eyebrow svg.i {
-  width: 16px;
-  height: 16px;
+.brief {
+  position: relative;
+  width: min(360px, 100%);
+  box-sizing: border-box;
+  padding: 26px 24px 30px 30px;
+  background: #fff;
+  color: #1d1d1f;
+  border-radius: 3px;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  transform: rotate(-1.2deg);
+  box-shadow:
+    7px 7px 0 -1px #f4f6f8,
+    7px 7px 0 0 rgba(15, 40, 60, 0.14),
+    0 18px 40px rgba(15, 40, 60, 0.16);
+  /* Der Brief läuft unten aus: Es ist ein Ausschnitt, kein ganzer Antrag */
+  -webkit-mask-image: linear-gradient(#000 78%, transparent);
+  mask-image: linear-gradient(#000 78%, transparent);
+}
+.brief::before,
+.brief::after {
+  content: "";
+  position: absolute;
+  left: 9px;
+  width: 9px;
+  height: 1px;
+  background: #b9c0c8;
+}
+.brief::before {
+  top: 35%;
+}
+.brief::after {
+  top: 50%;
+}
+.brief p {
+  margin: 0 0 10px;
+}
+.brief-absender {
+  font-size: 0.62rem;
+  color: #5f6670;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.brief-an {
+  min-height: 4.5em;
+}
+.brief-datum {
+  text-align: right;
+}
+.brief .brief-betreff {
+  font-weight: 700;
+  margin-bottom: 14px;
+}
+.lp-brief figcaption {
+  width: min(360px, 100%);
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+.lp-brief figcaption svg.i {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  color: var(--money);
+  stroke-width: 2.6;
+}
+.lp-brief figcaption b {
+  color: var(--money);
+  white-space: nowrap;
 }
 .lp-hero h1 {
   font-size: clamp(2rem, 9vw, 3.3rem);
@@ -3159,129 +3222,25 @@ body {
   color: var(--accent);
 }
 /* Vorschau der App */
-.lp-vorschau {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-}
-.lp-phone {
-  width: min(330px, 100%);
-  background: var(--bg);
-  border-radius: 34px;
-  padding: 14px;
-  border: 8px solid #1c1c1e;
-  box-shadow: 0 24px 60px rgba(14, 60, 80, 0.22);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.lp-phone-kopf {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 2px 4px 4px;
-  font-size: 0.95rem;
-}
-.lp-phone-kopf img {
-  border-radius: 8px;
-  background: #fff;
-}
-.lp-karte {
-  background: var(--paper);
-  border-radius: 16px;
-  padding: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.lp-k-label {
-  font-size: 0.78rem;
-  color: var(--muted);
-}
-.lp-summe {
-  font-size: 2.1rem;
-  font-weight: 800;
-  color: var(--money);
-  letter-spacing: -0.03em;
-  line-height: 1;
-}
-.lp-track {
-  display: flex;
-  gap: 2px;
-  height: 8px;
-  border-radius: 4px;
-  overflow: hidden;
-  margin: 6px 0 2px;
-}
-.lp-zeile {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  font-size: 0.8rem;
-  padding: 5px 0;
-  border-top: 1px solid var(--line);
-}
-.lp-zeile b {
-  color: var(--money);
-}
-.lp-fertig {
-  flex-direction: row;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-}
-.lp-fertig > svg.i {
-  width: 30px;
-  height: 30px;
-  padding: 6px;
-  border-radius: 8px;
-  background: var(--accent);
-  color: #fff;
-}
-.lp-fertig > span:not(.lp-haken) {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  font-size: 0.85rem;
-}
-.lp-fertig small {
-  color: var(--muted);
-  font-size: 0.75rem;
-}
-.lp-haken svg.i {
-  width: 22px;
-  height: 22px;
-  color: var(--money);
-  stroke-width: 2.6;
-}
-.lp-bsp {
-  font-size: 0.8rem;
-  color: var(--muted);
-}
 /* Vertrauensleiste */
 .lp-trust {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  gap: 18px 16px;
   margin-top: -12px;
 }
 .lp-trust > div {
-  background: var(--paper);
-  border-radius: 16px;
-  padding: 14px;
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  gap: 10px;
+  align-items: flex-start;
   font-size: 0.88rem;
   color: var(--muted);
 }
 .lp-trust > div > svg.i {
-  width: 34px;
-  height: 34px;
-  padding: 7px;
-  border-radius: 10px;
-  background: var(--accent-soft);
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin-top: 1px;
   color: var(--accent);
 }
 .lp-trust span {
@@ -3296,25 +3255,38 @@ body {
 /* Schritte */
 .lp-schritte {
   list-style: none;
-  margin: 6px 0 0;
+  margin: 10px 0 0;
   padding: 0;
   display: grid;
-  gap: 12px;
+  max-width: 34rem;
 }
+/* Echte Abfolge: Nummern auf einer Linie, die die Schritte verbindet (statt drei gleicher Karten) */
 .lp-schritt {
-  background: var(--paper);
-  border-radius: 18px;
-  padding: 20px;
+  position: relative;
   display: grid;
-  grid-template-columns: auto 1fr;
-  grid-template-areas: "nr ico" "t t" "u u";
-  gap: 10px 12px;
-  align-items: center;
+  grid-template-columns: 36px 1fr;
+  column-gap: 16px;
+  row-gap: 4px;
+  padding-bottom: 28px;
+}
+.lp-schritt:last-child {
+  padding-bottom: 0;
+}
+.lp-schritt:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  left: 17px;
+  top: 40px;
+  bottom: 4px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+  opacity: 0.3;
 }
 .lp-nr {
-  grid-area: nr;
-  width: 34px;
-  height: 34px;
+  grid-row: span 2;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   background: var(--accent);
   color: #fff;
@@ -3322,20 +3294,13 @@ body {
   place-items: center;
   font-weight: 800;
 }
-.lp-schritt > svg.i {
-  grid-area: ico;
-  justify-self: end;
-  width: 28px;
-  height: 28px;
-  color: var(--accent);
-  opacity: 0.8;
-}
 .lp-schritt strong {
-  grid-area: t;
+  grid-column: 2;
   font-size: 1.12rem;
+  padding-top: 6px;
 }
 .lp-schritt > span:last-child {
-  grid-area: u;
+  grid-column: 2;
   color: var(--muted);
   font-size: 0.97rem;
 }
@@ -3343,8 +3308,7 @@ body {
 .lp-grau {
   background: var(--paper);
 }
-.lp-grau .kachel,
-.lp-grau .lp-fuer {
+.lp-grau .kachel {
   background: var(--bg);
 }
 .lp-fuer-liste {
@@ -3353,20 +3317,23 @@ body {
   margin-top: 6px;
 }
 .lp-fuer {
-  background: var(--bg);
-  border-radius: 18px;
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  border-top: 1px solid var(--line);
+  padding-top: 18px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px 12px;
+  align-items: center;
+}
+.lp-fuer ul {
+  grid-column: 1 / -1;
 }
 .lp-fuer > svg.i {
-  width: 40px;
-  height: 40px;
-  padding: 9px;
-  border-radius: 12px;
-  background: var(--accent);
-  color: #fff;
+  width: 28px;
+  height: 28px;
+  color: var(--accent);
+}
+.lp-fuer h3 {
+  margin: 0;
 }
 .lp-fuer ul {
   list-style: none;
@@ -3391,8 +3358,8 @@ body {
 }
 /* Rechner */
 .lp-rechner {
-  background: linear-gradient(135deg, var(--accent-soft), var(--money-soft));
-  border-radius: 22px;
+  background: var(--accent-soft);
+  border-radius: var(--r-gross);
   padding: 24px;
   display: flex;
   flex-direction: column;
@@ -3404,11 +3371,8 @@ body {
   gap: 10px;
 }
 .lp-rechner > div > svg.i {
-  width: 40px;
-  height: 40px;
-  padding: 9px;
-  border-radius: 12px;
-  background: var(--paper);
+  width: 30px;
+  height: 30px;
   color: var(--accent);
 }
 .lp-rechner h2 {
@@ -3488,6 +3452,29 @@ body {
   .lp-schritte,
   .lp-fuer-liste {
     grid-template-columns: repeat(3, 1fr);
+    max-width: none;
+    column-gap: 28px;
+  }
+  /* nebeneinander: die Linie läuft waagerecht von Nummer zu Nummer */
+  .lp-schritt {
+    grid-template-columns: 1fr;
+    padding-bottom: 0;
+  }
+  .lp-nr {
+    grid-row: auto;
+    margin-bottom: 8px;
+  }
+  .lp-schritt strong,
+  .lp-schritt > span:last-child {
+    grid-column: 1;
+  }
+  .lp-schritt:not(:last-child)::before {
+    left: 48px;
+    right: -16px;
+    top: 17px;
+    bottom: auto;
+    width: auto;
+    height: 2px;
   }
   .lp-sektion {
     padding-block: 64px;
@@ -3502,18 +3489,7 @@ body {
     grid-template-columns: repeat(3, 1fr);
   }
 }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .lp-phone {
-    border-color: #3a3a3c;
-  }
-}
-:root[data-theme="dark"] .lp-phone {
-  border-color: #3a3a3c;
-}
 .brand b {
-  white-space: nowrap;
-}
-.lp-zeile b {
   white-space: nowrap;
 }
 @media (max-width: 520px) {
@@ -3529,6 +3505,19 @@ body {
 .lp-schluss .btn {
   min-width: 260px;
   color: #0e7490;
+}
+
+/* Beträge: Ziffern gleicher Breite, damit Euro-Spalten sauber untereinander stehen und Zahlen beim Ändern nicht springen */
+.hero .figure,
+.hpost b,
+.item .val,
+.calc .tot,
+.mini-num b,
+.betrag-fett,
+.b-m,
+.b-v,
+.lp-brief figcaption b {
+  font-variant-numeric: tabular-nums;
 }
 
 /* ---------- Kleine Layout-Helfer ----------

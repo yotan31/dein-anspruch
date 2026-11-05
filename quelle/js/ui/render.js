@@ -81,7 +81,7 @@ function renderMain() {
   document.documentElement.style.setProperty("--fs", schrift());
   if (!Z.loaded) {
     $("main").innerHTML =
-      `<section class="panel"><p class="muted">Einen Moment, deine Daten werden geladen …</p></section>`;
+      `<section class="panel laden"><p class="muted">Einen Moment, deine Daten werden geladen …</p></section>`;
     return;
   }
   if (Z.RECOVERY) {
