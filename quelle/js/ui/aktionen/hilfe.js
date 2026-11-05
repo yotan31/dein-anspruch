@@ -11,6 +11,12 @@ import { render } from "../render.js";
 export const AKTIONEN_HILFE = {
   menu: (t) => {
     Z.showMenu = !Z.showMenu;
+    Z.showSprache = false;
+    render();
+  },
+  sprache: (t) => {
+    Z.showSprache = !Z.showSprache;
+    Z.showMenu = false;
     render();
   },
   "inst-ja": (t) => {

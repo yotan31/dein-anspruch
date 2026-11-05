@@ -43,6 +43,7 @@ Kostenlose Web-App für Menschen mit Pflegegrad oder Schwerbehinderung und ihre 
 - Programmteile haben beim Laden keine Nebenwirkungen; was beim Start passieren muss, steht in einer Funktion und wird in `start.js` aufgerufen.
 - Neuer Knopf: `data-act="name"` im HTML und ein Eintrag in der passenden Tabelle in `ui/aktionen/`. Doppelte Namen fallen beim Start auf.
 - Neue Datei: in `alle-module.js` ergänzen (der Test meldet es sonst).
+- Übersetzungen stehen in `quelle/js/i18n/uebersetzungen.js` (Schlüssel = deutscher Text, Werte: Türkisch, Russisch, Arabisch, Tigrinya, Englisch). Eine leere Stelle heißt „noch nicht übersetzt“, dann bleibt der deutsche Text. Anträge bleiben immer Deutsch.
 - Aussehen nur in `stil.css`; `style="…"` im JavaScript nur für Werte, die erst beim Zeichnen feststehen (z. B. Balkenbreiten).
 - Keine neuen Abhängigkeiten ohne Absprache. Große Bibliotheken (jsPDF, pdf.js, Texterkennung) werden erst bei Bedarf geladen.
 

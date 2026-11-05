@@ -43,7 +43,7 @@ export function startseite() {
   </section>
 
 
-  <section class="lp-sektion">
+  <section class="lp-sektion" id="so-gehts">
     <h2>In drei Schritten zu deinen Leistungen</h2>
     <ol class="lp-schritte">
       ${schritt(1, "Fragen beantworten", "Ein paar einfache Fragen zu Pflegegrad, Kasse und Wohnsituation.")}
@@ -52,7 +52,7 @@ export function startseite() {
     </ol>
   </section>
 
-  <section class="lp-sektion schnell">
+  <section class="lp-sektion schnell" id="leistungen">
     <h2>Was möchtest du beantragen?</h2>
     <div class="kacheln">${SCHNELL.map(([k, i, t, u]) => `<button type="button" class="kachel" data-act="schnell" data-ziel="${k}">${ic(i)}<strong>${t}</strong><span>${u}</span></button>`).join("")}</div>
   </section>
@@ -66,14 +66,14 @@ export function startseite() {
     </div>
   </section>
 
-  <section class="lp-sektion">
+  <section class="lp-sektion" id="rechner">
     <div class="lp-rechner">
       <div>${ic("form")}<h2>Welcher Pflegegrad kommt in Frage?</h2><p>Der Pflegegrad-Rechner schätzt nach dem Punktesystem der Pflegekasse ein, welcher Pflegegrad möglich ist. Ohne Anmeldung, etwa 5 Minuten.</p></div>
       <button type="button" class="btn big" data-act="r-start">Pflegegrad einschätzen</button>
     </div>
   </section>
 
-  <section class="lp-sektion fragen">
+  <section class="lp-sektion fragen" id="fragen">
     <h2>Häufige Fragen</h2>
     ${faqHTML()}
   </section>

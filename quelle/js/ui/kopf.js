@@ -1,5 +1,5 @@
 // Kopf der App: Überblick mit Summe und Balken, Reiter-Leiste und Schriftgröße.
-import { langSelect } from "../i18n/sprachen.js";
+import { LANGS } from "../i18n/uebersetzungen.js";
 import { deadlines, urg, urgTxt } from "../logic/fristen.js";
 import { sums } from "../logic/leistungen.js";
 import { lsGet } from "../services/lokal.js";
@@ -15,6 +15,26 @@ export function schrift() {
 }
 
 const MENU_ICON = "M4 7h16 M4 12h16 M4 17h16";
+
+/** Sprungziele der Startseite für die Navigation oben (auf dem Handy im Menü) */
+const STARTSEITE_NAV = [
+  ["so-gehts", "So funktioniert's"],
+  ["leistungen", "Leistungen"],
+  ["rechner", "Pflegegrad-Rechner"],
+  ["fragen", "Fragen"],
+];
+
+/** Weltkugel-Knopf mit Sprachauswahl; die Namen stehen in der jeweiligen Sprache, damit jede Person ihre findet */
+function sprachwahl() {
+  const knopf = `<button type="button" class="sprachbtn" data-act="sprache" aria-expanded="${!!Z.showSprache}" aria-controls="sprachwahl" aria-label="Sprache (Language): ${Z.LANG.toUpperCase()}">${ic("globe")}<span class="kurz" aria-hidden="true">${Z.LANG.toUpperCase()}</span></button>`;
+  const liste = Z.showSprache
+    ? `<ul class="sprachwahl" id="sprachwahl" aria-label="Sprache (Language)">${LANGS.map(
+        ([k, n]) =>
+          `<li><button type="button" data-lang="${k}" lang="${k}"${k === "ar" ? ' dir="rtl"' : ""}${k === Z.LANG ? ' aria-current="true"' : ""}>${n}${k === Z.LANG ? ic("check") : ""}</button></li>`,
+      ).join("")}</ul>`
+    : "";
+  return [knopf, liste];
+}
 
 /** Zeichnet den Kopf: Marke, Speicherstand und Überblick mit Summe. */
 export function renderHero() {
@@ -40,17 +60,8 @@ export function renderHero() {
       ? `<button type="button" class="linkbtn" data-act="guest-register">Konto anlegen</button>`
       : "";
   const menuBtn = `<button type="button" class="menubtn" data-act="menu" aria-expanded="${!!Z.showMenu}" aria-controls="hmenu"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="${MENU_ICON}"/></svg><span class="sr">Menü: Sprache, Schriftgröße, Konto</span></button>`;
-  const menu = Z.showMenu
-    ? `<div class="hmenu" id="hmenu">
-     <div><span>Sprache</span>${langSelect()}</div>
-     <div><span>Schriftgröße</span>${fontsw}</div>
-     ${Z.S.done && !Z.S.wiz && !Z.RECHNER ? `<div><button type="button" class="linkbtn" data-act="edit">Angaben ändern</button></div>` : ""}
-     <div><button type="button" class="linkbtn" data-act="hilfe-open">Hilfe und häufige Fragen</button></div>
-     ${acct ? `<div>${acct}</div>` : ""}
-   </div>`
-    : "";
-  const ideeBtn = `<button type="button" class="ideebtn" data-act="fb-open" title="App verbessern">${ic("idee")}<span class="lbl">App verbessern</span></button>`;
-  const anmelden =
+  // Startseite: noch nicht angemeldet und kein anderer Bildschirm offen
+  const aufStartseite =
     !Z.USER &&
     !Z.GUEST &&
     !Z.RECOVERY &&
@@ -58,10 +69,24 @@ export function renderHero() {
     Z.loaded &&
     !Z.zeigeAnmeldung &&
     (Z.authMode || "login") === "login" &&
-    !Z.authMsg
-      ? `<button type="button" class="btn small ghost kopf-anmelden" data-act="au-zeigen">Anmelden</button>`
-      : "";
-  const top = `<div class="topbar">${brand}<div class="topright">${anmelden}${ideeBtn}${menuBtn}</div></div>${menu}`;
+    !Z.authMsg;
+  const menu = Z.showMenu
+    ? `<div class="hmenu" id="hmenu">
+     ${aufStartseite ? `<nav class="menuenav" aria-label="Startseite">${STARTSEITE_NAV.map(([id, t]) => `<a href="#${id}">${t}</a>`).join("")}</nav>` : ""}
+     <div><span>Schriftgröße</span>${fontsw}</div>
+     ${Z.S.done && !Z.S.wiz && !Z.RECHNER ? `<div><button type="button" class="linkbtn" data-act="edit">Angaben ändern</button></div>` : ""}
+     <div><button type="button" class="linkbtn" data-act="hilfe-open">Hilfe und häufige Fragen</button></div>
+     ${acct ? `<div>${acct}</div>` : ""}
+   </div>`
+    : "";
+  const ideeBtn = `<button type="button" class="ideebtn" data-act="fb-open" title="App verbessern">${ic("idee")}<span class="lbl">App verbessern</span></button>`;
+  const navLinks = STARTSEITE_NAV.map(([id, t]) => `<a href="#${id}">${t}</a>`).join("");
+  const nav = aufStartseite ? `<nav class="kopfnav" aria-label="Startseite">${navLinks}</nav>` : "";
+  const anmelden = aufStartseite
+    ? `<button type="button" class="btn small ghost kopf-anmelden" data-act="au-zeigen">Anmelden</button>`
+    : "";
+  const [sprachKnopf, sprachListe] = sprachwahl();
+  const top = `<div class="topbar">${brand}${nav}<div class="topright">${anmelden}${ideeBtn}${sprachKnopf}${menuBtn}</div></div>${menu}${sprachListe}`;
   const kopf = `<div class="hrow">${personBtn || "<span></span>"}${save}</div>`;
   if (Z.S.wiz || Z.RECHNER || (Z.S.done && Z.S.tab !== "ansprueche")) {
     $("hero").innerHTML = top + (personBtn ? `<div class="hsheet slim">${kopf}</div>` : "");
@@ -127,6 +152,6 @@ export function renderTabs() {
   ];
   t.innerHTML = T.map(
     ([k, l, i, b]) =>
-      `<button type="button" role="tab" data-tab="${k}" aria-selected="${Z.S.tab === k}">${ic(i)}<span class="lbl">${l}</span>${b ? `<span class="badge">${b}</span>` : ""}</button>`,
+      `<button type="button" data-tab="${k}"${Z.S.tab === k ? ' aria-current="page"' : ""}>${ic(i)}<span class="lbl">${l}</span>${b ? `<span class="badge">${b}</span>` : ""}</button>`,
   ).join("");
 }

@@ -54,7 +54,7 @@ export function finderHTML(k, mitTitel = true) {
   const L = FINDER[k];
   if (!L) return "";
   const p = plz();
-  return `<div>${mitTitel ? "<h4>In der Nähe finden</h4>" : ""}
+  return `<div>${mitTitel ? '<h3 class="unter">In der Nähe finden</h3>' : ""}
     ${p ? "" : `<div class="field plz-feld"><label for="plz-${k}">Deine Postleitzahl</label><input type="text" inputmode="numeric" id="plz-${k}" data-plz="1" maxlength="5" placeholder="z. B. 70173"></div>`}
     <div class="extlinks">${L.map(([t, q]) => {
       const url = /^https?:/.test(q)

@@ -90,8 +90,12 @@ function schliesseBeiTippDaneben(ziel) {
     ziel.hidden = true;
     return true;
   }
-  if (Z.showMenu && !ziel.closest("#hmenu,[data-act=menu]")) {
+  if (Z.showMenu && (!ziel.closest("#hmenu,[data-act=menu]") || ziel.closest(".menuenav a"))) {
     Z.showMenu = false;
+    render();
+  }
+  if (Z.showSprache && !ziel.closest("#sprachwahl,[data-act=sprache]")) {
+    Z.showSprache = false;
     render();
   }
   return false;
@@ -140,6 +144,10 @@ function beiAufklappen(e) {
 function beiTaste(e) {
   const tg = /** @type {HTMLElement} */ (e.target);
   if (e.key === "Escape") {
+    if (Z.showSprache || Z.showMenu) {
+      Z.showSprache = Z.showMenu = false;
+      render();
+    }
     $("lightbox").hidden = true;
     for (const id of ["fbbox", "hilfebox", "infobox"]) {
       const o = $(id);

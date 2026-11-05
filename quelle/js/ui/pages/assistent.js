@@ -87,7 +87,7 @@ export function viewWizard() {
     return `<section class="panel wiz">${top}${bar(nQ + 1, nQ + 1, "Prüfen")}
       <h2 class="wq">Stimmt alles?</h2>
       <p class="whelp">Tippe auf „Ändern“, wenn etwas nicht passt.${missing ? ` ${missing === 1 ? "Eine Angabe ist" : missing + " Angaben sind"} noch offen. Das ist nicht schlimm: Im Antrag steht dann eine Lücke, die du von Hand ausfüllen kannst.` : ""}</p>
-      <dl class="sum">${qs.map((q, j) => `<div><dt>${esc(lab(q))}</dt><dd>${showVal(q) ? esc(showVal(q)) : '<span class="open">noch offen</span>'}</dd><button type="button" class="linkbtn" data-wnav="goto:${j}">Ändern</button></div>`).join("") || '<p class="muted">Für diesen Antrag brauchen wir keine weiteren Angaben.</p>'}</dl>
+      <dl class="sum">${qs.map((q, j) => `<div><dt>${esc(lab(q))}</dt><dd>${showVal(q) ? esc(showVal(q)) : '<span class="open">noch offen</span>'}</dd><dd class="aendern"><button type="button" class="linkbtn" data-wnav="goto:${j}">Ändern</button></dd></div>`).join("") || '<p class="muted">Für diesen Antrag brauchen wir keine weiteren Angaben.</p>'}</dl>
       ${b.k === "jahresbetrag" ? vhpSummary() : ""}
       <div class="nav big go">${i > 0 ? `<button class="btn ghost" type="button" data-wnav="back">Zurück</button>` : "<span></span>"}<button class="btn" type="button" data-wnav="next">Antrag erstellen</button></div>
     </section>`;

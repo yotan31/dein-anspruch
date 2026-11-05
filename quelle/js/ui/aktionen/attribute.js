@@ -1,6 +1,7 @@
 // Aktionen über eigene data-Attribute (z. B. data-tab="belege", data-open="entlastung"), statt über data-act.
 // Die Reihenfolge der Liste ist die Prüfreihenfolge: Trägt ein Element mehrere Attribute, gewinnt das erste.
 // Aufgerufen von ui/bedienung.js; jede Funktion bekommt den Wert des Attributs und das angetippte Element t.
+import { waehleSprache } from "../../i18n/sprachen.js";
 import { getQ, pruefeAngabe, wizSteps } from "../../logic/antraege.js";
 import { curLetter } from "../../logic/antragstext.js";
 import { selYears } from "../../logic/belege.js";
@@ -134,6 +135,14 @@ export const ATTRIBUT_AKTIONEN = [
     },
   ],
   ["edit", (wert) => editBeleg(wert)],
+  [
+    "lang",
+    (wert) => {
+      waehleSprache(wert);
+      Z.showSprache = false;
+      render();
+    },
+  ],
   ["wopen", (wert) => startWiz(wert)],
   ["fbart", (wert) => openFeedback(wert)],
   ["info", (wert, t) => openInfo(wert, t.dataset.infotext || "")],

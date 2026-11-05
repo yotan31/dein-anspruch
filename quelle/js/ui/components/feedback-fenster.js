@@ -26,7 +26,7 @@ export function openFeedback(art = "idee") {
   d.innerHTML = `<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="fb-h">
     <h3 id="fb-h">${ic("idee")}App verbessern</h3>
     <p class="small muted">Jede Nachricht wird gelesen. Einmal im Monat gehen wir alle Wünsche durch und entscheiden, was als Nächstes verbessert wird. Bitte keine Namen oder Gesundheitsdaten hineinschreiben.</p>
-    <div class="filters" role="radiogroup" aria-label="Art der Rückmeldung">${ARTEN.map(([k, t]) => `<button type="button" class="chip" role="radio" data-fbart="${k}" aria-checked="${art === k}" aria-pressed="${art === k}">${t}</button>`).join("")}</div>
+    <div class="filters" role="radiogroup" aria-label="Art der Rückmeldung">${ARTEN.map(([k, t]) => `<button type="button" class="chip" role="radio" data-fbart="${k}" aria-checked="${art === k}">${t}</button>`).join("")}</div>
     <div class="field"><label for="fb-text">Deine Nachricht</label><textarea id="fb-text" rows="5" maxlength="3000" placeholder="${esc(ph)}">${esc(alt)}</textarea></div>
     <div class="field"><label for="fb-kontakt">E-Mail für Rückfragen (freiwillig)</label><input type="email" id="fb-kontakt" value="${esc((Z.USER && Z.USER.email) || "")}"></div>
     <div class="btnrow"><button class="btn" type="button" data-act="fb-send" data-art="${art}">Senden</button><button class="btn ghost" type="button" data-act="fb-close">Abbrechen</button></div>

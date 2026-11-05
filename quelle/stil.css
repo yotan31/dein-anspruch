@@ -108,6 +108,18 @@ body {
 #main:has(> .laden) {
   min-height: 100vh;
 }
+/* Nur für Bildschirmleser sichtbar (z. B. die Hauptüberschrift jeder Ansicht) */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
 h1,
 h2,
 h3 {
@@ -460,7 +472,7 @@ button.stat {
   gap: 7px;
   min-width: 0;
 }
-.tabs button[aria-selected="true"] {
+.tabs button[aria-current="page"] {
   color: var(--accent);
 }
 .tabs .badge {
@@ -899,7 +911,7 @@ dl.sum dd {
   grid-column: 1;
   overflow-wrap: anywhere;
 }
-dl.sum button {
+dl.sum dd.aendern {
   grid-column: 2;
   grid-row: 1 / span 2;
 }
@@ -1098,7 +1110,8 @@ ol.howsend {
   cursor: pointer;
   min-height: 44px;
 }
-.chip[aria-pressed="true"] {
+.chip[aria-pressed="true"],
+.chip[aria-checked="true"] {
   border-color: var(--ink);
   color: var(--paper);
   background: var(--ink);
@@ -1264,9 +1277,13 @@ ol.howsend {
   display: flex;
   flex-direction: column;
 }
-.detail h4 {
+.detail h3.unter {
   margin: 0 0 6px;
   color: var(--ink);
+  font-family: inherit;
+  font-weight: 700;
+  letter-spacing: normal;
+  line-height: inherit;
 }
 .detail ol,
 .detail ul {
@@ -1986,7 +2003,7 @@ label {
   .tabs button span.lbl {
     font-size: 0.8rem;
   }
-  .tabs button[aria-selected="true"] {
+  .tabs button[aria-current="page"] {
     background: transparent;
     color: var(--accent);
   }
@@ -2574,7 +2591,7 @@ hr.sep {
   gap: 16px;
   padding: 18px 18px 14px;
 }
-.detail h4 {
+.detail h3.unter {
   font-size: 0.95rem;
   margin-bottom: 8px;
 }
@@ -2924,7 +2941,7 @@ h3 {
     backdrop-filter: blur(20px);
   }
 }
-.tabs button[aria-selected="true"] {
+.tabs button[aria-current="page"] {
   border-top-color: transparent !important;
 }
 /* Hinweise ruhiger */
@@ -3427,10 +3444,9 @@ body {
 .brand b {
   white-space: nowrap;
 }
-@media (max-width: 520px) {
-  .wrap:has(.lp) .ideebtn {
-    display: none;
-  }
+/* Startseite: „App verbessern“ nur in der App; hier steht „Feedback geben“ unten, und oben ist Platz für die Navigation */
+.wrap:has(.lp) .ideebtn {
+  display: none;
 }
 .lp-schluss {
   margin-bottom: -16px;
@@ -3452,6 +3468,181 @@ body {
 .b-m,
 .b-v {
   font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Kopfzeile: Sprache, Navigation der Startseite, Handy ----------
+   Am Ende, weil diese Regeln ältere Kopf-Regeln weiter oben gezielt überschreiben. */
+/* Weltkugel: Sprache wählen. Das Kürzel daneben zeigt die aktuelle Sprache auf einen Blick */
+.sprachbtn {
+  height: 46px;
+  min-width: 46px;
+  padding: 0 10px;
+  border-radius: var(--r-mittel);
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+.sprachbtn svg.i {
+  width: 21px;
+  height: 21px;
+}
+.sprachbtn[aria-expanded="true"] {
+  border-color: var(--ink);
+}
+.sprachwahl {
+  list-style: none;
+  margin: 0;
+  padding: 6px 0;
+  position: absolute;
+  top: 56px;
+  right: 0;
+  width: min(240px, 100%);
+  z-index: 25;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--r-gross);
+  box-shadow: 0 12px 32px rgba(10, 20, 32, 0.18);
+}
+.sprachwahl button {
+  all: unset;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  font-size: 1rem;
+  text-align: start;
+}
+.sprachwahl button:focus-visible {
+  outline: 3px solid #f2b134;
+  outline-offset: -3px;
+}
+.sprachwahl button[aria-current="true"] {
+  font-weight: 700;
+}
+.sprachwahl svg.i {
+  width: 18px;
+  height: 18px;
+  color: var(--money);
+  stroke-width: 2.6;
+}
+.sprachwahl li + li {
+  border-top: 1px solid var(--line);
+}
+/* Navigation der Startseite: auf großen Bildschirmen im Kopf, sonst oben im Menü */
+.kopfnav {
+  display: none;
+}
+.kopfnav a,
+.menuenav a {
+  color: var(--ink);
+  font-weight: 600;
+  text-decoration: none;
+}
+.kopfnav a:hover,
+.menuenav a:hover {
+  color: var(--accent);
+}
+.menuenav {
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid var(--line);
+}
+.menuenav a {
+  padding: 13px 16px;
+  min-height: 24px;
+}
+.menuenav a + a {
+  border-top: 1px solid var(--line);
+}
+@media (min-width: 1100px) {
+  .kopfnav {
+    display: flex;
+    gap: 24px;
+    margin-inline: auto;
+  }
+  .menuenav {
+    display: none;
+  }
+}
+/* Sprungziele: etwas Abstand nach oben, damit die Überschrift nicht am Rand klebt */
+.lp-sektion[id] {
+  scroll-margin-top: 16px;
+}
+/* Datumsfelder: Fokus wie bei allen anderen Feldern sichtbar (Chrome zeigt ihn sonst nur an einzelnen Teilen) */
+input[type="date"]:focus,
+input[type="month"]:focus {
+  outline: 3px solid #f2b134;
+  outline-offset: 2px;
+}
+/* Handy: Kopfzeile kompakter, damit Name, Anmelden, Weltkugel und Menü nebeneinander passen.
+   Wird es trotzdem zu eng (große Schrift), bricht die rechte Gruppe in eine zweite Zeile um, statt abgeschnitten zu werden. */
+.topbar {
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
+.topright {
+  margin-left: auto;
+}
+@media (max-width: 420px) {
+  .brand {
+    gap: 6px;
+  }
+  .brand .logo {
+    width: 36px;
+    height: 36px;
+  }
+  .brand b {
+    font-size: 1.05rem;
+  }
+  .topbar {
+    column-gap: 8px;
+  }
+  .topright {
+    gap: 4px;
+  }
+  .menubtn,
+  .sprachbtn,
+  .ideebtn {
+    height: 42px;
+    min-width: 42px;
+  }
+  .menubtn {
+    width: 42px;
+  }
+  .sprachbtn {
+    padding: 0;
+  }
+  .sprachbtn .kurz {
+    display: none;
+  }
+  .kopf-anmelden {
+    padding: 6px 8px;
+    font-size: 0.9rem;
+  }
+}
+/* Unter 380 px (z. B. iPhone SE) bleibt nur das Logo; der Name steht für Bildschirmleser weiter da */
+@media (max-width: 380px) {
+  .brand b {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
 }
 
 /* ---------- Kleine Layout-Helfer ----------

@@ -109,14 +109,6 @@ function rechnerAntwort(t) {
  */
 export function beiAenderung(e) {
   const t = /** @type {HTMLInputElement} */ (e.target);
-  if (t.id === "langsel") {
-    Z.LANG = t.value;
-    try {
-      localStorage.setItem("da-lang", JSON.stringify(Z.LANG));
-    } catch (x) {}
-    render();
-    return;
-  }
   if (t.dataset.plz) {
     // erst bei vollständiger Postleitzahl, sonst würde jede Ziffer die Links neu aufbauen
     if (/^\d{5}$/.test(t.value.trim())) {

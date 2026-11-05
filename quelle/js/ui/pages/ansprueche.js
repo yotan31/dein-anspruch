@@ -103,7 +103,7 @@ function detailHTML(b) {
       </div>`
         : `<p class="notice info">${ic("info")}<span>Dafür ist kein Antrag nötig. Trage den Betrag einfach in der Steuererklärung ein (oder gib diese Info an deine Steuerberatung weiter).</span></p>`
     }
-    <div><h4>So läuft es ab</h4><ol class="steps">${b.steps.map((s) => `<li>${esc(s)}</li>`).join("")}</ol></div>
+    <div><h3 class="unter">So läuft es ab</h3><ol class="steps">${b.steps.map((s) => `<li>${esc(s)}</li>`).join("")}</ol></div>
     <div class="akk">
       ${naehe ? akk(b.k + ":naehe", "pin", "In der Nähe finden", "", naehe) : ""}
       ${checks.length ? akk(b.k + ":docs", "list", "Unterlagen", `${erledigt} von ${checks.length} erledigt`, `<ul class="checks">${checks.map((c, i) => `<li><label><input type="checkbox" data-check="${b.k}:${i}" ${Z.S.checks[b.k + ":" + i] ? "checked" : ""}><span>${esc(c)}</span></label></li>`).join("")}</ul>`) : ""}

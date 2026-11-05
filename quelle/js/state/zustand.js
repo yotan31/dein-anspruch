@@ -89,6 +89,8 @@ export const Z = {
   /** @type {any} geöffnete Leistung */
   openKey: null,
   showMenu: false,
+  /** Sprachauswahl hinter der Weltkugel offen */
+  showSprache: false,
   /** @type {Record<string,boolean>} geöffnete aufklappbare Bereiche */
   akk: {},
   /** @type {any} zuletzt gezeichnete Ansicht, für Bildschirmwechsel */

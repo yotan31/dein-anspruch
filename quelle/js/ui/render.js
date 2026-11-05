@@ -15,6 +15,7 @@ import { VIEWS } from "./pages/fragebogen.js";
 import { viewPersons } from "./pages/personen.js";
 import { viewRechner } from "./pages/rechner.js";
 import { viewTermine } from "./pages/termine.js";
+import { esc } from "../utils/format.js";
 
 /* ---------- Rendering ---------- */
 /** @param {string} id @returns {any} Element der Seite (bewusst ohne genauen Typ, wird überall als Formularfeld oder Bereich genutzt) */
@@ -72,49 +73,67 @@ export function render() {
   Z.lastIdx = idx;
 }
 
+/** Name der aktuellen Ansicht, leer auf der Startseite (sie hat eine eigene Überschrift) */
+function seitenname() {
+  if (!Z.loaded) return "Wird geladen";
+  if (Z.RECOVERY) return "Neues Passwort";
+  if (Z.RECHNER) return "Pflegegrad-Rechner";
+  if (!Z.USER && !Z.GUEST) return "";
+  if (Z.USER && Z.showPersons) return "Personen";
+  if (consentNeeded()) return "Einwilligung";
+  const b = Z.S.wiz && B.find((x) => x.k === Z.S.wiz.k);
+  if (b) return "Antrag: " + b.t;
+  if (!Z.S.done) return "Fragebogen";
+  return { ansprueche: "Ansprüche", belege: "Belege", termine: "Termine" }[Z.S.tab] || "";
+}
+
 /** Springt ohne Animation an den Seitenanfang. */
 export function scrollTop() {
   window.scrollTo({ top: 0, behavior: "instant" });
 }
 
-function renderMain() {
-  document.documentElement.style.setProperty("--fs", schrift());
+/** HTML der aktuellen Ansicht im Hauptbereich */
+function ansichtHTML() {
   if (!Z.loaded) {
-    $("main").innerHTML =
-      `<section class="panel laden"><p class="muted">Einen Moment, deine Daten werden geladen …</p></section>`;
-    return;
+    return `<section class="panel laden"><p class="muted">Einen Moment, deine Daten werden geladen …</p></section>`;
   }
   if (Z.RECOVERY) {
-    $("main").innerHTML = viewNeuesPasswort();
-    return;
+    return viewNeuesPasswort();
   }
   if (Z.RECHNER) {
-    $("main").innerHTML = viewRechner();
-    return;
+    return viewRechner();
   }
   if (!Z.USER && !Z.GUEST) {
-    $("main").innerHTML = viewLogin();
-    return;
+    return viewLogin();
   }
   if (Z.USER && Z.showPersons) {
-    $("main").innerHTML = viewPersons();
-    return;
+    return viewPersons();
   }
   if (consentNeeded()) {
-    $("main").innerHTML = viewConsent();
-    return;
+    return viewConsent();
   }
   if (Z.S.wiz && B.find((x) => x.k === Z.S.wiz.k)) {
-    $("main").innerHTML = viewWizard();
-    return;
+    return viewWizard();
   }
   Z.S.wiz = null;
   if (!Z.S.done) {
     const vs = visSteps();
     if (Z.S.step >= vs.length) Z.S.step = vs.length - 1;
-    $("main").innerHTML = VIEWS[vs[Z.S.step].id]();
-  } else {
-    $("main").innerHTML =
-      Z.S.tab === "belege" ? viewBelege() : Z.S.tab === "termine" ? viewTermine() : viewAnsprueche();
+    return VIEWS[vs[Z.S.step].id]();
   }
+  return Z.S.tab === "belege" ? viewBelege() : Z.S.tab === "termine" ? viewTermine() : viewAnsprueche();
+}
+
+/**
+ * Zeichnet den Hauptbereich. Jede Ansicht bekommt eine Hauptüberschrift (für Bildschirmleser unsichtbar) und einen
+ * passenden Titel im Browser-Tab, damit klar ist, wo man gerade ist (WCAG 2.4.2). Die Überschrift steht gleich im HTML,
+ * damit das sanfte Neuzeichnen (ui/morph.js) die Seite weiter Stück für Stück abgleichen kann.
+ */
+function renderMain() {
+  document.documentElement.style.setProperty("--fs", schrift());
+  const html = ansichtHTML(),
+    name = seitenname();
+  document.title = name ? `${name} – Dein Anspruch` : "Dein Anspruch";
+  $("main").innerHTML =
+    (/<h1[\s>]/.test(html) ? "" : `<h1 class="sr-only">${esc(name || "Dein Anspruch")}</h1>`) + html;
 }

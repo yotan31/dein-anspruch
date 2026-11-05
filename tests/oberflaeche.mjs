@@ -336,13 +336,27 @@ console.log("Ansprüche und Antrag-Assistent");
   check("Summe ist aufgeschlüsselt (Posten mit Betrag)", (await page.locator("#hero .hpost b").count()) >= 1);
   await page.tap('#hero [data-act="menu"]');
   await page.waitForTimeout(150);
-  check(
-    "Menü zeigt Sprache und Schriftgröße",
-    (await page.locator("#hmenu #langsel").count()) === 1 && (await page.locator("#hmenu [data-font]").count()) === 3,
-  );
+  check("Menü zeigt die Schriftgröße", (await page.locator("#hmenu [data-font]").count()) === 3);
   await page.tap('#hero [data-act="menu"]');
   await page.waitForTimeout(150);
   check("Menü schließt wieder", (await page.locator("#hmenu").count()) === 0);
+  // Weltkugel: Sprache wählen, Oberfläche wechselt, zurück auf Deutsch
+  await page.tap('#hero [data-act="sprache"]');
+  await page.waitForTimeout(150);
+  check("Weltkugel zeigt alle Sprachen", (await page.locator("#sprachwahl [data-lang]").count()) === 6);
+  await page.tap('#sprachwahl [data-lang="en"]');
+  await page.waitForTimeout(200);
+  check(
+    "Englisch: Oberfläche übersetzt, Auswahl geschlossen",
+    (await page.locator("#sprachwahl").count()) === 0 &&
+      (await page.evaluate(() => document.documentElement.lang)) === "en" &&
+      /Your open benefits/.test(await page.textContent("#main")),
+  );
+  await page.tap('#hero [data-act="sprache"]');
+  await page.waitForTimeout(150);
+  await page.tap('#sprachwahl [data-lang="de"]');
+  await page.waitForTimeout(200);
+  check("Zurück auf Deutsch", (await page.evaluate(() => document.documentElement.lang)) === "de");
   await page.tap('#hero [data-act="menu"]');
   await page.waitForTimeout(150);
   await page.tap('#hmenu [data-font="1.3"]');
@@ -410,7 +424,7 @@ console.log("Ansprüche und Antrag-Assistent");
   check(
     "Reiter wechselt sofort, ohne Animation",
     !/go-/.test((await page.getAttribute("#main", "class")) || "") &&
-      (await page.locator('[data-tab="termine"][aria-selected="true"]').count()) === 1,
+      (await page.locator('[data-tab="termine"][aria-current="page"]').count()) === 1,
   );
   check("keine Programmfehler", errors.length === 0, errors.join(" | "));
 }
