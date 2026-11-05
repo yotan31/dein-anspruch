@@ -116,7 +116,7 @@ function belegRow(b) {
   const isImg = b.asset && /^image\//.test(b.ctype || "");
   const thumb = b.asset
     ? isImg
-      ? `<button type="button" class="thumb thumb-zoom" data-view="${b.asset}" aria-label="Beleg ansehen"><img src="${esc(blobUrl(b.asset))}" alt="" loading="lazy"></button>`
+      ? `<button type="button" class="thumb thumb-zoom" data-view="${esc(b.asset)}" aria-label="Beleg ansehen"><img src="${esc(blobUrl(b.asset))}" alt="" loading="lazy"></button>`
       : `<a class="thumb" href="${esc(blobUrl(b.asset))}" target="_blank" rel="noopener" aria-label="PDF öffnen">${ic("file")}</a>`
     : `<span class="thumb">${ic("receipt")}</span>`;
   const d = parseIso(b.datum);

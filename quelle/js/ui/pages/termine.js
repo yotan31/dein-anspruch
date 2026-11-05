@@ -72,7 +72,7 @@ function dueHTML(x) {
     <div class="d-s">${esc(x.s)}</div>
     <div class="btnrow">
       <details class="calmenu"><summary class="btn small soft">${ic("cal")}In Kalender eintragen</summary><span class="calopts"><a class="btn small ghost" href="${gcal(x)}" target="_blank" rel="noopener">Google Kalender</a><a class="btn small ghost" href="${ocal(x)}" target="_blank" rel="noopener">Outlook</a></span></details>
-      ${x.own ? `<button type="button" class="btn small ghost" data-delown="${x.own}">Entfernen</button>` : ""}
+      ${x.own ? `<button type="button" class="btn small ghost" data-delown="${esc(x.own)}">Entfernen</button>` : ""}
     </div>
   </div>`;
 }
