@@ -8,22 +8,11 @@ body {
 img {
   max-width: 100%;
 }
-[hidden] {
-  display: none !important;
-}
-
 /* Layout: eine ruhige Spalte. Oben ein dunkles „Akten-Deckblatt“ mit der Summe, darunter Reiter wie bei einem Ordner: Ansprüche · Belege · Termine. */
 :root {
-  --bg: #f3f8fb;
-  --paper: #ffffff;
-  --paper-2: #f2f8fb;
-  --ink: #14243b;
-  --muted: #53647a;
-  --line: #d9e6ee;
   --accent: #0e7490;
   --accent-ink: #ffffff;
   --accent-soft: #e3f4f7;
-  --tint: #e6f3fa;
   --money: #167a45;
   --money-2: #4fae7a;
   --money-3: #a3dcbb;
@@ -37,11 +26,6 @@ img {
   --hero-muted: var(--muted);
   --hero-money: var(--money);
   --tab: #ffffff;
-  --shadow: 0 1px 2px rgba(20, 36, 59, 0.04), 0 4px 14px rgba(20, 36, 59, 0.05);
-  --f-display:
-    -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --f-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --r: 14px;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -73,16 +57,9 @@ img {
   }
 }
 :root[data-theme="dark"] {
-  --bg: #0d141e;
-  --paper: #162130;
-  --paper-2: #1b2738;
-  --ink: #e6edf5;
-  --muted: #9dabbd;
-  --line: #2a384b;
   --accent: #5cc0cc;
   --accent-ink: #06222a;
   --accent-soft: #16323a;
-  --tint: #132536;
   --money: #6dd3a0;
   --money-2: #3f9d70;
   --money-3: #2a6a4c;
@@ -112,7 +89,6 @@ body {
   background: var(--bg);
   color: var(--ink);
   font-family: var(--f-body);
-  font-size: 1.0625rem;
   line-height: 1.55;
   padding-inline: 16px;
   padding-block: 16px 64px;
@@ -136,16 +112,6 @@ h3 {
   line-height: 1.18;
   text-wrap: balance;
   margin: 0;
-  font-weight: 600;
-}
-h1 {
-  font-size: clamp(1.8rem, 7vw, 2.4rem);
-}
-h2 {
-  font-size: 1.5rem;
-}
-h3 {
-  font-size: 1.15rem;
 }
 p {
   margin: 0;
@@ -173,7 +139,6 @@ svg.i {
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-
 /* Deckblatt */
 .hero {
   display: flex;
@@ -200,7 +165,6 @@ svg.i {
   padding: 0;
 }
 .menubtn[aria-expanded="true"] {
-  background: var(--ink);
   color: var(--paper);
   border-color: var(--ink);
 }
@@ -242,7 +206,6 @@ svg.i {
   background: var(--paper);
   border: 1px solid var(--line);
   border-top: 4px solid var(--accent);
-  border-radius: 4px 4px var(--r) var(--r);
   padding: 16px 20px 18px;
   display: flex;
   flex-direction: column;
@@ -462,7 +425,6 @@ button.stat {
 .stat.alert svg.i {
   color: var(--warn);
 }
-
 /* Reiter */
 .tabs {
   display: flex;
@@ -497,7 +459,6 @@ button.stat {
 }
 .tabs button[aria-selected="true"] {
   color: var(--accent);
-  border-top-color: var(--accent) !important;
 }
 .tabs .badge {
   background: var(--warn);
@@ -515,7 +476,6 @@ button.stat {
     display: none;
   }
 }
-
 /* Panels & Formulare */
 .panel {
   background: var(--paper);
@@ -683,8 +643,6 @@ textarea {
 }
 .btn {
   font: inherit;
-  font-weight: 700;
-  border-radius: 999px;
   padding: 10px 20px;
   cursor: pointer;
   border: 1.5px solid var(--accent);
@@ -838,7 +796,6 @@ textarea {
   font-size: 1.1rem;
   padding: 14px 26px;
   min-height: 54px;
-  box-shadow: 0 6px 16px rgba(14, 116, 144, 0.22);
 }
 .startbox {
   display: flex;
@@ -867,13 +824,9 @@ h2.wq label {
   display: flex;
   gap: 10px;
   align-items: flex-start;
-  background: var(--accent-soft);
   border-radius: 12px;
-  padding: 12px 14px;
-  font-size: 1rem;
 }
 .whelp svg {
-  color: var(--accent);
   margin-top: 3px;
 }
 .wiz input[type="text"],
@@ -1089,7 +1042,6 @@ ol.howsend {
   height: auto;
 }
 .notice {
-  border-radius: 12px;
   padding: 12px 14px;
   font-size: 0.93rem;
   background: var(--warn-soft);
@@ -1120,7 +1072,6 @@ ol.howsend {
 .notice.good svg {
   color: var(--money);
 }
-
 /* Ansprüche */
 .section-title {
   display: flex;
@@ -1132,7 +1083,6 @@ ol.howsend {
 .filters {
   display: flex;
   gap: 6px;
-  flex-wrap: wrap;
 }
 .chip {
   border: 1.5px solid var(--line);
@@ -1162,7 +1112,6 @@ ol.howsend {
   box-shadow: var(--shadow);
 }
 .item {
-  border-bottom: 1px solid var(--line);
   background: var(--paper);
   display: flex;
   flex-direction: column;
@@ -1178,14 +1127,6 @@ ol.howsend {
   grid-template-columns: 38px minmax(0, 1fr) auto 18px;
   grid-template-areas: "ico ttl val chev" "ico short short short" "ico tags tags tags";
   gap: 4px 14px;
-  padding: 16px 18px;
-  align-items: start;
-}
-.item > button.head:hover {
-  background: var(--paper-2);
-}
-.item > button.head[aria-expanded="true"] {
-  background: var(--accent-soft);
 }
 .item > button.head:focus-visible {
   outline: 3px solid #f2b134;
@@ -1252,37 +1193,18 @@ ol.howsend {
   background: var(--accent-soft);
   color: var(--accent);
 }
-.ico.a-Steuer {
-  background: var(--warn-soft);
-  color: var(--warn);
-}
-.ico.a-Krankenkasse {
-  background: var(--money-soft);
-  color: var(--money);
-}
-.ico.a-Schwerbehinderung,
-.ico.a-Arbeit {
-  background: var(--paper-2);
-  color: var(--ink);
-}
 .item .ttl {
-  font-weight: 700;
-  font-size: 1.06rem;
   min-width: 0;
 }
 .detail .para {
-  font-size: 0.82rem;
   color: var(--muted);
 }
 .item .val {
   font-family: var(--f-display);
-  font-size: 1.12rem !important;
-  font-weight: 600;
   color: var(--money);
   text-align: right;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-  font-size: 0.95rem;
 }
 .item .val.neutral {
   font-family: var(--f-body);
@@ -1336,16 +1258,11 @@ ol.howsend {
   color: var(--money);
 }
 .detail {
-  border-top: 1px solid var(--line);
-  padding: 18px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  background: var(--paper-2);
 }
 .detail h4 {
   margin: 0 0 6px;
-  font-size: 0.95rem;
   color: var(--ink);
 }
 .detail ol,
@@ -1365,29 +1282,21 @@ ol.howsend {
 .steps li {
   counter-increment: st;
   position: relative;
-  padding: 0 0 14px 42px;
-  min-height: 28px;
 }
 .steps li::before {
   content: counter(st);
   position: absolute;
   left: 0;
-  top: -1px;
-  width: 28px;
-  height: 28px;
   border-radius: 50%;
   background: var(--accent);
   color: var(--accent-ink);
   font-weight: 700;
-  font-size: 0.9rem;
   display: grid;
   place-items: center;
 }
 .steps li:not(:last-child)::after {
   content: "";
   position: absolute;
-  left: 13px;
-  top: 30px;
   bottom: 2px;
   width: 2px;
   background: var(--line);
@@ -1504,7 +1413,6 @@ details[open].used summary svg.i {
   align-self: center;
   padding: 6px 12px;
 }
-
 /* Belege */
 .meter {
   display: flex;
@@ -1672,7 +1580,6 @@ details[open].used summary svg.i {
   top: calc(14px + env(safe-area-inset-top, 0px));
   right: 14px;
 }
-
 /* Termine */
 .due {
   display: grid;
@@ -1818,7 +1725,6 @@ details[open].used summary svg.i {
   flex-wrap: wrap;
   margin-top: 8px;
 }
-
 .toast {
   position: fixed;
   left: 50%;
@@ -1881,25 +1787,17 @@ footer {
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(10, 20, 32, 0.45);
   z-index: 40;
   display: flex;
-  align-items: flex-end;
   justify-content: center;
-  padding: 16px;
 }
 .overlay .sheet {
   background: var(--paper);
   color: var(--ink);
-  border-radius: 18px;
-  padding: 20px;
-  max-width: 520px;
   width: 100%;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25);
-  margin-bottom: env(safe-area-inset-bottom, 0px);
 }
 .overlay .sheet h3 {
   margin: 0;
@@ -2138,7 +2036,6 @@ label {
     padding: 8px 10px;
   }
 }
-
 .testbanner {
   position: sticky;
   top: 0;
@@ -2215,7 +2112,6 @@ label {
 .authlinks .linkbtn {
   font-size: 0.92rem;
 }
-
 .acct.person {
   display: inline-flex;
   align-items: center;
@@ -2255,7 +2151,6 @@ hr.sep {
   display: block;
   padding: 6px 0;
 }
-
 /* ohne Internet */
 .offlinebanner {
   position: sticky;
@@ -2270,7 +2165,6 @@ hr.sep {
   margin: -16px -16px 12px;
   border-bottom: 1px solid var(--line);
 }
-
 /* Startseite vor der Anmeldung */
 .landing {
   display: flex;
@@ -2433,22 +2327,15 @@ hr.sep {
 }
 .kachel {
   all: unset;
-  box-sizing: border-box;
   cursor: pointer;
   min-width: 0;
-  box-shadow: var(--shadow);
   background: var(--paper);
-  border: 1.5px solid var(--line);
   border-radius: var(--r);
   padding: 14px;
   display: flex;
   flex-direction: column;
   gap: 4px;
   min-height: 120px;
-}
-.kachel:hover {
-  border-color: var(--accent);
-  transform: translateY(-1px);
 }
 .kachel:active {
   background: var(--paper-2);
@@ -2544,7 +2431,6 @@ hr.sep {
   gap: 8px;
   align-items: flex-start;
 }
-
 /* Rückmeldung bei Erfolg: Haken springt kurz */
 @media (prefers-reduced-motion: no-preference) {
   .checks input:checked,
@@ -2563,7 +2449,6 @@ hr.sep {
     animation: open 0.12s ease-out;
   }
 }
-
 /* Großer Bildschirm: Liste links, Summe rechts und beim Scrollen sichtbar */
 @media (min-width: 1080px) {
   .wrap {
@@ -2630,7 +2515,6 @@ hr.sep {
   min-width: 46px;
   border-radius: 999px;
   border: 1.5px solid #f2c14e;
-  background: #fff8e6;
   color: #7a5200;
   display: inline-flex;
   align-items: center;
@@ -2766,7 +2650,6 @@ hr.sep {
   gap: 8px;
 }
 .akk-body .extlink {
-  font-size: 0.95rem;
   min-height: 40px;
 }
 .akk-body .small.muted {
@@ -2824,7 +2707,6 @@ hr.sep {
 .akk-body .extlink:hover {
   text-decoration: underline;
 }
-
 /* ================= iOS-Stil =================
    Systemschrift (auf iPhone/Mac San Francisco), gruppierter grauer Hintergrund, weiße Karten ohne Rahmen,
    Trennlinien statt Kästen, durchscheinende Leisten, Fenster von unten. Farben bleiben die der App. */
@@ -2908,6 +2790,7 @@ h3 {
   border-radius: var(--r);
 }
 .kachel {
+  box-sizing: border-box;
   border: 1.5px solid transparent;
   box-shadow: none;
 }
@@ -3166,7 +3049,6 @@ h3 {
   min-height: 40px;
   background: var(--paper);
 }
-
 /* ================= Startseite wie eine Webseite ================= */
 body {
   overflow-x: clip;
@@ -3545,15 +3427,12 @@ body {
 }
 /* Abschluss */
 .lp-schluss {
-  background: var(--accent);
   color: #fff;
   padding-block: 48px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  text-align: center;
   gap: 14px;
-  margin-bottom: -16px;
 }
 .lp-schluss h2 {
   color: #fff;
@@ -3565,9 +3444,7 @@ body {
 }
 .lp-schluss .btn {
   background: #fff;
-  color: var(--accent);
   border-color: #fff;
-  min-width: 260px;
 }
 /* Kopfzeile: Anmelden */
 .kopf-anmelden {
@@ -3645,8 +3522,11 @@ body {
   }
 }
 .lp-schluss {
+  margin-bottom: -16px;
+  text-align: center;
   background: #0e7490;
 }
 .lp-schluss .btn {
+  min-width: 260px;
   color: #0e7490;
 }
