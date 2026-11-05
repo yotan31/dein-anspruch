@@ -1,6 +1,8 @@
+// Baustein „Deine Daten“: Sicherung herunterladen, einspielen und alles löschen (mit Bestätigung).
 import { Z } from "../../state/zustand.js";
 import { ic, infoBtn } from "../symbole.js";
 
+/** Baustein „Deine Daten“ (HTML). */
 export function datenBox() {
   return `<section class="panel datenbox">
     <div class="titelzeile"><h3>Deine Daten</h3>${infoBtn("Sicherung", "Lade ab und zu eine Sicherung herunter. Mit der Datei kannst du alles wiederherstellen, auch nach dem Löschen oder auf einem neuen Handy.")}</div>

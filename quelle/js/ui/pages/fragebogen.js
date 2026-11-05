@@ -1,3 +1,4 @@
+// Fragebogen: ein Bildschirm pro Schritt (Kasse, Pflegegrad, Pflegeperson, Schwerbehinderung …).
 import { AOK_REGIONEN, KASSEN, MZ, WOHNEN } from "../../config/stammdaten.js";
 import { visSteps } from "../../logic/fragebogen.js";
 import { B, applicable } from "../../logic/leistungen.js";

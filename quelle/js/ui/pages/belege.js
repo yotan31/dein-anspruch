@@ -1,3 +1,4 @@
+// Reiter „Belege“: Fotos und Einträge, Filter nach Jahr und Art, Zuzahlungs-Übersicht.
 import { KATS, bruttoOf, chronisch, selYears, zuz } from "../../logic/belege.js";
 import { blobUrl } from "../../services/speicher.js";
 import { Z } from "../../state/zustand.js";
@@ -14,6 +15,7 @@ function belegYears() {
   return [...ys].sort().reverse();
 }
 
+/** Reiter „Belege“ (HTML). */
 export function viewBelege() {
   const years = selYears();
   const kf = Z.S.belegFilter.kat || "";

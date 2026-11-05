@@ -1,9 +1,15 @@
+// Antragstexte: Betreff und Brieftext je Leistung, nötige Unterlagen, E-Mail- und Gmail-Links.
+// Der Text kann von der Familie überschrieben werden (Z.S.texte); dann gilt ihre Fassung.
 import { beratungStatus } from "./fristen.js";
 import { pg } from "./lage.js";
 import { FA, KK, PK, kassePK, txt } from "./leistungen.js";
 import { Z } from "../state/zustand.js";
 import { deD } from "../utils/datum.js";
 
+/**
+ * Unterlagen, die dem Antrag beiliegen sollten; bei Angehörigen zusätzlich die Vollmacht.
+ * @param b Leistung
+ */
 export function docsFor(b) {
   const d = [...(txt(b.docs) || [])].filter(Boolean);
   if (Z.S.rolle === "angehoerig" && b.to !== FA && b.to !== "arbeitgeber" && !d.some((x) => /Vollmacht/.test(x)))
@@ -32,6 +38,10 @@ function letter(b) {
   return { subject, body };
 }
 
+/**
+ * Betreff und Text des Antrags: die eigene Fassung der Familie, sonst der Vorschlag.
+ * @param b Leistung
+ */
 export function curLetter(b) {
   const L = letter(b);
   return { subject: Z.S.texte[b.k + "_sub"] ?? L.subject, body: Z.S.texte[b.k] ?? L.body };
@@ -43,11 +53,17 @@ export function gmailLink(b, addr) {
   return `https://mail.google.com/mail/?view=cm&fs=1${addr ? `&to=${encodeURIComponent(addr)}` : ""}&su=${encodeURIComponent(L.subject)}&body=${encodeURIComponent(L.body)}`;
 }
 
+/**
+ * mailto-Link mit Betreff und Text für das eigene E-Mail-Programm.
+ * @param b Leistung
+ * @param addr Empfänger
+ */
 export function mailto(b, addr) {
   const L = curLetter(b);
   return `mailto:${addr}?subject=${encodeURIComponent(L.subject)}&body=${encodeURIComponent(L.body)}`;
 }
 
+/** Text zur Terminvereinbarung für den nächsten Beratungsbesuch beim Pflegedienst. */
 export function pdText() {
   const st = beratungStatus();
   const H = st.done ? st.next : st.H;

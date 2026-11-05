@@ -1,3 +1,5 @@
+// Speicher der Angaben: mit Konto in Supabase (Personen, Familie, Fotos), ohne Konto im Browser.
+// Speichert verzögert und der Reihe nach, damit schnelle Eingaben sich nicht gegenseitig überschreiben.
 import { SB_KEY, SB_URL } from "../config/supabase.js";
 import { lsGet, lsSet } from "./lokal.js";
 import { blank, merge } from "../state/angaben.js";
@@ -5,6 +7,10 @@ import { Z } from "../state/zustand.js";
 import { toast } from "../ui/hinweise.js";
 import { $, render, scrollTop } from "../ui/render.js";
 
+/**
+ * Adresse eines vorab geladenen Belegfotos.
+ * @param p Pfad im Fotospeicher
+ */
 export function blobUrl(p) {
   return Z.URLS[p] || "";
 }
@@ -45,6 +51,7 @@ function uiKey() {
   return "da-ui-" + (Z.USER ? Z.USER.id : "gast") + "-" + (Z.FALL_ID || "x");
 }
 
+/** Speichert die Angaben kurz verzögert, damit nicht jeder Tastendruck einzeln gespeichert wird. */
 export function save() {
   if (!Z.canSave || !Z.ref) return;
   clearTimeout(Z.saveTimer);
@@ -68,6 +75,10 @@ export function save() {
   }, 700);
 }
 
+/**
+ * Anzeigename einer Person.
+ * @param f Fall
+ */
 export function fallName(f) {
   const p = (f && f.data && f.data.person) || {};
   return (p.name || "").trim() || "Neue Person";
@@ -174,6 +185,7 @@ const REF_LOCAL = {
   },
 };
 
+/** Lädt alle Personen, auf die das Konto Zugriff hat. */
 export async function loadFaelle() {
   const { data, error } = await Z.sb.from("fall").select("id,data,created_by,updated_at").order("created_at");
   if (error) throw error;
@@ -182,6 +194,10 @@ export async function loadFaelle() {
   Z.FAELLE = data.map((f) => ({ ...f, rolle: rollen[f.id] || "mitglied" }));
 }
 
+/**
+ * Legt eine neue Person an.
+ * @param data Startangaben
+ */
 export async function createFall(data) {
   const { data: row, error } = await Z.sb
     .from("fall")
@@ -193,6 +209,10 @@ export async function createFall(data) {
   return row.id;
 }
 
+/**
+ * Öffnet eine Person: Angaben, Belege und Fotos laden.
+ * @param id Fall
+ */
 export async function openFall(id) {
   Z.FALL_ID = id;
   lsSet("da-fall-" + Z.USER.id, id);
@@ -212,6 +232,7 @@ export async function openFall(id) {
   loadMembers();
 }
 
+/** Lädt, wer außer einem selbst Zugriff auf die geöffnete Person hat. */
 export async function loadMembers() {
   Z.MEMBERS = [];
   if (!Z.FALL_ID) return;
@@ -222,10 +243,12 @@ export async function loadMembers() {
 
 const CONSENT_VERSION = "2026-10";
 
+/** Fehlt noch die Einwilligung zur Speicherung von Gesundheitsdaten? */
 export function consentNeeded() {
   return !!Z.USER && !(Z.USER.user_metadata || {}).einwilligung_am;
 }
 
+/** Speichert die Einwilligung mit Datum am Konto. */
 export async function giveConsent() {
   const c = $("cs-ok");
   if (!c || !c.checked) {
@@ -303,6 +326,7 @@ async function refreshFromServer() {
   reloadBelege();
 }
 
+/** Legt eine weitere Person an und öffnet sie. */
 export async function addPerson() {
   try {
     const id = await createFall({});
@@ -314,6 +338,7 @@ export async function addPerson() {
   }
 }
 
+/** Erstellt einen Einladungslink für Familienmitglieder. */
 export async function makeInvite() {
   Z.inviteBusy = true;
   render();
@@ -327,6 +352,10 @@ export async function makeInvite() {
   render();
 }
 
+/**
+ * Entzieht einem Familienmitglied den Zugriff.
+ * @param uid Konto
+ */
 export async function removeMember(uid) {
   const { error } = await Z.sb.from("mitglied").delete().eq("fall_id", Z.FALL_ID).eq("user_id", uid);
   if (error) return toast("Entfernen hat nicht geklappt.");
@@ -340,6 +369,7 @@ export async function removeMember(uid) {
   loadMembers().then(render);
 }
 
+/** Löscht die geöffnete Person samt Belegen und Fotos. */
 export async function deletePerson() {
   try {
     const paths = Z.BEL.map((b) => b.asset).filter(Boolean);
@@ -356,6 +386,7 @@ export async function deletePerson() {
   }
 }
 
+/** Nutzung ohne Konto: Angaben bleiben nur in diesem Browser. */
 export function startGuest() {
   Z.GUEST = true;
   Z.USER = null;
@@ -369,6 +400,7 @@ export function startGuest() {
   render();
 }
 
+/** Verbindet beim Start mit Supabase und lädt Konto und Angaben (ohne Internet: Angaben aus dem Browser). */
 export async function initStore() {
   try {
     if (new URLSearchParams(location.search).has("rechner")) Z.RECHNER = { i: 0, a: [] };
@@ -446,7 +478,7 @@ export async function initStore() {
   }
 }
 
-/** Wird beim Start der App einmal aufgerufen (siehe 99-start.js). */
+/** Wird beim Start der App einmal aufgerufen (siehe start.js). */
 export function startSpeicher() {
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") refreshFromServer().catch(() => {});

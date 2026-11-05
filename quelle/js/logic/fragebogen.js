@@ -1,3 +1,4 @@
+// Welche Schritte der Fragebogen zeigt; hängt von den bisherigen Antworten ab (z. B. Pflegeperson nur bei Pflege zu Hause).
 import { isHome, pg } from "./lage.js";
 import { Z } from "../state/zustand.js";
 
@@ -12,6 +13,7 @@ const STEPS = [
   { id: "daten", label: "Deine Angaben", show: () => true },
 ];
 
+/** Schritte des Fragebogens, die nach den bisherigen Antworten gezeigt werden. */
 export function visSteps() {
   return STEPS.filter((s) => s.show());
 }

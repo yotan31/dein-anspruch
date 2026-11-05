@@ -1,3 +1,5 @@
+// Pflegegrad-Rechner: Fragen und Gewichtung nach dem Begutachtungsinstrument, Ergebnis als Punkte und Pflegegrad.
+// Nur eine Selbsteinschätzung; das sagt die Oberfläche auch so.
 import { pgAusPunkten } from "./bescheid.js";
 
 /* ---------- Pflegegrad-Rechner (Selbsteinschätzung nach dem Begutachtungsinstrument) ---------- */
@@ -127,6 +129,10 @@ export const MOD = {
   },
 };
 // {i, a:[]}
+/**
+ * Ergebnis des Pflegegrad-Rechners: gewichtete Punkte je Modul, Gesamtpunkte und Pflegegrad.
+ * @param a Antworten
+ */
 export function rechnerErgebnis(a) {
   const roh = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
     mx = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };

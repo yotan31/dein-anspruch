@@ -1,3 +1,4 @@
+// Häufige Fragen und wo es persönliche Beratung gibt (Startseite und Hilfe).
 import { ic } from "../symbole.js";
 import { esc } from "../../utils/format.js";
 

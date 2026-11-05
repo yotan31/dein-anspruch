@@ -1,3 +1,4 @@
+// Verhinderungspflege: Fragen, Zeitraum, Erstattung (Stunden, Fahrtkosten) und nötige Nachweise.
 import { BETRAEGE } from "../config/betraege.js";
 import { JAHRESBETRAG, PG } from "../config/stammdaten.js";
 import { pg } from "./lage.js";
@@ -15,6 +16,7 @@ export const VHP_GRUND = {
   termine: "Termine, Erholung oder andere wichtige Gründe",
 };
 
+/** Erstattung der Verhinderungspflege: was beantragt werden kann und was vom Jahresbetrag übrig bleibt. */
 export function vhpCalc() {
   const v = Z.S.vhp,
     rest = Math.max(0, JAHRESBETRAG - numDE(v.verbraucht));
@@ -27,6 +29,7 @@ export function vhpCalc() {
   return { rest, basis, cap, pflege, fahrt, verd, total, gekappt: basis > cap };
 }
 
+/** Nachweise, die je nach Art der Ersatzpflege beiliegen müssen. */
 export function vhpDocs() {
   const v = Z.S.vhp,
     d = [];
@@ -46,12 +49,14 @@ export function vhpDocs() {
   return d;
 }
 
+/** Zeitraum der Verhinderungspflege für den Antragstext. */
 export function vhpZeitraum() {
   const a = parseIso(Z.S.vhp.von),
     b = parseIso(Z.S.vhp.bis);
   return a ? (b && +b !== +a ? `vom ${deD(a)} bis ${deD(b)}` : `am ${deD(a)}`) : "im Zeitraum [von – bis]";
 }
 
+/** Satz mit dem beantragten Betrag und seiner Berechnung für den Antragstext. */
 export function vhpAsk() {
   const v = Z.S.vhp,
     c = vhpCalc(),

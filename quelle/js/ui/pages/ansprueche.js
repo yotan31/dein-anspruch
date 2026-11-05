@@ -1,3 +1,4 @@
+// Reiter „Ansprüche“: Liste der Leistungen mit Filter, Stand und aufklappbaren Details.
 import { langNotice } from "../../i18n/sprachen.js";
 import { docsFor } from "../../logic/antragstext.js";
 import { sums, txt } from "../../logic/leistungen.js";

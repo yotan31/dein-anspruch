@@ -1,3 +1,4 @@
+// Kopf der App: Überblick mit Summe und Balken, Reiter-Leiste und Schriftgröße.
 import { langSelect } from "../i18n/sprachen.js";
 import { deadlines, urg, urgTxt } from "../logic/fristen.js";
 import { sums } from "../logic/leistungen.js";
@@ -15,6 +16,7 @@ export function schrift() {
 
 const MENU_ICON = "M4 7h16 M4 12h16 M4 17h16";
 
+/** Zeichnet den Kopf: Marke, Speicherstand und Überblick mit Summe. */
 export function renderHero() {
   const save = `<div class="savestate"><span class="dot ${Z.saveState.c}" id="savedot"></span><span id="savetxt">${esc(Z.saveState.t)}</span></div>`;
   const brand = `<div class="brand"><img class="logo" src="logo.webp" width="44" height="44" alt=""><b>Dein Anspruch</b></div>`;
@@ -111,6 +113,7 @@ export function renderHero() {
   </div>`;
 }
 
+/** Zeichnet die Reiter-Leiste; ausgeblendet im Fragebogen, Assistenten und Rechner. */
 export function renderTabs() {
   const t = $("tabs");
   t.hidden = !Z.S.done || !!Z.S.wiz || !!Z.RECHNER || (!Z.USER && !Z.GUEST) || consentNeeded() || Z.RECOVERY;

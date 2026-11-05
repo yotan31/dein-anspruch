@@ -1,3 +1,4 @@
+// Sicherung: alle Angaben als Datei herunterladen, wieder einspielen oder alles endgültig löschen.
 import { logout } from "./anmeldung.js";
 import { lsSet } from "./lokal.js";
 import { createFall, fallName, loadFaelle, openFall, save } from "./speicher.js";
@@ -11,6 +12,7 @@ function WIPE_WORD(v) {
   return /^l(ö|oe|o)schen$/i.test(String(v || "").trim());
 }
 
+/** Löscht alle Angaben, Belege und Fotos endgültig, nachdem LÖSCHEN eingetippt wurde. */
 export async function wipeAll() {
   const w = $("wipe-word");
   if (!w || !WIPE_WORD(w.value)) {
@@ -66,6 +68,7 @@ function cleanData(d) {
   return x;
 }
 
+/** Lädt eine Sicherung aller Angaben und Belege als Datei herunter. */
 export async function backupData() {
   if (Z.dataBusy) return;
   Z.dataBusy = "backup";
@@ -127,6 +130,10 @@ export async function backupData() {
   render();
 }
 
+/**
+ * Spielt eine Sicherungsdatei wieder ein.
+ * @param file Sicherungsdatei
+ */
 export async function restoreData(file) {
   if (!file || Z.dataBusy) return;
   let j = null;

@@ -1,8 +1,10 @@
+// Karte für E-Mail-Erinnerungen an Fristen (nur mit Konto).
 import { loadEri } from "../../services/erinnerungen.js";
 import { Z } from "../../state/zustand.js";
 import { ic } from "../symbole.js";
 import { esc } from "../../utils/format.js";
 
+/** Karte für E-Mail-Erinnerungen (HTML); nur mit Konto. */
 export function eriCard() {
   if (!Z.USER) return "";
   if (!Z.eriLoaded) {

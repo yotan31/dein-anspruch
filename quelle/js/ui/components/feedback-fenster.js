@@ -1,3 +1,4 @@
+// Fenster „App verbessern“: Rückmeldung schreiben und absenden.
 import { applyI18n } from "../../i18n/sprachen.js";
 import { Z } from "../../state/zustand.js";
 import { $ } from "../render.js";
@@ -42,6 +43,7 @@ export function openFeedback(art = "idee") {
   }, 60);
 }
 
+/** Schließt das Fenster „App verbessern“. */
 export function closeFeedback() {
   const d = $("fbbox");
   if (d) d.hidden = true;

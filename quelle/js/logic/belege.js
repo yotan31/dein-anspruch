@@ -1,3 +1,4 @@
+// Belege auswerten: Arten (Kategorien), gewählte Jahre, Bruttoeinkommen und Zuzahlungs-Belastungsgrenze.
 import { BETRAEGE } from "../config/betraege.js";
 import { gdb, pg } from "./lage.js";
 import { Z } from "../state/zustand.js";
@@ -16,12 +17,17 @@ export const KATS = {
   sonst: { t: "Sonstiges" },
 };
 
+/** Im Belege-Reiter gewählte Jahre, neueste zuerst; ohne Auswahl das laufende Jahr. */
 export function selYears() {
   let j = (Z.S.belegFilter.jahre || []).map(String).filter(Boolean);
   if (!j.length) j = [String(new Date().getFullYear())];
   return [...new Set(j)].sort().reverse();
 }
 
+/**
+ * Bruttoeinkommen eines Jahres für die Belastungsgrenze; fürs laufende Jahr ersatzweise die Angabe aus dem Fragebogen.
+ * @param j Jahr
+ */
 export function bruttoOf(j) {
   j = String(j);
   const bj = Z.S.bruttoJahr || {};
@@ -29,11 +35,18 @@ export function bruttoOf(j) {
   return j === String(new Date().getFullYear()) ? Z.S.brutto || "" : "";
 }
 
+/**
+ * Gilt die Person als chronisch krank (1 % statt 2 % Belastungsgrenze)? Ohne Angabe ab Pflegegrad 3 oder GdB 60.
+ */
 export function chronisch() {
   if (Z.S.chronisch) return Z.S.chronisch === "ja";
   return pg() >= 3 || gdb() >= 60;
 }
 
+/**
+ * Zuzahlungen eines Jahres und die Belastungsgrenze (Summe, Prozentsatz, Brutto, Grenze in Euro).
+ * @param jahr Jahr
+ */
 export function zuz(jahr) {
   const sum = Z.BEL.filter((b) => KATS[b.kat] && KATS[b.kat].zz && String(b.jahr) === String(jahr)).reduce(
     (s, b) => s + (Number(b.betrag) || 0),

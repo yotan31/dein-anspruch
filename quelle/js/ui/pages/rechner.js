@@ -1,3 +1,4 @@
+// Pflegegrad-Rechner als Seite: Fragen, Fortschritt und Ergebnis.
 import { ENTLASTUNG } from "../../config/stammdaten.js";
 import { PG_GRENZEN } from "../../logic/bescheid.js";
 import { pg } from "../../logic/lage.js";
@@ -8,12 +9,14 @@ import { render, scrollTop } from "../render.js";
 import { ic } from "../symbole.js";
 import { esc } from "../../utils/format.js";
 
+/** Startet den Pflegegrad-Rechner von vorn. */
 export function startRechner() {
   Z.RECHNER = { i: 0, a: [] };
   render();
   scrollTop();
 }
 
+/** Aktuelle Frage oder Ergebnis des Rechners (HTML). */
 export function viewRechner() {
   const R = Z.RECHNER,
     n = RQ.length;

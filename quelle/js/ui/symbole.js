@@ -1,3 +1,5 @@
+// Symbole (Icons) und Bilder als SVG im Code, damit keine Bilddateien geladen werden müssen.
+// Farben kommen aus CSS-Klassen, damit sie im dunklen Modus mitwechseln.
 import { esc } from "../utils/format.js";
 
 /* ---------- Icons ---------- */
@@ -41,6 +43,11 @@ const ICON = {
   idee: "M9 18h6 M10 21h4 M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.3 1.1 2.2h5c0-.9.4-1.6 1.1-2.2A6 6 0 0 0 12 3z",
 };
 
+/**
+ * Symbol als SVG (HTML).
+ * @param n Name
+ * @param c CSS-Klasse
+ */
 export function ic(n, c = "i") {
   return `<svg class="${c}" viewBox="0 0 24 24" aria-hidden="true"><path d="${ICON[n]}"/></svg>`;
 }

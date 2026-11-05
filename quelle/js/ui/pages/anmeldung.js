@@ -1,3 +1,4 @@
+// Seite „Anmelden“: Anmelden, Konto anlegen, Passwort vergessen und neues Passwort festlegen.
 import { lsGet } from "../../services/lokal.js";
 import { zaehle } from "../../services/zaehlung.js";
 import { Z } from "../../state/zustand.js";
@@ -23,6 +24,7 @@ export function viewNeuesPasswort() {
   </section>`;
 }
 
+/** Anmeldeformular (HTML) für Anmelden, Registrieren oder Passwort vergessen. */
 export function viewLogin() {
   const reg = Z.authMode === "register",
     fg = Z.authMode === "forgot",

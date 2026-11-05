@@ -1,3 +1,4 @@
+// Grundlage aller PDFs: lädt jsPDF erst beim ersten Dokument und speichert Dateien zum Herunterladen.
 import { DL } from "./speicher.js";
 import { toast } from "../ui/hinweise.js";
 
@@ -37,8 +38,14 @@ export async function newDoc() {
   return new window.jspdf.jsPDF({ unit: "mm", format: "a4" });
 }
 
+/**
+ * Speichert eine Datei zum Herunterladen und meldet den Erfolg.
+ * @param filename Dateiname
+ * @param data Inhalt
+ * @param okMsg Meldung danach
+ */
 export async function saveFile(filename, data, okMsg) {
-  const dl = DL; // Datei-Download im Browser (siehe 19-speicher.js)
+  const dl = DL; // Datei-Download im Browser (siehe services/speicher.js)
   try {
     await dl.save({ filename, data });
     toast(okMsg || "Gespeichert");

@@ -1,3 +1,5 @@
+// Zeichnet die Oberfläche aus dem Zustand Z neu (render) und bietet kleine Helfer zum Scrollen.
+// Jede Änderung am Zustand endet mit render(); so gibt es nur einen Weg, wie die Anzeige entsteht.
 import { applyI18n } from "../i18n/sprachen.js";
 import { visSteps } from "../logic/fragebogen.js";
 import { B } from "../logic/leistungen.js";
@@ -22,6 +24,9 @@ export function $(id) {
 
 const TAB_ORDER = ["ansprueche", "belege", "termine"];
 
+/**
+ * Welche Ansicht gerade dran ist (Anmeldung, Fragebogen, Reiter …); ein Wechsel löst die Übergangs-Animation aus.
+ */
 export function famKey() {
   if (Z.RECHNER) return "r";
   if (typeof Z.USER !== "undefined" && !Z.USER && !Z.GUEST) return "login";
@@ -35,12 +40,17 @@ function screenIdx() {
   return Z.RECHNER ? Z.RECHNER.i : Z.S.wiz ? Z.S.wiz.i : !Z.S.done ? Z.S.step : TAB_ORDER.indexOf(Z.S.tab);
 }
 
+/**
+ * Scrollt ein Element ins Bild, wenn es zu weit oben oder unten liegt.
+ * @param el Element
+ */
 export function reveal(el) {
   if (!el) return;
   const r = el.getBoundingClientRect();
   if (r.top < 70 || r.top > innerHeight * 0.45) el.scrollIntoView({ block: "start" });
 }
 
+/** Zeichnet die ganze Oberfläche aus dem Zustand neu; nur Geändertes wird ausgetauscht (ui/morph.js). */
 export function render() {
   const fam = famKey(),
     idx = screenIdx(),
@@ -62,6 +72,7 @@ export function render() {
   Z.lastIdx = idx;
 }
 
+/** Springt ohne Animation an den Seitenanfang. */
 export function scrollTop() {
   window.scrollTo({ top: 0, behavior: "instant" });
 }

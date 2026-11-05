@@ -1,3 +1,4 @@
+// Sammel-PDF prüfen: erkannte Belege einer PDF ansehen, korrigieren und übernehmen.
 import { KATS } from "../../logic/belege.js";
 import { Z } from "../../state/zustand.js";
 import { bar } from "./assistent.js";
@@ -14,6 +15,7 @@ function bulkYears() {
   return Object.entries(c).sort();
 }
 
+/** Ansicht der Sammel-PDF (HTML): Fortschritt beim Lesen oder Liste zum Prüfen. */
 export function bulkView() {
   const B = Z.bulk;
   if (B.phase === "lesen" || B.phase === "speichern")

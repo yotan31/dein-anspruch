@@ -1,3 +1,5 @@
+// Leistungskatalog: alle Ansprüche mit Bedingungen, Beträgen, Empfängern und Texten, dazu die Summen.
+// Herzstück der Berechnung; Änderungen hier immer mit tests/rechnungen.test.mjs prüfen.
 import { BETRAEGE } from "../config/betraege.js";
 import {
   BEHPAUSCH,
@@ -735,12 +737,14 @@ function kasseInfo() {
   return KASSEN[Z.S.kasse] || KASSEN.andere;
 }
 
+/** Name der Krankenkasse für Anträge. */
 export function kasseName() {
   if (Z.S.kasse === "aok") return "AOK " + (Z.S.aokRegion || "");
   if (Z.S.kasse === "andere") return Z.S.kasseAndere || "Krankenkasse";
   return kasseInfo().name;
 }
 
+/** Name der Pflegekasse für Anträge (sie gehört zur Krankenkasse). */
 export function kassePK() {
   if (Z.S.kasse === "aok") return "AOK-Pflegekasse " + (Z.S.aokRegion || "");
   if (Z.S.kasse === "andere") return "Pflegekasse bei der " + (Z.S.kasseAndere || "Krankenkasse");
@@ -751,10 +755,15 @@ function kasseMail() {
   return Z.S.kasse === "aok" || Z.S.kasse === "andere" ? "" : kasseInfo().mail;
 }
 
+/**
+ * Wert oder Ergebnis einer Funktion; Leistungen dürfen Texte abhängig von den Angaben berechnen.
+ * @param v Wert oder Funktion
+ */
 export function txt(v) {
   return typeof v === "function" ? v() : v;
 }
 
+/** Leistungen, die nach den Angaben der Familie in Frage kommen. */
 export function applicable() {
   return B.filter((b) => {
     try {
@@ -765,6 +774,7 @@ export function applicable() {
   });
 }
 
+/** Summen für den Überblick: offene Geldbeträge und Anzahl der Ansprüche. */
 export function sums() {
   const all = applicable();
   const offen = all.filter((b) => !Z.S.genutzt[b.k]);

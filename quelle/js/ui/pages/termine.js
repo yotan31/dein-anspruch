@@ -1,3 +1,4 @@
+// Reiter „Termine“: Beratungsbesuche, Fristen, eigene Erinnerungen und Kalender-Links.
 import { pdText } from "../../logic/antragstext.js";
 import { beratungRelevant, beratungStatus, besuche, deadlines, gcal, ocal, urg, urgTxt } from "../../logic/fristen.js";
 import { mz } from "../../logic/lage.js";

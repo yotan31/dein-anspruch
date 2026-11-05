@@ -1,3 +1,4 @@
+// Fenster von unten: Hilfe und kurze Erklärungen hinter den ⓘ-Knöpfen.
 import { applyI18n } from "../../i18n/sprachen.js";
 import { faqHTML } from "./fragen.js";
 import { $ } from "../render.js";
@@ -36,6 +37,7 @@ export function openHilfe() {
   }, 60);
 }
 
+/** Schließt das Hilfe-Fenster. */
 export function closeHilfe() {
   const d = $("hilfebox");
   if (d) d.hidden = true;
@@ -72,6 +74,7 @@ export function openInfo(titel, text) {
   }, 60);
 }
 
+/** Schließt das Erklär-Fenster. */
 export function closeInfo() {
   const d = $("infobox");
   if (d) d.hidden = true;

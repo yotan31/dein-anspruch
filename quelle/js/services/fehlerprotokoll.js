@@ -1,3 +1,5 @@
+// Meldet Programmfehler ohne persönliche Daten an die Datenbank, damit sie behoben werden können.
+// Begrenzt auf wenige Meldungen pro Sitzung, damit eine Fehlerschleife nichts flutet.
 import { APP_VERSION } from "../config/version.js";
 import { Z } from "../state/zustand.js";
 import { closeFeedback } from "../ui/components/feedback-fenster.js";
@@ -31,7 +33,7 @@ function reportError(msg, stack) {
   } catch (e) {}
 }
 
-/** Wird beim Start der App einmal aufgerufen (siehe 99-start.js). */
+/** Wird beim Start der App einmal aufgerufen (siehe start.js). */
 export function startFehlerprotokoll() {
   window.addEventListener("error", (e) => {
     if (e.message && !/ResizeObserver|^Script error/.test(e.message))

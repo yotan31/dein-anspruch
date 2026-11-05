@@ -1,3 +1,4 @@
+// Antrags-Assistent als Seite: eine Frage pro Bildschirm, am Ende der fertige Antrag.
 import { getQ, personQs, wizSteps, wizTo } from "../../logic/antraege.js";
 import { curLetter, docsFor, gmailLink, mailto } from "../../logic/antragstext.js";
 import { B, FA, RECIP, empfAdresse, txt } from "../../logic/leistungen.js";
@@ -10,6 +11,10 @@ import { ic } from "../symbole.js";
 import { deD, parseIso } from "../../utils/datum.js";
 import { esc, eur, numDE } from "../../utils/format.js";
 
+/**
+ * Öffnet den Antrags-Assistenten für eine Leistung.
+ * @param k Schlüssel der Leistung
+ */
 export function startWiz(k) {
   const b = B.find((x) => x.k === k);
   zaehle("antrag_geoeffnet", k);
@@ -68,6 +73,7 @@ function qInput(q) {
   return q.type === "money" ? `<div class="euro">${inp}<span>€</span></div>` : inp;
 }
 
+/** Aktueller Schritt des Assistenten (HTML). */
 export function viewWizard() {
   const { b, list } = wizSteps();
   const i = Math.min(Z.S.wiz.i, list.length - 1);
@@ -99,6 +105,12 @@ export function viewWizard() {
   </section>`;
 }
 
+/**
+ * Fortschrittsbalken (HTML).
+ * @param n erledigt
+ * @param of gesamt
+ * @param label Beschriftung
+ */
 export function bar(n, of, label) {
   return `<div class="stepper"><div class="meta"><span>${esc(label)}</span><span>${Math.round((n / of) * 100)} %</span></div><div class="bar"><i style="width:${Math.round((n / of) * 100)}%"></i></div></div>`;
 }

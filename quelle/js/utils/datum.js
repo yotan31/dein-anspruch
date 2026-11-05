@@ -1,28 +1,50 @@
-/* ---------- Datum ---------- */
+// Datums-Helfer: heutiges Datum, Umrechnen zwischen ISO und deutscher Schreibweise, Tage bis zu einem Datum.
+/** Heute, 0 Uhr; damit Tagesvergleiche nicht von der Uhrzeit abhängen. */
 export function TODAY() {
   const d = new Date();
   d.setHours(0, 0, 0, 0);
   return d;
 }
 
+/**
+ * Datum als JJJJ-MM-TT in Ortszeit (toISOString würde nach UTC verschieben).
+ * @param d Datum
+ */
 export function isoD(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+/**
+ * JJJJ-MM-TT als Datum in Ortszeit; null bei anderem Format.
+ * @param s Text
+ */
 export function parseIso(s) {
   if (!s || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
   const [y, m, d] = s.split("-").map(Number);
   return new Date(y, m - 1, d);
 }
 
+/**
+ * Datum deutsch geschrieben (TT.MM.JJJJ).
+ * @param d Datum
+ */
 export function deD(d) {
   return d.toLocaleDateString("de-DE");
 }
 
+/**
+ * Tage von heute bis zum Datum (negativ: vorbei).
+ * @param d Datum
+ */
 export function daysUntil(d) {
   return Math.round((+d - +TODAY()) / 864e5);
 }
 
+/**
+ * Datum plus n Tage.
+ * @param d Datum
+ * @param n Tage
+ */
 export function addDays(d, n) {
   const x = new Date(d);
   x.setDate(x.getDate() + n);
@@ -31,6 +53,10 @@ export function addDays(d, n) {
 
 export const MON = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
 
+/**
+ * Halbjahr eines Datums mit Anfang und Ende (für Beratungsbesuche).
+ * @param d Datum
+ */
 export function halfOf(d) {
   const h = d.getMonth() < 6 ? 1 : 2;
   const y = d.getFullYear();
@@ -43,6 +69,11 @@ export function halfOf(d) {
   };
 }
 
+/**
+ * Halbjahr n Schritte vor oder zurück.
+ * @param H Halbjahr
+ * @param n Schritte
+ */
 export function shiftHalf(H, n) {
   let y = H.y,
     h = H.h + n;
@@ -57,6 +88,7 @@ export function shiftHalf(H, n) {
   return halfOf(new Date(y, h === 1 ? 0 : 6, 1));
 }
 
+/** Heutiges Datum deutsch geschrieben, für Briefe. */
 export function today() {
   return new Date().toLocaleDateString("de-DE");
 }

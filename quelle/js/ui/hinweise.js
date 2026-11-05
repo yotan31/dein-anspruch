@@ -1,7 +1,12 @@
+// Kurzmeldungen (toast) und Kopieren in die Zwischenablage mit Rückmeldung.
 import { tr } from "../i18n/sprachen.js";
 import { Z } from "../state/zustand.js";
 import { $ } from "./render.js";
 
+/**
+ * Kopiert Text in die Zwischenablage; geht das nicht, wird der Antragstext markiert und um Strg+C gebeten.
+ * @param text Text
+ */
 export async function copy(text) {
   try {
     await navigator.clipboard.writeText(text);
@@ -16,6 +21,10 @@ export async function copy(text) {
   }
 }
 
+/**
+ * Kurze Meldung unten am Bildschirm, verschwindet von selbst.
+ * @param m Text
+ */
 export function toast(m) {
   const t = $("toast");
   t.textContent = tr(m);

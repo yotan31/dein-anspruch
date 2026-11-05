@@ -1,3 +1,5 @@
+// Antrags-Assistent: Fragen je Anspruch, Reihenfolge der Schritte, Prüfung der Antworten (z. B. IBAN, Datum).
+// Reine Regeln ohne Oberfläche; gezeichnet wird in ui/pages/assistent.js.
 import { VERBRAUCH, VHP_ERSATZ } from "../config/stammdaten.js";
 import { zuz } from "./belege.js";
 import { gdb } from "./lage.js";
@@ -7,7 +9,7 @@ import { Z } from "../state/zustand.js";
 import { deD, parseIso } from "../utils/datum.js";
 import { eur, numDE } from "../utils/format.js";
 
-/** Wird beim Start der App einmal aufgerufen (siehe 99-start.js). */
+/** Wird beim Start der App einmal aufgerufen (siehe start.js). */
 export function ergaenzeBefreiungsantrag() {
   /* ---------- Befreiungs-Antrag (nur aus Belegen) ---------- */
   B.push({
@@ -48,12 +50,22 @@ export const HILFE = [
   "Hilfe in der Nacht",
 ];
 
+/**
+ * Antworten des Assistenten zu einem Anspruch; legt sie beim ersten Zugriff an.
+ * @param k Schlüssel der Leistung
+ */
 export function ansObj(k) {
   if (k === "jahresbetrag") return Z.S.vhp;
   Z.S.ans = Z.S.ans || {};
   return (Z.S.ans[k] = Z.S.ans[k] || {});
 }
 
+/**
+ * Antwort für den Antragstext oder ein Platzhalter in eckigen Klammern, wenn sie fehlt.
+ * @param k Leistung
+ * @param f Feld
+ * @param ph Platzhalter
+ */
 export function av(k, f, ph) {
   const v = ansObj(k)[f];
   if (Array.isArray(v)) return v.length ? v.join(", ") : `[${ph}]`;
@@ -65,6 +77,11 @@ function ad(k, f, ph) {
   return d ? deD(d) : `[${ph}]`;
 }
 
+/**
+ * Ist die Frage beantwortet?
+ * @param k Leistung
+ * @param f Feld
+ */
 export function has(k, f) {
   const v = ansObj(k)[f];
   return Array.isArray(v) ? v.length > 0 : v != null && String(v).trim() !== "";
@@ -581,8 +598,8 @@ export const ASSIST = {
   },
 };
 
-export /* ---------- Assistent: Ablauf ---------- */
-function personQs(b, a) {
+/* ---------- Assistent: Ablauf ---------- */
+export function personQs(b, a) {
   const p = Z.S.person,
     L = [];
   if (!p.name) L.push("name");
@@ -645,6 +662,9 @@ function personQ(k) {
   }[k];
 }
 
+/**
+ * Fragen des geöffneten Assistenten in der Reihenfolge, in der sie gezeigt werden: erst die leichten, Adresse am Ende.
+ */
 export function wizSteps() {
   const w = Z.S.wiz,
     b = B.find((x) => x.k === w.k);
@@ -662,6 +682,10 @@ export function wizSteps() {
   return { b, list: [...qs, { type: "summary" }, { type: "done" }] };
 }
 
+/**
+ * Aktuelle Antwort auf eine Frage, egal ob sie bei der Person, beim Empfänger oder beim Antrag gespeichert ist.
+ * @param q Frage
+ */
 export function getQ(q) {
   if (q.store === "person") return Z.S.person[q.k];
   if (q.store === "empf") {
@@ -719,6 +743,11 @@ export function ibanOk(v) {
   return m === 1;
 }
 
+/**
+ * Antwort speichern; ein selbst bearbeiteter Antragstext wird verworfen, damit die neue Angabe drinsteht.
+ * @param q Frage
+ * @param v Antwort
+ */
 export function setQ(q, v) {
   if (q.store === "person") Z.S.person[q.k] = v;
   else ansObj(Z.S.wiz.k)[q.k] = v;
@@ -727,7 +756,7 @@ export function setQ(q, v) {
   save();
 }
 
-/** Wird beim Start der App einmal aufgerufen (siehe 99-start.js). */
+/** Wird beim Start der App einmal aufgerufen (siehe start.js). */
 export function verbindeAssistenten() {
   for (const [k, a] of Object.entries(ASSIST)) {
     const b = B.find((x) => x.k === k);
@@ -737,7 +766,7 @@ export function verbindeAssistenten() {
   }
 }
 
-/** Wird beim Start der App einmal aufgerufen (siehe 99-start.js). */
+/** Wird beim Start der App einmal aufgerufen (siehe start.js). */
 export function ergaenzeWiderspruch() {
   B.push({
     k: "widerspruch",

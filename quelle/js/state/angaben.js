@@ -1,4 +1,6 @@
-/* ---------- Zustand ---------- */
+// Aufbau der Angaben einer Familie (blank) und Zusammenführen mit gespeicherten älteren Ständen (merge),
+// damit neue Felder nach einem Update einen Startwert haben.
+/** Leere Angaben einer Familie mit allen Feldern und Startwerten. */
 export function blank() {
   return {
     step: 0,
@@ -67,6 +69,10 @@ export function blank() {
   };
 }
 
+/**
+ * Gespeicherte Angaben mit den Startwerten zusammenführen, damit neue Felder nach einem Update vorhanden sind.
+ * @param d gespeicherte Angaben
+ */
 export function merge(d) {
   const b = blank();
   const m = {

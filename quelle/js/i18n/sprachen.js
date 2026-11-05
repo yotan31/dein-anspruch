@@ -1,3 +1,5 @@
+// Übersetzung der Oberfläche zur Laufzeit: tr() für einzelne Texte, applyI18n() für schon gezeichnete Teile.
+// Anträge bleiben bewusst Deutsch, weil Kassen und Ämter sie auf Deutsch erwarten.
 import { LANGS, T } from "./uebersetzungen.js";
 import { Z } from "../state/zustand.js";
 import { ic } from "../ui/symbole.js";
@@ -20,6 +22,10 @@ const RX = [
   [/^Pflegegrad (\d)$/, ["Bakım derecesi $1", "Степень ухода $1", "درجة الرعاية $1", "ደረጃ ክንክን $1"]],
 ];
 
+/**
+ * Übersetzt einen deutschen Text in die gewählte Sprache; ohne Übersetzung bleibt er Deutsch.
+ * @param s deutscher Text
+ */
 export function tr(s) {
   if (Z.LANG === "de" || !s) return s;
   const i = LIDX[Z.LANG];
@@ -37,6 +43,10 @@ export function tr(s) {
   return out ? s.replace(k, out) : s;
 }
 
+/**
+ * Übersetzt alle Texte in einem schon gezeichneten Bereich und stellt Sprache und Schreibrichtung (Arabisch: rechts nach links) ein.
+ * @param root Bereich der Seite
+ */
 export function applyI18n(root) {
   document.documentElement.lang = Z.LANG;
   document.documentElement.dir = Z.LANG === "ar" ? "rtl" : "ltr";
@@ -57,10 +67,12 @@ export function applyI18n(root) {
   }
 }
 
+/** Auswahlfeld für die Sprache (HTML). */
 export function langSelect() {
   return `<select class="langsel" id="langsel" aria-label="Sprache">${LANGS.map(([k, n]) => `<option value="${k}" ${Z.LANG === k ? "selected" : ""}>${n}</option>`).join("")}</select>`;
 }
 
+/** Hinweis in der gewählten Sprache, dass Anträge Deutsch bleiben; auf Deutsch leer. */
 export function langNotice() {
   if (Z.LANG === "de") return "";
   const m = {
@@ -72,7 +84,7 @@ export function langNotice() {
   return `<p class="notice info small">${ic("info")}<span>${m[Z.LANG]}</span></p>`;
 }
 
-/** Wird beim Start der App einmal aufgerufen (siehe 99-start.js). */
+/** Wird beim Start der App einmal aufgerufen (siehe start.js). */
 export function ladeSprache() {
   try {
     Z.LANG = JSON.parse(localStorage.getItem("da-lang") || '"de"') || "de";

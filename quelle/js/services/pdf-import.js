@@ -1,3 +1,5 @@
+// Sammel-PDF: mehrere Belege aus einer PDF lesen, Seiten zu Belegen gruppieren und gemeinsam speichern.
+// pdf.js wird erst bei Bedarf geladen, damit der Start schnell bleibt.
 import { selYears } from "../logic/belege.js";
 import { groupPages } from "../logic/belegerkennung.js";
 import { loadTesseract } from "./bescheid.js";
@@ -59,6 +61,10 @@ async function pageCanvas(page, maxW) {
   return c;
 }
 
+/**
+ * Liest eine Sammel-PDF Seite für Seite und schlägt die enthaltenen Belege vor.
+ * @param file PDF
+ */
 export async function importPdf(file) {
   Z.pending = null;
   Z.bulk = { phase: "lesen", n: 0, total: 0, items: [], file, msg: "Die PDF wird geöffnet …" };
@@ -159,6 +165,7 @@ async function bulkBlob(it) {
   return { blob: doc.output("blob"), type: "application/pdf" };
 }
 
+/** Speichert die geprüften Belege aus der Sammel-PDF. */
 export async function bulkSave() {
   if (!Z.bulk || Z.bulk.phase !== "pruefen") return;
   const bad = Z.bulk.items.find(

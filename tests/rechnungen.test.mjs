@@ -1,7 +1,7 @@
 // Prüft alle Berechnungen und Erkennungen einzeln, ohne Browser.
 // Aufruf: node --test tests/
 // Die erwarteten Werte sind aus Gesetz bzw. Leistungsübersicht 2026 abgeleitet, nicht aus dem Programm.
-// Wenn sich Beträge ändern (00-betraege.js), müssen die Erwartungen hier mit angepasst werden.
+// Wenn sich Beträge ändern (quelle/js/config/betraege.js), müssen die Erwartungen hier mit angepasst werden.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { ladeApp } from "./lade-app.mjs";

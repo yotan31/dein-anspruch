@@ -1,5 +1,7 @@
+// Seite „Einwilligung“: Zustimmung zur Speicherung von Gesundheitsdaten (Art. 9 DSGVO) vor der ersten Nutzung.
 import { Z } from "../../state/zustand.js";
 
+/** Einwilligung zur Speicherung von Gesundheitsdaten (HTML). */
 export function viewConsent() {
   return `<section class="panel auth consent">
     <h2>Bevor es losgeht</h2>

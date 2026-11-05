@@ -1,4 +1,5 @@
-/* ---------- Sanftes Neuzeichnen: nur geänderte Teile austauschen, Bildschirmwechsel animieren ---------- */
+// Sanftes Neuzeichnen: tauscht nur geänderte Teile aus, damit Eingabefelder und Scrollposition erhalten bleiben,
+// und animiert den Wechsel zwischen Bildschirmen.
 const IH = Object.getOwnPropertyDescriptor(Element.prototype, "innerHTML");
 
 function sameNode(a, b) {
@@ -88,7 +89,7 @@ function smoothEl(el) {
   });
 }
 
-/** Wird beim Start der App einmal aufgerufen (siehe 99-start.js). */
+/** Wird beim Start der App einmal aufgerufen (siehe start.js). */
 export function aktiviereSanftesNeuzeichnen() {
   ["hero", "tabs", "main"].forEach((id) => smoothEl(document.getElementById(id)));
 }

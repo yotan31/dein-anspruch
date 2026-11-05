@@ -1,3 +1,4 @@
+// Pflegegrad-Bescheid: Punkte → Pflegegrad, Widerspruchsfrist und Erkennen der Werte aus dem Bescheid-Text.
 import { Z } from "../state/zustand.js";
 import { daysUntil, parseIso } from "../utils/datum.js";
 import { numDE } from "../utils/format.js";
@@ -5,6 +6,10 @@ import { numDE } from "../utils/format.js";
 /* ---------- Bescheid & Widerspruch ---------- */
 export const PG_GRENZEN = [12.5, 27, 47.5, 70, 90];
 // ab diesen Punkten gilt Pflegegrad 1..5
+/**
+ * Pflegegrad zu einer Punktzahl aus der Begutachtung.
+ * @param p Punkte
+ */
 export function pgAusPunkten(p) {
   let g = 0;
   PG_GRENZEN.forEach((t, i) => {
@@ -13,6 +18,9 @@ export function pgAusPunkten(p) {
   return g;
 }
 
+/**
+ * Auswertung des gespeicherten Bescheids: Pflegegrad, Abstand zur nächsten Stufe, Widerspruchsfrist; ohne Bescheid null.
+ */
 export function bescheidInfo() {
   const b = Z.S.bescheid;
   if (!b) return null;
@@ -44,6 +52,10 @@ const GUT_HINWEISE = [
   [/pflegekurs|schulung/i, "Pflegekurs", "pflegekurs"],
 ];
 
+/**
+ * Sucht Pflegegrad, Punkte und Datum im gelesenen Text eines Bescheids.
+ * @param t Text
+ */
 export function parseBescheid(t) {
   const out = {};
   const txt = t.replace(/\s+/g, " ");

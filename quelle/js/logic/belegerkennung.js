@@ -1,3 +1,5 @@
+// Erkennt in gelesenem Text (Foto oder PDF) Datum, Betrag und Art eines Belegs und gruppiert PDF-Seiten.
+// Nur Vorschläge: Die Familie prüft jeden Wert, bevor er gespeichert wird.
 import { KATS } from "./belege.js";
 
 function pad2(n) {
@@ -42,6 +44,10 @@ function mkDatum(y, m, d) {
   return `${y}-${pad2(m)}-${pad2(d)}`;
 }
 
+/**
+ * Alle Datumsangaben in einer Textzeile.
+ * @param line Zeile
+ */
 export function datesIn(line) {
   const out = [];
   let m;
@@ -57,6 +63,10 @@ export function datesIn(line) {
 
 const BETRAG = /(?<![\d,.])(\d{1,3}(?:[.\s']\d{3})+|\d+),(\d{2})(?!\d)/g;
 
+/**
+ * Alle Geldbeträge in einer Textzeile (deutsche Schreibweise).
+ * @param line Zeile
+ */
 export function amountsIn(line) {
   return [...line.matchAll(BETRAG)]
     .map((m) => Number(m[1].replace(/[.\s']/g, "") + "." + m[2]))
@@ -65,6 +75,10 @@ export function amountsIn(line) {
 
 const NICHT_DATUM = /geb\.|geboren|geburt|fällig|zahlbar bis|zahlungsziel|gültig bis|bis zum|überweisen bis|skonto/i;
 
+/**
+ * Wahrscheinlichstes Belegdatum: bevorzugt neben Wörtern wie „Rechnungsdatum“.
+ * @param lines Zeilen des Belegs
+ */
 export function pickDate(lines) {
   const key =
     /(rechnungs|beleg|quittungs|ausstellungs|kauf|verordnungs|abgabe)?datum|\bvom\b|\brechnung\b|\bquittung\b|\bdatum\b/i;
@@ -87,6 +101,11 @@ export function pickDate(lines) {
   return best && best[1] > 1 ? best[0] : first;
 }
 
+/**
+ * Wahrscheinlichster Endbetrag: bevorzugt neben „Summe“, „Gesamt“ oder „Zuzahlung“.
+ * @param lines Zeilen
+ * @param kat Art des Belegs
+ */
 export function pickAmount(lines, kat) {
   const val = (i) => {
     const a = amountsIn(lines[i]);
@@ -143,6 +162,10 @@ const KAT_REGELN = [
   ["bescheid", /bescheid|widerspruch|sehr geehrte/i],
 ];
 
+/**
+ * Art des Belegs anhand typischer Wörter (Apotheke, Fahrt …); sonst „sonst“.
+ * @param text Text des Belegs
+ */
 export function guessKat(text) {
   for (const [k, re] of KAT_REGELN) if (re.test(text)) return k;
   return "sonst";
@@ -163,6 +186,10 @@ function rechnungsNr(text) {
   return m ? m[3] : "";
 }
 
+/**
+ * Fasst aufeinanderfolgende PDF-Seiten desselben Belegs zusammen.
+ * @param pages gelesene Seiten
+ */
 export function groupPages(pages) {
   const groups = [];
   for (const p of pages) {

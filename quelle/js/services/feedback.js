@@ -1,3 +1,4 @@
+// Rückmeldungen an das Team senden und die App weiterempfehlen (Teilen-Menü des Geräts).
 import { APP_VERSION } from "../config/version.js";
 import { Z } from "../state/zustand.js";
 import { closeFeedback } from "../ui/components/feedback-fenster.js";
@@ -13,6 +14,7 @@ function bereich() {
   return (Z.S.tab || "ansprueche") + (Z.openKey ? ":" + Z.openKey : "");
 }
 
+/** Sendet die Rückmeldung aus dem Fenster „App verbessern“. */
 export async function sendFeedback() {
   const t = (($("fb-text") || {}).value || "").trim();
   if (t.length < 2) {
@@ -49,6 +51,7 @@ export async function sendFeedback() {
   toast("Danke! Deine Nachricht ist angekommen.");
 }
 
+/** Empfiehlt die App weiter: Teilen-Menü des Geräts, sonst über WhatsApp. */
 export async function shareApp() {
   const url = "https://yotan31.github.io/dein-anspruch/";
   const text =

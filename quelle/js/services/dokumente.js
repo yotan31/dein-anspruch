@@ -1,3 +1,4 @@
+// Erzeugt die Dokumente zum Herunterladen: Antrag als PDF, Belegmappe, Quittung, Tabelle (CSV).
 import { curLetter, docsFor } from "../logic/antragstext.js";
 import { KATS, selYears } from "../logic/belege.js";
 import { B, RECIP, empfAdresse, kasseName } from "../logic/leistungen.js";
@@ -9,6 +10,7 @@ import { toast } from "../ui/hinweise.js";
 import { deD, parseIso, today } from "../utils/datum.js";
 import { eur, numDE } from "../utils/format.js";
 
+/** PDF-Quittung für die Verhinderungspflege durch Privatpersonen. */
 export async function makeQuittung() {
   const doc = await newDoc();
   if (!doc) return;
@@ -144,6 +146,10 @@ function drawLetter(doc, b) {
   }
 }
 
+/**
+ * Antrag als PDF-Brief.
+ * @param b Leistung
+ */
 export async function makePDF(b) {
   const doc = await newDoc();
   if (!doc) return;
@@ -165,6 +171,12 @@ async function blobToDataURL(id) {
   return { url: c.toDataURL("image/jpeg", 0.8), w: c.width, h: c.height };
 }
 
+/**
+ * Belegmappe als PDF: Übersicht und Fotos, auf Wunsch mit Antrag und nur Zuzahlungen.
+ * @param withLetter mit Antrag
+ * @param onlyZZ nur Zuzahlungen
+ * @param yearsArg Jahre
+ */
 export async function makeMappe(withLetter, onlyZZ, yearsArg) {
   const doc = await newDoc();
   if (!doc) return;
@@ -257,6 +269,7 @@ export async function makeMappe(withLetter, onlyZZ, yearsArg) {
   );
 }
 
+/** Belege der gewählten Jahre als Tabelle (CSV, mit Semikolon für Excel). */
 export async function makeCSV() {
   const years = selYears();
   const jahr = years.slice().reverse().join("-");

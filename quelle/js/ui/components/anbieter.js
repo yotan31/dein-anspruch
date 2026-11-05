@@ -1,3 +1,4 @@
+// Baustein „Anbieter vor Ort finden“: Suche nach Postleitzahl über die offiziellen Verzeichnisse.
 import { Z } from "../../state/zustand.js";
 import { ic } from "../symbole.js";
 import { esc } from "../../utils/format.js";

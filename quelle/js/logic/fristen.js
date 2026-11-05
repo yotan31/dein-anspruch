@@ -1,3 +1,4 @@
+// Termine und Fristen: Beratungsbesuche nach § 37 Abs. 3 SGB XI, Verfallsdaten, Kalender-Links.
 import { KATS } from "./belege.js";
 import { bescheidInfo } from "./bescheid.js";
 import { gdb, isHome, pg } from "./lage.js";
@@ -9,12 +10,14 @@ export function beratungRelevant() {
   return pg() >= 2 && ["angehoerige", "gemischt", "wg"].includes(Z.S.wohnen);
 }
 
+/** Daten aller Beratungsbesuche: eingetragene und solche aus Belegen, ohne Doppelte. */
 export function besuche() {
   const a = (Z.S.termine.besuche || []).map((x) => x.d);
   const b = Z.BEL.filter((x) => x.kat === "beratung" && x.datum).map((x) => x.datum);
   return [...new Set([...a, ...b])].filter(parseIso).sort();
 }
 
+/** Stand des Beratungsbesuchs im laufenden Halbjahr (erledigt oder fällig) und das nächste Halbjahr. */
 export function beratungStatus() {
   const H = halfOf(TODAY());
   const v = besuche().map(parseIso);
@@ -22,6 +25,9 @@ export function beratungStatus() {
   return { H, done: inH(H), prev: shiftHalf(H, -1), prevDone: inH(shiftHalf(H, -1)), next: shiftHalf(H, 1), inH };
 }
 
+/**
+ * Alle Fristen der Familie nach Datum: Beratung, Widerspruch, Verfall, Verhinderungspflege, Zuzahlungsbefreiung, Wertmarke, eigene Erinnerungen.
+ */
 export function deadlines() {
   const L = [];
   const t = TODAY();
@@ -112,16 +118,28 @@ export function deadlines() {
   return L.sort((a, b) => +a.d - +b.d);
 }
 
+/**
+ * Dringlichkeit eines Datums: „late“ (vorbei), „soon“ (60 Tage) oder „ok“.
+ * @param d Datum
+ */
 export function urg(d) {
   const n = daysUntil(d);
   return n < 0 ? "late" : n <= 60 ? "soon" : "ok";
 }
 
+/**
+ * Abstand zu einem Datum in Worten, z. B. „in 12 Tagen“.
+ * @param d Datum
+ */
 export function urgTxt(d) {
   const n = daysUntil(d);
   return n < 0 ? `${-n} Tage überfällig` : n === 0 ? "heute" : n === 1 ? "morgen" : `in ${n} Tagen`;
 }
 
+/**
+ * Link, der die Frist in Google Kalender einträgt.
+ * @param item Frist
+ */
 export function gcal(item) {
   const r = item.remind < TODAY() ? TODAY() : item.remind;
   const a = isoD(r).replace(/-/g, ""),
@@ -129,6 +147,10 @@ export function gcal(item) {
   return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(item.t)}&dates=${a}/${b}&details=${encodeURIComponent(item.s + " Frist: " + deD(item.d) + ". (Dein Anspruch)")}`;
 }
 
+/**
+ * Link, der die Frist in Outlook einträgt.
+ * @param item Frist
+ */
 export function ocal(item) {
   const r = item.remind < TODAY() ? TODAY() : item.remind;
   return `https://outlook.live.com/calendar/0/deeplink/compose?path=/calendar/action/compose&rru=addevent&allday=true&subject=${encodeURIComponent(item.t)}&startdt=${isoD(r)}&enddt=${isoD(addDays(r, 1))}&body=${encodeURIComponent(item.s + " Frist: " + deD(item.d) + ".")}`;

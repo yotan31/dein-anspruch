@@ -1,3 +1,4 @@
+// Karte zum Pflegegrad-Bescheid: Stand, Widerspruchsfrist und Knopf zum Erfassen.
 import { bescheidInfo } from "../../logic/bescheid.js";
 import { urgTxt } from "../../logic/fristen.js";
 import { Z } from "../../state/zustand.js";
@@ -5,6 +6,7 @@ import { ic, infoBtn } from "../symbole.js";
 import { TODAY, deD, isoD, parseIso } from "../../utils/datum.js";
 import { esc } from "../../utils/format.js";
 
+/** Karte zum Bescheid (HTML); leer, wenn Pflege nicht gewählt ist. */
 export function bescheidCard() {
   if (!Z.S.bereiche.pflege) return "";
   const i = bescheidInfo();

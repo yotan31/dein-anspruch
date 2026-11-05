@@ -1,6 +1,8 @@
+// Feste Listen der App: Pflegegrade, Kassen, AOK-Regionen, Wohnformen, Merkzeichen, Entlastungs-Anbieter.
+// Beträge stehen nicht hier, sondern in config/betraege.js, damit es für jedes neue Jahr nur eine Stelle gibt.
 import { BETRAEGE } from "./betraege.js";
 
-/* ---------- Stammdaten (Beträge kommen aus 00-betraege.js) ---------- */
+/* ---------- Stammdaten (Beträge kommen aus config/betraege.js) ---------- */
 export const PG = {
   pflegegeld: BETRAEGE.pflegegeld,
   sachleistung: BETRAEGE.sachleistung,

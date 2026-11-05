@@ -1,3 +1,4 @@
+// Belege erfassen und speichern: Foto verkleinern, Text erkennen, Eintrag anlegen, ändern, löschen.
 import { selYears } from "../logic/belege.js";
 import { blobUrl, save } from "./speicher.js";
 import { Z } from "../state/zustand.js";
@@ -27,6 +28,10 @@ export function startPending(file) {
   render();
 }
 
+/**
+ * Öffnet einen gespeicherten Beleg zum Bearbeiten.
+ * @param id Beleg
+ */
 export function editBeleg(id) {
   const b = Z.BEL.find((x) => x.id === id);
   if (!b) return;
@@ -45,6 +50,10 @@ export function editBeleg(id) {
   scrollTop();
 }
 
+/**
+ * Foto verkleinern und als JPEG vorbereiten; PDFs bleiben unverändert. Spart Speicher und Datenvolumen.
+ * @param f Datei
+ */
 export async function prepareFile(f) {
   if (f.type === "application/pdf") return { blob: f, type: "application/pdf" };
   try {
@@ -61,6 +70,7 @@ export async function prepareFile(f) {
   throw { code: "unsupported_type" };
 }
 
+/** Speichert den Beleg, der gerade erfasst wird (mit Konto in der Datenbank, sonst im Browser). */
 export async function saveBeleg() {
   if (Z.busy || !Z.pending) return;
   const p = Z.pending;
@@ -145,6 +155,10 @@ export async function saveBeleg() {
   render();
 }
 
+/**
+ * Löscht einen Beleg samt Foto.
+ * @param id Beleg
+ */
 export async function deleteBeleg(id) {
   const b = Z.BEL.find((x) => x.id === id);
   Z.delAsk = null;
@@ -164,6 +178,10 @@ export async function deleteBeleg(id) {
   render();
 }
 
+/**
+ * Markiert einen Beleg als eingereicht oder nimmt die Markierung zurück.
+ * @param id Beleg
+ */
 export async function toggleSubmitted(id) {
   const b = Z.BEL.find((x) => x.id === id);
   if (!b) return;

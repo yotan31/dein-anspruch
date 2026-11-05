@@ -1,10 +1,11 @@
+// Installation als App auf dem Startbildschirm (Android über den Browser-Dialog, iOS mit Anleitung).
 import { lsSet } from "./lokal.js";
 import { Z } from "../state/zustand.js";
 import { offlineHinweis } from "../ui/components/install-karte.js";
 import { render } from "../ui/render.js";
 
-export /** Läuft die App schon als installierte App (Startbildschirm)? */
-function istInstalliert() {
+/** Läuft die App schon als installierte App (Startbildschirm)? */
+export function istInstalliert() {
   try {
     return matchMedia("(display-mode: standalone)").matches || /** @type {any} */ (navigator).standalone === true;
   } catch (e) {
@@ -12,10 +13,12 @@ function istInstalliert() {
   }
 }
 
+/** iPhone oder iPad? Dort gibt es keinen Installations-Dialog, nur die Anleitung. */
 export function istIOS() {
   return /iPhone|iPad|iPod/.test(navigator.userAgent);
 }
 
+/** Öffnet den Installations-Dialog des Browsers (Android, Chrome, Edge). */
 export async function installieren() {
   const p = Z.installPrompt;
   if (!p) return;
@@ -28,12 +31,13 @@ export async function installieren() {
   render();
 }
 
+/** Installations-Hinweis dauerhaft ausblenden. */
 export function installWeg() {
   lsSet("da-install-weg", true);
   render();
 }
 
-/** Wird beim Start der App einmal aufgerufen (siehe 99-start.js). */
+/** Wird beim Start der App einmal aufgerufen (siehe start.js). */
 export function startInstallation() {
   if (
     "serviceWorker" in navigator &&

@@ -1,3 +1,5 @@
+// Anonyme Schritt-Zählung: nur Monat, Schritt und Antrags-Art, nie Personen oder Inhalte.
+// Dient dazu zu sehen, wo Familien hängen bleiben.
 import { Z } from "../state/zustand.js";
 
 /* ---------- Anonyme Schritt-Zählung: nur Monat, Schritt und Antrag-Art ----------

@@ -1,8 +1,10 @@
+// Seite „Personen“: zwischen gepflegten Personen wechseln, neue anlegen, Familie einladen.
 import { fallName } from "../../services/speicher.js";
 import { Z } from "../../state/zustand.js";
 import { ic } from "../symbole.js";
 import { esc } from "../../utils/format.js";
 
+/** Seite „Personen“ (HTML). */
 export function viewPersons() {
   const cur = Z.FAELLE.find((f) => f.id === Z.FALL_ID) || {};
   const own = cur.rolle === "besitzer";

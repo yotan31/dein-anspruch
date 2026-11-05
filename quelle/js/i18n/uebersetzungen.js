@@ -1,5 +1,6 @@
-export /* ---------- Sprachen: Oberfläche, Fragebogen und Rechner übersetzt; Anträge bleiben Deutsch ---------- */
-const LANGS = [
+// Wörterbuch aller Übersetzungen (Deutsch → Türkisch, Russisch, Arabisch, Tigrinya).
+// Nur Daten, keine Logik; neue Texte werden hier ergänzt.
+export const LANGS = [
   ["de", "Deutsch"],
   ["tr", "Türkçe"],
   ["ru", "Русский"],
@@ -7,8 +8,8 @@ const LANGS = [
   ["ti", "ትግርኛ"],
 ];
 
-export // Reihenfolge je Eintrag: Türkisch, Russisch, Arabisch, Tigrinya
-const T = {
+// Reihenfolge je Eintrag: Türkisch, Russisch, Arabisch, Tigrinya
+export const T = {
   "Alle Hilfen, die euch bei Pflege zustehen. Mit fertigen Anträgen.": [
     "Bakımda hakkınız olan tüm yardımlar. Hazır başvurularla.",
     "Вся помощь по уходу, которая вам положена. С готовыми заявлениями.",

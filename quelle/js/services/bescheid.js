@@ -1,3 +1,4 @@
+// Bescheid fotografieren und lesen: lädt die Texterkennung (Tesseract) erst bei Bedarf und speichert das Ergebnis.
 import { parseBescheid } from "../logic/bescheid.js";
 import { pg } from "../logic/lage.js";
 import { prepareFile } from "./belege.js";
@@ -7,6 +8,7 @@ import { toast } from "../ui/hinweise.js";
 import { render } from "../ui/render.js";
 import { TODAY, isoD, parseIso } from "../utils/datum.js";
 
+/** Lädt die Texterkennung beim ersten Bedarf; sie ist groß und wird sonst nicht gebraucht. */
 export async function loadTesseract() {
   if (window.Tesseract) return window.Tesseract;
   return new Promise((res, rej) => {
@@ -20,6 +22,10 @@ export async function loadTesseract() {
   });
 }
 
+/**
+ * Liest den Text eines fotografierten Bescheids und füllt das Formular zum Prüfen vor.
+ * @param file Foto
+ */
 export async function scanBescheid(file) {
   if (!file) return;
   Z.bescheidDraft = { ...(Z.S.bescheid || {}), pg: Z.S.bescheid?.pg || String(pg() || ""), file };
@@ -45,6 +51,7 @@ export async function scanBescheid(file) {
   render();
 }
 
+/** Übernimmt den geprüften Bescheid in die Angaben. */
 export async function saveBescheid() {
   const d = Z.bescheidDraft;
   if (!d) return;

@@ -1,3 +1,4 @@
+// Hinweis zur Installation als App und zur Nutzung ohne Internet.
 import { istIOS, istInstalliert } from "../../services/installieren.js";
 import { lsGet } from "../../services/lokal.js";
 import { Z } from "../../state/zustand.js";
@@ -14,6 +15,10 @@ export function installKarte() {
   </section>`;
 }
 
+/**
+ * Zeigt oder entfernt den Hinweis „Ohne Internet“.
+ * @param an Hinweis zeigen
+ */
 export function offlineHinweis(an) {
   let b = document.getElementById("offlinebanner");
   if (an && !b) {

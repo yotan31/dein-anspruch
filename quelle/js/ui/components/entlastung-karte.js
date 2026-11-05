@@ -1,3 +1,4 @@
+// Karte zum Entlastungsbetrag: angespart, verbraucht und was wann verfällt.
 import { ENTLASTUNG } from "../../config/stammdaten.js";
 import { entlKonto } from "../../logic/entlastung.js";
 import { urgTxt } from "../../logic/fristen.js";
@@ -6,6 +7,7 @@ import { ic, infoBtn } from "../symbole.js";
 import { daysUntil } from "../../utils/datum.js";
 import { esc, eur } from "../../utils/format.js";
 
+/** Karte zum Entlastungsbetrag (HTML); leer ohne Anspruch. */
 export function entlCard() {
   const k = entlKonto();
   if (!k) return "";

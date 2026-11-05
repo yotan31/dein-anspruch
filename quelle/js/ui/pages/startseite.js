@@ -1,3 +1,4 @@
+// Startseite für alle, die noch nicht angemeldet sind: was die App kann, wie es geht, häufige Fragen.
 import { BETRAEGE } from "../../config/betraege.js";
 import { faqHTML } from "../components/fragen.js";
 import { ic } from "../symbole.js";
@@ -29,8 +30,8 @@ function vorschau() {
   </div>`;
 }
 
-export /** Startseite für alle, die noch nicht angemeldet sind */
-function startseite() {
+/** Startseite für alle, die noch nicht angemeldet sind */
+export function startseite() {
   const schritt = (n, i, t, u) =>
     `<li class="lp-schritt"><span class="lp-nr">${n}</span>${ic(i)}<strong>${t}</strong><span>${u}</span></li>`;
   const fuer = (i, t, punkte) =>

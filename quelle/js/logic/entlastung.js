@@ -1,3 +1,4 @@
+// Entlastungsbetrag-Konto: angesparte, verbrauchte und verfallende Beträge nach Monaten.
 import { ENTLASTUNG } from "../config/stammdaten.js";
 import { isHome, pg } from "./lage.js";
 import { Z } from "../state/zustand.js";

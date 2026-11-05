@@ -1,9 +1,14 @@
+// Anmeldung über Supabase: Konto anlegen, anmelden, Passwort zurücksetzen, abmelden.
 import { lsGet, lsSet } from "./lokal.js";
 import { blank } from "../state/angaben.js";
 import { Z } from "../state/zustand.js";
 import { toast } from "../ui/hinweise.js";
 import { $, render, scrollTop } from "../ui/render.js";
 
+/**
+ * Führt die Aktion des Anmeldeformulars aus (anmelden, registrieren, Passwort vergessen oder neu setzen).
+ * @param a Name der Aktion
+ */
 export async function authAction(a) {
   const mail = ($("au-mail") || {}).value?.trim() || "",
     pw = ($("au-pw") || {}).value || "";
@@ -80,6 +85,7 @@ export async function authAction(a) {
   render();
 }
 
+/** Anmeldung mit Google über Supabase (Weiterleitung zu Google und zurück). */
 export async function googleLogin() {
   Z.authBusy = true;
   Z.authMsg = "";
@@ -97,6 +103,7 @@ export async function googleLogin() {
   }
 }
 
+/** Abmelden und alle Angaben der Sitzung aus der App entfernen. */
 export async function logout() {
   try {
     await Z.sb.auth.signOut();
