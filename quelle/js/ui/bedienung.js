@@ -11,11 +11,11 @@ import { AKTIONEN_DATEN } from "./aktionen/daten.js";
 import { beiAenderung, beiEingabe } from "./aktionen/eingaben.js";
 import { AKTIONEN_FRAGEBOGEN } from "./aktionen/fragebogen.js";
 import { AKTIONEN_HILFE } from "./aktionen/hilfe.js";
-import { AKTIONEN_KONTO } from "./aktionen/konto.js";
+import { AKTIONEN_KONTO, zurStartseite } from "./aktionen/konto.js";
 import { AKTIONEN_PERSONEN } from "./aktionen/personen.js";
 import { AKTIONEN_RECHNER } from "./aktionen/rechner.js";
 import { AKTIONEN_TERMINE } from "./aktionen/termine.js";
-import { $, render } from "./render.js";
+import { $, famKey, render } from "./render.js";
 
 /** Alle data-act-Aktionen; jeder Name darf nur einmal vorkommen (wird beim Start geprüft). */
 const AKTIONEN = vereinige([
@@ -199,6 +199,10 @@ export function verbindeBedienung() {
   document.addEventListener("focusin", beiFokus);
   document.addEventListener("toggle", beiAufklappen, true); // toggle steigt nicht auf, daher in der Erfassungsphase
   document.addEventListener("keydown", beiTaste);
+  // Zurück-Taste des Browsers bzw. Handys: aus der App ohne Konto zurück zur Startseite
+  addEventListener("popstate", () => {
+    if (!Z.USER && famKey() !== "login") zurStartseite();
+  });
   verbindeZiehenUndAblegen();
   $("lbclose").onclick = () => ($("lightbox").hidden = true);
   $("lightbox").onclick = (e) => {

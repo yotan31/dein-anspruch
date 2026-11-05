@@ -342,10 +342,20 @@ button.hpost:focus-visible {
   position: relative;
   z-index: 1;
 }
+/* Logo und Name sind ein Knopf zur Startseite, sehen aber nicht wie ein Knopf aus */
 .brand {
   display: flex;
   align-items: center;
   gap: 10px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  border-radius: var(--r-mittel);
 }
 .brand .logo {
   width: 44px;
@@ -3605,7 +3615,7 @@ input[type="month"]:focus {
     height: 36px;
   }
   .brand b {
-    font-size: 1.05rem;
+    font-size: 1rem;
   }
   .topbar {
     column-gap: 8px;

@@ -69,6 +69,11 @@ export function render() {
   try {
     applyI18n(document.querySelector(".wrap"));
   } catch (e) {}
+  // Startseite verlassen (Fragebogen, Rechner, App ohne Konto): Eintrag im Verlauf, damit „Zurück“ dorthin führt
+  if (Z.lastFam === "login" && fam !== "login" && !Z.USER)
+    try {
+      history.pushState({ app: true }, "");
+    } catch (e) {}
   Z.lastFam = fam;
   Z.lastIdx = idx;
 }

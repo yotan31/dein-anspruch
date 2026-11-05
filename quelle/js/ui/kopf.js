@@ -39,7 +39,8 @@ function sprachwahl() {
 /** Zeichnet den Kopf: Marke, Speicherstand und Überblick mit Summe. */
 export function renderHero() {
   const save = `<div class="savestate"><span class="dot ${Z.saveState.c}" id="savedot"></span><span id="savetxt">${esc(Z.saveState.t)}</span></div>`;
-  const brand = `<div class="brand"><img class="logo" src="logo.webp" width="44" height="44" alt=""><b>Dein Anspruch</b></div>`;
+  // Das Logo führt zurück: ohne Konto zur Startseite, mit Konto zur Übersicht
+  const brand = `<button type="button" class="brand" data-act="startseite" aria-label="Dein Anspruch, zur Startseite"><img class="logo" src="logo.webp" width="44" height="44" alt=""><b>Dein Anspruch</b></button>`;
   const curF = Z.USER && Z.FAELLE.find((f) => f.id === Z.FALL_ID);
   const personBtn = curF
     ? `<button type="button" class="acct person" data-act="persons" aria-expanded="${Z.showPersons}">${ic("user")}${esc(fallName(curF))} ▾</button>`

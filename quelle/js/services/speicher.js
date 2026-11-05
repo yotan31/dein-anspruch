@@ -185,6 +185,21 @@ const REF_LOCAL = {
   },
 };
 
+/**
+ * Ohne Konto zurück zur Startseite. Die Angaben werden sofort im Browser gesichert (ein noch wartendes Speichern
+ * ginge sonst verloren) und sind beim nächsten „Jetzt kostenlos prüfen“ wieder da.
+ */
+export function beendeGast() {
+  if (!Z.GUEST) return;
+  clearTimeout(Z.saveTimer);
+  Z.saveTimer = null;
+  lsSet("dein-anspruch-gast", { ...JSON.parse(JSON.stringify(Z.S)), updated: new Date().toISOString() });
+  lsSet("dein-anspruch-modus", "");
+  Z.GUEST = false;
+  Z.canSave = false;
+  Z.ref = null;
+}
+
 /** Lädt alle Personen, auf die das Konto Zugriff hat. */
 export async function loadFaelle() {
   const { data, error } = await Z.sb.from("fall").select("id,data,created_by,updated_at").order("created_at");

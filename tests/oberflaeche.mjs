@@ -324,6 +324,18 @@ console.log("Startseite: Schnellstart und Hilfe");
     "nach dem Fragebogen öffnet sich direkt der gewählte Antrag",
     await page.evaluate(() => S.done && S.wiz && S.wiz.k === "pg_antrag" && !S.ziel),
   );
+  await page.locator("#hero .brand").tap();
+  await page.waitForTimeout(300);
+  check("Logo führt ohne Konto zurück zur Startseite", (await page.locator(".lp-hero").count()) === 1);
+  await page.locator('.lp-hero [data-act="au-guest"]').tap();
+  await page.waitForTimeout(300);
+  check(
+    "danach geht es mit den gespeicherten Angaben weiter",
+    await page.evaluate(() => S.done && S.wiz && S.wiz.k === "pg_antrag"),
+  );
+  await page.goBack();
+  await page.waitForTimeout(400);
+  check("Zurück-Taste führt zur Startseite", (await page.locator(".lp-hero").count()) === 1);
   check("keine Programmfehler", errors.length === 0, errors.join(" | "));
 }
 
