@@ -2,7 +2,6 @@
 // damit einzelne Berechnungen direkt geprüft werden können.
 // ladeApp({ heute: "2026-03-15" }) liefert eine Funktion run("ausdruck"), die im Programm ausgewertet wird.
 import vm from "node:vm";
-import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -11,27 +10,12 @@ const DIR = path.join(ROOT, "quelle", "js");
 
 const esbuild = await import(process.env.ESBUILD_PFAD || "esbuild");
 let gebaut = null;
-// einmal bauen, für alle Tests wiederverwenden (ohne den Startteil, der die Oberfläche aufbaut)
+// einmal bauen, für alle Tests wiederverwenden
 function code() {
   if (gebaut) return gebaut;
   const r = esbuild.buildSync({
-    stdin: {
-      contents:
-        fs
-          .readdirSync(DIR)
-          .filter((f) => /^\d\d-.*\.js$/.test(f) && !f.startsWith("99-"))
-          .sort()
-          .map((f) => `import * as m${f.slice(0, 2)} from "./${f}";`)
-          .join("\n") +
-        `\nimport { Z } from "./zustand.js";\nObject.defineProperty(globalThis, "__da", { value: Object.assign({ Z }, ${fs
-          .readdirSync(DIR)
-          .filter((f) => /^\d\d-.*\.js$/.test(f) && !f.startsWith("99-"))
-          .sort()
-          .map((f) => "m" + f.slice(0, 2))
-          .join(", ")}) });`,
-      resolveDir: DIR,
-      loader: "js",
-    },
+    // alle Programmteile ohne den Startteil (start.js), der die Oberfläche aufbaut
+    entryPoints: [path.join(DIR, "alle-module.js")],
     bundle: true,
     format: "iife",
     target: ["es2020"],
@@ -126,7 +110,11 @@ export function ladeApp({ heute = "2026-03-15" } = {}) {
   vm.createContext(ctx);
   vm.runInContext(code(), ctx, { filename: "app.js" });
   // Vorbereitung wie beim echten Start (ohne die Teile, die die Oberfläche und den Speicher anschließen)
-  vm.runInContext(`__da.start03(); __da.start05(); __da.start06(); __da.start09();`, ctx);
+  // dieselben Datenschritte wie beim Start der App (quelle/js/start.js), ohne Oberfläche
+  vm.runInContext(
+    `__da.ergaenzeBefreiungsantrag(); __da.verbindeAssistenten(); __da.ergaenzeWiderspruch(); __da.ladeSprache();`,
+    ctx,
+  );
   // Programmteile unter ihren Namen erreichbar machen (wie früher als globale Namen)
   vm.runInContext(
     `(() => { const d = globalThis.__da;

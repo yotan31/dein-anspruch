@@ -1,0 +1,109 @@
+import { applyI18n } from "../i18n/sprachen.js";
+import { visSteps } from "../logic/fragebogen.js";
+import { B } from "../logic/leistungen.js";
+import { consentNeeded } from "../services/speicher.js";
+import { Z } from "../state/zustand.js";
+import { renderHero, renderTabs, schrift } from "./kopf.js";
+import { viewLogin, viewNeuesPasswort } from "./pages/anmeldung.js";
+import { viewAnsprueche } from "./pages/ansprueche.js";
+import { viewWizard } from "./pages/assistent.js";
+import { viewBelege } from "./pages/belege.js";
+import { viewConsent } from "./pages/einwilligung.js";
+import { VIEWS } from "./pages/fragebogen.js";
+import { viewPersons } from "./pages/personen.js";
+import { viewRechner } from "./pages/rechner.js";
+import { viewTermine } from "./pages/termine.js";
+
+/* ---------- Rendering ---------- */
+/** @param {string} id @returns {any} Element der Seite (bewusst ohne genauen Typ, wird überall als Formularfeld oder Bereich genutzt) */
+export function $(id) {
+  return document.getElementById(id);
+}
+
+const TAB_ORDER = ["ansprueche", "belege", "termine"];
+
+export function famKey() {
+  if (Z.RECHNER) return "r";
+  if (typeof Z.USER !== "undefined" && !Z.USER && !Z.GUEST) return "login";
+  if (typeof Z.showPersons !== "undefined" && Z.showPersons) return "persons";
+  if (Z.S.wiz) return "w:" + Z.S.wiz.k;
+  if (!Z.S.done) return "q";
+  return "tab:" + (typeof Z.FALL_ID !== "undefined" ? Z.FALL_ID : "");
+}
+
+function screenIdx() {
+  return Z.RECHNER ? Z.RECHNER.i : Z.S.wiz ? Z.S.wiz.i : !Z.S.done ? Z.S.step : TAB_ORDER.indexOf(Z.S.tab);
+}
+
+export function reveal(el) {
+  if (!el) return;
+  const r = el.getBoundingClientRect();
+  if (r.top < 70 || r.top > innerHeight * 0.45) el.scrollIntoView({ block: "start" });
+}
+
+export function render() {
+  const fam = famKey(),
+    idx = screenIdx(),
+    changed = Z.lastFam !== null && (fam !== Z.lastFam || idx !== Z.lastIdx);
+  if (changed) {
+    const a = document.activeElement;
+    if (a && a !== document.body && a.blur && !(a.closest && a.closest("#hero")))
+      try {
+        a.blur();
+      } catch (e) {}
+  }
+  renderHero();
+  renderTabs();
+  renderMain();
+  try {
+    applyI18n(document.querySelector(".wrap"));
+  } catch (e) {}
+  Z.lastFam = fam;
+  Z.lastIdx = idx;
+}
+
+export function scrollTop() {
+  window.scrollTo({ top: 0, behavior: "instant" });
+}
+
+function renderMain() {
+  document.documentElement.style.setProperty("--fs", schrift());
+  if (!Z.loaded) {
+    $("main").innerHTML =
+      `<section class="panel"><p class="muted">Einen Moment, deine Daten werden geladen …</p></section>`;
+    return;
+  }
+  if (Z.RECOVERY) {
+    $("main").innerHTML = viewNeuesPasswort();
+    return;
+  }
+  if (Z.RECHNER) {
+    $("main").innerHTML = viewRechner();
+    return;
+  }
+  if (!Z.USER && !Z.GUEST) {
+    $("main").innerHTML = viewLogin();
+    return;
+  }
+  if (Z.USER && Z.showPersons) {
+    $("main").innerHTML = viewPersons();
+    return;
+  }
+  if (consentNeeded()) {
+    $("main").innerHTML = viewConsent();
+    return;
+  }
+  if (Z.S.wiz && B.find((x) => x.k === Z.S.wiz.k)) {
+    $("main").innerHTML = viewWizard();
+    return;
+  }
+  Z.S.wiz = null;
+  if (!Z.S.done) {
+    const vs = visSteps();
+    if (Z.S.step >= vs.length) Z.S.step = vs.length - 1;
+    $("main").innerHTML = VIEWS[vs[Z.S.step].id]();
+  } else {
+    $("main").innerHTML =
+      Z.S.tab === "belege" ? viewBelege() : Z.S.tab === "termine" ? viewTermine() : viewAnsprueche();
+  }
+}

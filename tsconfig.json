@@ -14,5 +14,5 @@
     "module": "ESNext",
     "moduleResolution": "bundler"
   },
-  "include": ["quelle/js/*.js", "quelle/typen.d.ts"]
+  "include": ["quelle/js/**/*.js", "quelle/typen.d.ts"]
 }
