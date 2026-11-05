@@ -10,11 +10,11 @@ export const LANGS = [
 
 // Reihenfolge je Eintrag: Türkisch, Russisch, Arabisch, Tigrinya
 export const T = {
-  "Alle Hilfen, die dir und deiner Familie bei Pflege zustehen. Mit fertigen Anträgen.": [
-    "Bakımda hakkınız olan tüm yardımlar. Hazır başvurularla.",
-    "Вся помощь по уходу, которая вам положена. С готовыми заявлениями.",
-    "كل المساعدات التي تستحقونها في الرعاية. مع طلبات جاهزة.",
-    "ኩሉ ሓገዝ ናይ ክንክን ዝግባእኩም። ምስ ድሉዋት ሕቶታት።",
+  "Pflegeleistungen prüfen und beantragen.": [
+    "Bakım yardımlarını kontrol edin ve başvurun.",
+    "Проверить и оформить выплаты по уходу.",
+    "تحقق من خدمات الرعاية وقدّم الطلبات.",
+    "ናይ ክንክን ሓገዛት ፈትሽ፡ ከኣ ሕተት።",
   ],
   "Pflegegrad einschätzen": [
     "Bakım derecesini tahmin et",
@@ -86,8 +86,6 @@ export const T = {
   ],
   "Hilfe und Fragen": ["Yardım ve sorular", "Помощь и вопросы", "المساعدة والأسئلة", "ሓገዝን ሕቶታትን"],
   "Keine Vollmacht nötig": ["Vekâletname gerekmez", "Доверенность не нужна", "لا حاجة إلى توكيل", "ውክልና ኣየድልን"],
-  "Daten in Deutschland": ["Veriler Almanya'da", "Данные в Германии", "البيانات في ألمانيا", "ዳታ ኣብ ጀርመን"],
-  "Alles auf einen Blick": ["Her şey bir bakışta", "Всё с первого взгляда", "كل شيء في لمحة", "ኩሉ ብሓደ ጠመተ"],
   "Persönliche Hilfe": ["Kişisel yardım", "Личная помощь", "مساعدة شخصية", "ውልቃዊ ሓገዝ"],
   "Welche Hilfen stehen euch noch zu?": [
     "Hangi yardımlara hâlâ hakkınız var?",
