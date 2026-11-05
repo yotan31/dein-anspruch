@@ -44,7 +44,7 @@ export function viewBelege() {
     <div class="drop" id="drop">
       ${bild("belege")}
       <p><strong>${canFiles ? "Rezept, Quittung oder Rechnung fotografieren" : "Rezept, Quittung oder Rechnung erfassen"}</strong></p>
-      <div class="btnrow" style="justify-content:center">
+      <div class="btnrow justify-center">
         ${canFiles ? `<button class="btn" type="button" data-act="cam">${ic("camera")}Foto aufnehmen</button><button class="btn soft" type="button" data-act="pick">${ic("file")}Datei wählen</button>` : ""}
         <button class="btn ${canFiles ? "ghost" : ""}" type="button" data-act="manual">${ic("plus")}${canFiles ? "Ohne Foto erfassen" : "Beleg eintragen"}</button>
       </div>
@@ -55,14 +55,14 @@ export function viewBelege() {
 
   <section class="panel">
     <div class="titelzeile"><h3>Zuzahlungen begrenzen</h3>${infoBtn("Belastungsgrenze (§ 62 SGB V)", "Pro Jahr zahlt man höchstens 2 % der Bruttoeinnahmen des Haushalts zu, chronisch Kranke 1 %. Für Ehepartner und Kinder zieht die Kasse Freibeträge ab.\n\nZu viel Gezahltes kann meist bis zu 4 Jahre rückwirkend erstattet werden, für jedes Jahr mit eigenem Antrag.")}</div>
-    <div class="field" style="max-width:320px"><label for="chron">Schwerwiegend chronisch krank?</label><select id="chron"><option value="" ${!Z.S.chronisch ? "selected" : ""}>Automatisch (${chronisch() ? "ja" : "nein"})</option><option value="ja" ${Z.S.chronisch === "ja" ? "selected" : ""}>Ja, 1 %</option><option value="nein" ${Z.S.chronisch === "nein" ? "selected" : ""}>Nein, 2 %</option></select></div>
+    <div class="field max-320"><label for="chron">Schwerwiegend chronisch krank?</label><select id="chron"><option value="" ${!Z.S.chronisch ? "selected" : ""}>Automatisch (${chronisch() ? "ja" : "nein"})</option><option value="ja" ${Z.S.chronisch === "ja" ? "selected" : ""}>Ja, 1 %</option><option value="nein" ${Z.S.chronisch === "nein" ? "selected" : ""}>Nein, 2 %</option></select></div>
     ${years
       .map((j) => {
         const z = zuz(j);
         const p = z.grenze ? Math.min(100, (z.sum / z.grenze) * 100) : 0;
         const reached = z.grenze && z.sum >= z.grenze;
-        return `<div class="meter" style="border-top:1px solid var(--line);padding-top:12px">
-        <div class="section-title"><strong>${j}</strong><div class="field" style="flex-direction:row;align-items:center;gap:8px"><label for="brutto-${j}" class="small">Brutto ${j} (€)</label><input type="text" inputmode="decimal" id="brutto-${j}" data-brutto="${j}" value="${esc(bruttoOf(j))}" placeholder="z. B. 24000" style="width:130px"></div></div>
+        return `<div class="meter meter-trenner">
+        <div class="section-title"><strong>${j}</strong><div class="field field-zeile"><label for="brutto-${j}" class="small">Brutto ${j} (€)</label><input type="text" inputmode="decimal" id="brutto-${j}" data-brutto="${j}" value="${esc(bruttoOf(j))}" placeholder="z. B. 24000" class="brutto-feld"></div></div>
         <div class="nums"><span>Gezahlt: <strong>${eur(z.sum, 2)}</strong></span><span>Grenze (${z.pct} %): <strong>${z.grenze ? eur(z.grenze, 2) : "Brutto eintragen"}</strong></span></div>
         <div class="track" role="progressbar" aria-label="Zuzahlungen ${j}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(p)}"><i class="${reached ? "over" : ""}" style="width:${p}%"></i></div>
         ${z.grenze ? (reached ? `<p class="notice good">${ic("check")}<span><strong>Grenze erreicht.</strong> ${eur(z.sum - z.grenze, 2)} zurückholen${j === String(new Date().getFullYear()) ? ", und für den Rest des Jahres entfallen Zuzahlungen" : ""}.</span></p>` : `<p class="small muted">Noch ${eur(z.grenze - z.sum, 2)} bis zur Grenze.</p>`) : ""}
@@ -72,7 +72,7 @@ export function viewBelege() {
       .join("")}
   </section>
 
-  <section style="display:flex;flex-direction:column;gap:12px">
+  <section class="stapel-12">
     <div class="section-title"><h3>Abgelegt: ${esc(label)}</h3><span class="small muted">${shown.length} Belege · ${eur(
       shown.reduce((s, b) => s + (Number(b.betrag) || 0), 0),
       2,
@@ -93,7 +93,7 @@ export function viewBelege() {
             .reverse()
             .map(
               (y) =>
-                `${years.length > 1 ? `<h3 style="margin-top:4px">${y}</h3>` : ""}${Object.entries(byYear[y])
+                `${years.length > 1 ? `<h3 class="mt-4">${y}</h3>` : ""}${Object.entries(byYear[y])
                   .map(
                     ([k, arr]) =>
                       `<div class="group"><header><span>${esc((KATS[k] || KATS.sonst).t)}</span><span>${eur(
@@ -114,12 +114,12 @@ function belegRow(b) {
   const isImg = b.asset && /^image\//.test(b.ctype || "");
   const thumb = b.asset
     ? isImg
-      ? `<button type="button" class="thumb" data-view="${b.asset}" style="padding:0;cursor:zoom-in" aria-label="Beleg ansehen"><img src="${esc(blobUrl(b.asset))}" alt="" loading="lazy"></button>`
+      ? `<button type="button" class="thumb thumb-zoom" data-view="${b.asset}" aria-label="Beleg ansehen"><img src="${esc(blobUrl(b.asset))}" alt="" loading="lazy"></button>`
       : `<a class="thumb" href="${esc(blobUrl(b.asset))}" target="_blank" rel="noopener" aria-label="PDF öffnen">${ic("file")}</a>`
     : `<span class="thumb">${ic("receipt")}</span>`;
   const d = parseIso(b.datum);
   return `<div class="beleg">${thumb}
-    <div style="min-width:0"><div class="b-t">${esc(b.titel || (KATS[b.kat] || KATS.sonst).t)}</div><div class="b-m">${d ? deD(d) : "ohne Datum"}${b.eingereicht ? ' · <span style="color:var(--money);font-weight:700">eingereicht</span>' : ""}</div></div>
+    <div class="min-w-0"><div class="b-t">${esc(b.titel || (KATS[b.kat] || KATS.sonst).t)}</div><div class="b-m">${d ? deD(d) : "ohne Datum"}${b.eingereicht ? ' · <span class="betrag-fett">eingereicht</span>' : ""}</div></div>
     <div class="b-v">${b.betrag !== "" && b.betrag != null ? eur(Number(b.betrag), 2) : "–"}</div>
     <div class="b-a">${
       Z.delAsk === b.id
@@ -136,7 +136,7 @@ function pendingForm() {
     <h3>${p.editId ? "Beleg bearbeiten" : "Neuer Beleg"}</h3>
     <div class="preview">
       ${p.preview ? `<span class="thumb big"><img src="${esc(p.preview)}" alt="Vorschau"></span>` : p.file || p.keepAsset ? `<span class="thumb big">${ic("file")}</span>` : `<span class="thumb big">${ic("receipt")}</span>`}
-      ${canFiles ? `<div class="btnrow" style="flex-direction:column;align-items:flex-start"><button class="btn small soft" type="button" data-act="cam">${ic("camera")}${p.preview || p.file || p.keepAsset ? "Neues Foto" : "Foto aufnehmen"}</button><button class="btn small ghost" type="button" data-act="pick">${ic("file")}Datei wählen</button>${p.file || p.keepAsset ? `<button class="linkbtn danger" type="button" data-act="dropphoto">Foto entfernen</button>` : ""}</div>` : ""}
+      ${canFiles ? `<div class="btnrow btnrow-spalte"><button class="btn small soft" type="button" data-act="cam">${ic("camera")}${p.preview || p.file || p.keepAsset ? "Neues Foto" : "Foto aufnehmen"}</button><button class="btn small ghost" type="button" data-act="pick">${ic("file")}Datei wählen</button>${p.file || p.keepAsset ? `<button class="linkbtn danger" type="button" data-act="dropphoto">Foto entfernen</button>` : ""}</div>` : ""}
     </div>
     <fieldset class="q"><legend>Was ist das für ein Beleg?</legend><div class="choices">${Object.entries(KATS)
       .map(

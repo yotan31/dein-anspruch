@@ -28,7 +28,7 @@ export function viewAnsprueche() {
    ${installKarte()}
    ${
      !Z.S.welcomeSeen
-       ? `<section class="panel" style="gap:12px">
+       ? `<section class="panel gap-12">
      <div class="section-title"><h2>Fertig! So geht's weiter</h2><button type="button" class="linkbtn" data-act="welcome-ok">Ausblenden</button></div>
      <div class="howto">
        <button type="button" class="howbtn" data-act="welcome-ok"><b>${ic("list")}Ansprüche prüfen</b><span>Unten antippen: Anleitung, Checkliste, fertiger Antrag als Text oder PDF.</span></button>
@@ -41,10 +41,10 @@ export function viewAnsprueche() {
    <div class="section-title"><h2>Deine offenen Ansprüche</h2>${fortschritt(all)}</div>
    ${areas.length > 2 ? `<div class="filters">${areas.map((a) => `<button type="button" class="chip" data-area="${esc(a)}" aria-pressed="${Z.areaFilter === a}">${esc(a)}</button>`).join("")}</div>` : ""}
    ${sorted.length ? `<div class="list">${sorted.map(itemHTML).join("")}</div>` : `<section class="panel leer">${bild("fertig")}<h3>Alles im Blick</h3><p class="muted">Ihr nutzt bereits alles, was wir für eure Lage prüfen konnten.</p></section>`}
-   ${genutzt.length ? `<details class="used"><summary>${ic("chev")}Bereits genutzt (${genutzt.length})</summary><div class="list" style="margin-top:10px">${genutzt.map(itemHTML).join("")}</div></details>` : ""}
+   ${genutzt.length ? `<details class="used"><summary>${ic("chev")}Bereits genutzt (${genutzt.length})</summary><div class="list mt-10">${genutzt.map(itemHTML).join("")}</div></details>` : ""}
    ${bescheidCard() || entlCard() ? `<div class="section-title"><h3>Weitere Hilfen</h3></div><div class="minis">${bescheidCard()}${entlCard()}</div>` : ""}
    <div class="nav endnav"><button class="btn ghost" type="button" data-act="edit">Angaben ändern</button><button class="linkbtn danger" type="button" data-act="reset">Antworten zurücksetzen</button></div>
-   <div id="resetconfirm" hidden class="notice bad">${ic("alert")}<span>Alle Antworten aus dem Fragebogen zurücksetzen und neu anfangen? Belege und Fristen bleiben erhalten. <span class="btnrow" style="margin-top:8px"><button class="btn small danger" type="button" data-act="reset-yes">Ja, löschen</button><button class="btn small ghost" type="button" data-act="reset-no">Abbrechen</button></span></span></div>
+   <div id="resetconfirm" hidden class="notice bad">${ic("alert")}<span>Alle Antworten aus dem Fragebogen zurücksetzen und neu anfangen? Belege und Fristen bleiben erhalten. <span class="btnrow mt-8"><button class="btn small danger" type="button" data-act="reset-yes">Ja, löschen</button><button class="btn small ghost" type="button" data-act="reset-no">Abbrechen</button></span></span></div>
    ${datenBox()}`;
 }
 

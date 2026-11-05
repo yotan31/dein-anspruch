@@ -17,6 +17,6 @@ export function entlCard() {
       <div class="nums"><span>${k.y} genutzt: <strong>${eur(k.genutzt, 2)}</strong></span><span>Anspruch bis heute: <strong>${eur(k.bisHeute)}</strong></span></div></div>
     ${k.vorjOffen > 0 ? `<p class="notice ${daysUntil(k.verfall) <= 60 ? "" : "info"}">${ic("alert")}<span><strong>${eur(k.vorjOffen)} aus ${k.y - 1}</strong> verfallen am 30.06.${k.y} (${urgTxt(k.verfall)}). Jetzt Hilfe organisieren und Rechnung einreichen.</span></p>` : ""}
     <div class="btnrow"><button class="btn small" type="button" data-act="entl-add">${ic("plus")}Rechnung erfassen</button><button class="btn small ghost" type="button" data-wopen="entlastung">Erstattung beantragen</button>
-      <label class="small muted" style="display:flex;align-items:center;gap:6px">Pflegegrad seit <input type="month" id="entl-seit" value="${esc(Z.S.entlSeit || "")}" style="width:auto;padding:4px 8px"></label></div>
+      <label class="small muted entl-seit-label">Pflegegrad seit <input type="month" id="entl-seit" value="${esc(Z.S.entlSeit || "")}" class="entl-seit-feld"></label></div>
   </section>`;
 }

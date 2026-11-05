@@ -48,26 +48,26 @@ export function ic(n, c = "i") {
 /* ---------- Illustrationen: ruhige Flächen in den Farben der App, passen sich dem dunklen Modus an ---------- */
 const BILD = {
   // Start: Unterlagen mit Haken, daneben ein Herz
-  start: `<rect x="20" y="22" width="92" height="116" rx="10" stroke-width="2" style="fill:var(--paper-2);stroke:var(--line)"/>
-  <rect x="34" y="12" width="92" height="116" rx="10" stroke-width="2" style="fill:var(--paper);stroke:var(--line)"/>
-  <path d="M50 42l6 6 12-12" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" style="stroke:var(--money);fill:none"/>
-  <rect x="76" y="38" width="36" height="8" rx="4" style="fill:var(--line)"/>
-  <path d="M50 72l6 6 12-12" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" style="stroke:var(--money);fill:none"/>
-  <rect x="76" y="68" width="30" height="8" rx="4" style="fill:var(--line)"/>
-  <circle cx="58" cy="104" r="9" stroke-width="4" style="fill:none;stroke:var(--accent)"/>
-  <rect x="76" y="98" width="36" height="8" rx="4" style="fill:var(--line)"/>
-  <circle cx="146" cy="104" r="32" style="fill:var(--money-soft)"/>
-  <path d="M146 123s-17-10.5-17-23a9.5 9.5 0 0 1 17-5.8 9.5 9.5 0 0 1 17 5.8c0 12.5-17 23-17 23z" style="fill:var(--money)"/>`,
+  start: `<rect x="20" y="22" width="92" height="116" rx="10" stroke-width="2" class="b-papier-2"/>
+  <rect x="34" y="12" width="92" height="116" rx="10" stroke-width="2" class="b-papier"/>
+  <path d="M50 42l6 6 12-12" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" class="b-strich-gruen"/>
+  <rect x="76" y="38" width="36" height="8" rx="4" class="b-linie"/>
+  <path d="M50 72l6 6 12-12" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" class="b-strich-gruen"/>
+  <rect x="76" y="68" width="30" height="8" rx="4" class="b-linie"/>
+  <circle cx="58" cy="104" r="9" stroke-width="4" class="b-strich-akzent"/>
+  <rect x="76" y="98" width="36" height="8" rx="4" class="b-linie"/>
+  <circle cx="146" cy="104" r="32" class="b-gruen-weich"/>
+  <path d="M146 123s-17-10.5-17-23a9.5 9.5 0 0 1 17-5.8 9.5 9.5 0 0 1 17 5.8c0 12.5-17 23-17 23z" class="b-gruen"/>`,
   // Belege: Quittung mit Kamera
-  belege: `<path d="M46 14h64v112l-10.7-7-10.6 7-10.7-7-10.7 7-10.6-7L46 126z" stroke-width="2" stroke-linejoin="round" style="fill:var(--paper);stroke:var(--line)"/>
-  <rect x="58" y="32" width="40" height="7" rx="3.5" style="fill:var(--line)"/><rect x="58" y="50" width="30" height="7" rx="3.5" style="fill:var(--line)"/>
-  <rect x="58" y="68" width="40" height="7" rx="3.5" style="fill:var(--line)"/><rect x="58" y="92" width="22" height="9" rx="4.5" style="fill:var(--money-3)"/>
-  <circle cx="132" cy="102" r="30" style="fill:var(--accent-soft)"/>
-  <path d="M117 95h7l4-6h10l4 6h7v20h-32z" stroke-width="3.5" stroke-linejoin="round" style="fill:none;stroke:var(--accent)"/><circle cx="133" cy="105" r="6" stroke-width="3.5" style="fill:none;stroke:var(--accent)"/>`,
+  belege: `<path d="M46 14h64v112l-10.7-7-10.6 7-10.7-7-10.7 7-10.6-7L46 126z" stroke-width="2" stroke-linejoin="round" class="b-papier"/>
+  <rect x="58" y="32" width="40" height="7" rx="3.5" class="b-linie"/><rect x="58" y="50" width="30" height="7" rx="3.5" class="b-linie"/>
+  <rect x="58" y="68" width="40" height="7" rx="3.5" class="b-linie"/><rect x="58" y="92" width="22" height="9" rx="4.5" class="b-gruen-hell"/>
+  <circle cx="132" cy="102" r="30" class="b-akzent-weich"/>
+  <path d="M117 95h7l4-6h10l4 6h7v20h-32z" stroke-width="3.5" stroke-linejoin="round" class="b-strich-akzent"/><circle cx="133" cy="105" r="6" stroke-width="3.5" class="b-strich-akzent"/>`,
   // Alles erledigt: großer Haken im Kreis
-  fertig: `<circle cx="90" cy="70" r="52" style="fill:var(--money-soft)"/><circle cx="90" cy="70" r="36" style="fill:var(--money)"/>
-  <path d="M73 70l12 12 22-24" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" style="stroke:#fff;fill:none"/>
-  <circle cx="34" cy="30" r="5" style="fill:var(--money-3)"/><circle cx="150" cy="24" r="4" style="fill:var(--accent)"/><circle cx="156" cy="112" r="6" style="fill:var(--money-3)"/>`,
+  fertig: `<circle cx="90" cy="70" r="52" class="b-gruen-weich"/><circle cx="90" cy="70" r="36" class="b-gruen"/>
+  <path d="M73 70l12 12 22-24" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" class="b-strich-weiss"/>
+  <circle cx="34" cy="30" r="5" class="b-gruen-hell"/><circle cx="150" cy="24" r="4" class="b-akzent"/><circle cx="156" cy="112" r="6" class="b-gruen-hell"/>`,
 };
 
 /** @param {"start"|"belege"|"fertig"} n */

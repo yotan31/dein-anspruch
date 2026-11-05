@@ -61,7 +61,7 @@ function qInput(q) {
   if (q.type === "addr")
     return `<div class="grid2"><div class="field"><label for="wq-strasse">Straße und Hausnummer</label><input type="text" id="wq-strasse" data-wqp="strasse" value="${esc(Z.S.person.strasse)}" autocomplete="street-address"></div><div class="field"><label for="wq-ort">PLZ und Ort</label><input type="text" id="wq-ort" data-wqp="ort" value="${esc(Z.S.person.ort)}" placeholder="z. B. 70173 Stuttgart"></div></div>`;
   if (q.type === "long")
-    return `<textarea id="${id}" data-wq="${q.k}" rows="4" placeholder="${esc(q.ph || "")}" style="min-height:120px">${esc(v || "")}</textarea>`;
+    return `<textarea id="${id}" data-wq="${q.k}" rows="4" placeholder="${esc(q.ph || "")}" class="wq-langtext">${esc(v || "")}</textarea>`;
   const t = q.type === "date" ? "date" : q.type === "tel" ? "tel" : "text";
   const im = q.type === "money" || q.type === "number" ? ' inputmode="decimal"' : "";
   const inp = `<input type="${t}" id="${id}" data-wq="${q.k}" value="${esc(v || "")}" placeholder="${esc(q.ph || "")}"${im}>`;
@@ -137,13 +137,13 @@ function viewDone(b) {
     <h3>So schickst du ihn ab</h3>
     <ol class="howsend">
       <li><strong>PDF ausdrucken und unterschreiben.</strong> Oder den Text in die App oder das Online-Postfach der Kasse kopieren.</li>
-      ${docs.length ? `<li><strong>Diese Unterlagen beilegen:</strong><ul class="checks">${docs.map((c, j) => `<li><label><input type="checkbox" data-check="${b.k}:${j}" ${Z.S.checks[b.k + ":" + j] ? "checked" : ""}><span>${esc(c)}</span></label></li>`).join("")}</ul>${priv ? `<button class="btn small soft" type="button" data-act="vhp-quittung" style="margin-top:8px">${ic("down")}${Z.S.vhp.ersatz === "angehoerig" ? "Bestätigung" : "Quittung"} zum Unterschreiben (PDF)</button>` : ""}</li>` : ""}
+      ${docs.length ? `<li><strong>Diese Unterlagen beilegen:</strong><ul class="checks">${docs.map((c, j) => `<li><label><input type="checkbox" data-check="${b.k}:${j}" ${Z.S.checks[b.k + ":" + j] ? "checked" : ""}><span>${esc(c)}</span></label></li>`).join("")}</ul>${priv ? `<button class="btn small soft mt-8" type="button" data-act="vhp-quittung">${ic("down")}${Z.S.vhp.ersatz === "angehoerig" ? "Bestätigung" : "Quittung"} zum Unterschreiben (PDF)</button>` : ""}</li>` : ""}
       <li><strong>Abschicken an:</strong> ${esc([r.name, empfAdresse(b.to).strasse, empfAdresse(b.to).ort].filter(Boolean).join(", "))}.<br><span class="small muted">${esc(r.hint)}</span>${r.mail ? `<br><span class="small">E-Mail: <code>${esc(r.mail)}</code></span>` : ""}</li>
       <li><strong>Hier abhaken, wenn es raus ist.</strong> Wir erinnern dich in 4 Wochen, falls noch keine Antwort da ist.</li>
     </ol>
     ${st === "offen" ? `<button class="btn big" type="button" data-act="sent" data-k="${b.k}">${ic("check")}Ich habe den Antrag abgeschickt</button>` : `<p class="notice good">${ic("check")}<span>Abgeschickt${Z.S.sent && Z.S.sent[b.k] ? " am " + deD(parseIso(Z.S.sent[b.k])) : ""}. Status: ${esc(st)}.</span></p>`}
     <details><summary class="small">Text selbst ändern (für Geübte)</summary>
-      <div class="field" style="margin-top:10px"><input type="text" data-sub="${b.k}" value="${esc(L.subject)}" aria-label="Betreff"><textarea data-tx="${b.k}" aria-label="Antragstext">${esc(L.body)}</textarea>
+      <div class="field mt-10"><input type="text" data-sub="${b.k}" value="${esc(L.subject)}" aria-label="Betreff"><textarea data-tx="${b.k}" aria-label="Antragstext">${esc(L.body)}</textarea>
       ${Z.S.texte[b.k] != null ? `<button class="btn small ghost" type="button" data-resettx="${b.k}">Änderungen verwerfen</button>` : ""}</div>
     </details>
   </section>`;

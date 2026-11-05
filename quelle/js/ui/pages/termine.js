@@ -31,7 +31,7 @@ export function viewTermine() {
       <div class="field"><label for="tdienst">Pflegedienst / Beratungsstelle</label><input type="text" id="tdienst" value="${esc(Z.S.termine.dienst)}" placeholder="Name"></div>
       <div class="field"><label for="ttel">Telefon</label><input type="tel" id="ttel" value="${esc(Z.S.termine.tel)}"></div>
     </div>
-    <div class="grid2" style="align-items:end">
+    <div class="grid2 items-end">
       <div class="field"><label for="tbesuch">Besuch hat stattgefunden am</label><input type="date" id="tbesuch" max="${isoD(TODAY())}"></div>
       <div><button class="btn" type="button" data-act="addbesuch">${ic("check")}Besuch eintragen</button></div>
     </div>
@@ -47,19 +47,19 @@ export function viewTermine() {
       : ""
   }
 
-  <section style="display:flex;flex-direction:column;gap:10px">
+  <section class="stapel-10">
     <div class="titelzeile"><h2>Fristen</h2>${infoBtn("Fristen und Erinnerungen", "Trage Fristen mit einem Tippen in deinen Kalender ein. Der Kalender meldet sich dann auch, wenn die App geschlossen ist. Mit Konto kann die App dich zusätzlich per E-Mail erinnern.")}</div>
     ${dl.length ? dl.map(dueHTML).join("") : `<p class="muted">Keine Fristen für deine Situation.</p>`}
   </section>
 
   <section class="panel">
     <h3>Eigene Erinnerung</h3>
-    <div class="grid2" style="align-items:end">
+    <div class="grid2 items-end">
       <div class="field"><label for="ownt">Was?</label><input type="text" id="ownt" placeholder="z. B. Widerspruch Pflegegrad abschicken"></div>
       <div class="field"><label for="ownd">Wann?</label><input type="date" id="ownd"></div>
     </div>
     <div><button class="btn soft" type="button" data-act="addown">${ic("plus")}Hinzufügen</button></div>
-    ${Z.S.sb.status === "ja" && (mz("G") || mz("aG") || mz("Gl") || mz("H") || mz("Bl")) ? `<div class="field" style="max-width:260px"><label for="twm">Wertmarke gültig bis</label><input type="date" id="twm" value="${esc(Z.S.termine.wertmarke)}"></div>` : ""}
+    ${Z.S.sb.status === "ja" && (mz("G") || mz("aG") || mz("Gl") || mz("H") || mz("Bl")) ? `<div class="field max-260"><label for="twm">Wertmarke gültig bis</label><input type="date" id="twm" value="${esc(Z.S.termine.wertmarke)}"></div>` : ""}
   </section>`;
 }
 

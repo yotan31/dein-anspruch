@@ -17,7 +17,7 @@ import { copy, toast } from "../hinweise.js";
 import { startWiz } from "../pages/assistent.js";
 import { $, render, reveal, scrollTop } from "../render.js";
 
-/** Abstand, bis ein bewusst zweites „Weiter“ trotz Hinweis übernommen wird, siehe pruefeAngabe() */
+/** Wird an den Hinweis von pruefeAngabe() angehängt: Ein zweites „Weiter“ übernimmt die Angabe trotzdem. */
 const HINWEIS_ZWEITES_WEITER = " Stimmt es trotzdem? Dann noch einmal auf „Weiter“ tippen.";
 
 /** Leistung in der Liste öffnen und hinscrollen (der Reiter bleibt, wie er ist). @param {string} k */

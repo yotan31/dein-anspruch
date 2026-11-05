@@ -43,7 +43,7 @@ export function viewRechner() {
           : `<button class="btn" type="button" data-act="r-konto">Antrag vorbereiten (kostenlos)</button>`
       }
         <button class="btn ghost" type="button" data-act="r-neu">Noch einmal</button></div>
-      <button class="linkbtn" type="button" data-act="teilen" style="align-self:flex-start">Rechner an Familie oder Freunde weiterempfehlen</button>
+      <button class="linkbtn self-start" type="button" data-act="teilen">Rechner an Familie oder Freunde weiterempfehlen</button>
     </section>`;
   }
   const q = RQ[R.i];

@@ -9,10 +9,10 @@ export function datenBox() {
     ${
       Z.wipeAsk
         ? `<div class="notice bad" id="wipebox">${ic("alert")}<span><strong>Bist du sicher?</strong> ${Z.USER ? `Dein Konto und alle Angaben, Belege und Fotos werden für immer gelöscht${Z.MEMBERS.length > 1 ? ". Eingeladene Familienmitglieder verlieren den Zugriff auf die gemeinsamen Angaben" : ""}.` : "Alle Angaben auf diesem Gerät werden gelöscht."} Das kann nicht rückgängig gemacht werden. Lade vorher am besten eine Sicherung herunter.
-      <span class="btnrow" style="margin-top:10px"><button class="btn small soft" type="button" data-act="backup" ${Z.dataBusy ? "disabled" : ""}>${ic("down")}Erst Sicherung herunterladen</button></span>
-      <span class="field" style="margin-top:10px"><label for="wipe-word">Zum Bestätigen <strong>LÖSCHEN</strong> eintippen</label><input type="text" id="wipe-word" autocomplete="off" autocapitalize="characters" spellcheck="false"></span>
-      <span class="btnrow" style="margin-top:10px"><button class="btn small danger" type="button" data-act="wipe-yes" ${Z.wipeBusy ? "disabled" : ""}>${Z.wipeBusy ? "Wird gelöscht …" : "Ja, endgültig löschen"}</button><button class="btn small ghost" type="button" data-act="wipe-no" ${Z.wipeBusy ? "disabled" : ""}>Abbrechen</button></span></span></div>`
-        : `<button class="linkbtn danger" type="button" data-act="wipe" style="align-self:flex-start">${Z.USER ? "Konto und alle Daten löschen" : "Alle Angaben auf diesem Gerät löschen"}</button>`
+      <span class="btnrow mt-10"><button class="btn small soft" type="button" data-act="backup" ${Z.dataBusy ? "disabled" : ""}>${ic("down")}Erst Sicherung herunterladen</button></span>
+      <span class="field mt-10"><label for="wipe-word">Zum Bestätigen <strong>LÖSCHEN</strong> eintippen</label><input type="text" id="wipe-word" autocomplete="off" autocapitalize="characters" spellcheck="false"></span>
+      <span class="btnrow mt-10"><button class="btn small danger" type="button" data-act="wipe-yes" ${Z.wipeBusy ? "disabled" : ""}>${Z.wipeBusy ? "Wird gelöscht …" : "Ja, endgültig löschen"}</button><button class="btn small ghost" type="button" data-act="wipe-no" ${Z.wipeBusy ? "disabled" : ""}>Abbrechen</button></span></span></div>`
+        : `<button class="linkbtn danger self-start" type="button" data-act="wipe">${Z.USER ? "Konto und alle Daten löschen" : "Alle Angaben auf diesem Gerät löschen"}</button>`
     }
   </section>`;
 }

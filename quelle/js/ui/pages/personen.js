@@ -26,7 +26,7 @@ export function viewPersons() {
     ${
       own
         ? Z.delPersonAsk
-          ? `<p class="notice bad">${ic("alert")}<span>${esc(fallName(cur))} mit allen Angaben und Belegen für alle löschen? <span class="btnrow" style="margin-top:8px"><button class="btn small danger" type="button" data-act="del-person-yes">Ja, löschen</button><button class="btn small ghost" type="button" data-act="del-person-no">Abbrechen</button></span></span></p>`
+          ? `<p class="notice bad">${ic("alert")}<span>${esc(fallName(cur))} mit allen Angaben und Belegen für alle löschen? <span class="btnrow mt-8"><button class="btn small danger" type="button" data-act="del-person-yes">Ja, löschen</button><button class="btn small ghost" type="button" data-act="del-person-no">Abbrechen</button></span></span></p>`
           : `<button class="linkbtn danger" type="button" data-act="del-person">${esc(fallName(cur))} löschen</button>`
         : `<button class="linkbtn danger" type="button" data-rmember="${Z.USER.id}">Aus diesem gemeinsamen Fall austreten</button>`
     }
