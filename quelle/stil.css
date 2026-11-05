@@ -1,7 +1,3 @@
-@font-face{font-family:"Atkinson Hyperlegible";src:url(vendor/schrift/AtkinsonHyperlegible-Regular.woff2) format("woff2");font-weight:400;font-style:normal;font-display:swap}
-@font-face{font-family:"Atkinson Hyperlegible";src:url(vendor/schrift/AtkinsonHyperlegible-Bold.woff2) format("woff2");font-weight:700;font-style:normal;font-display:swap}
-@font-face{font-family:"Atkinson Hyperlegible";src:url(vendor/schrift/AtkinsonHyperlegible-Italic.woff2) format("woff2");font-weight:400;font-style:italic;font-display:swap}
-@font-face{font-family:"Source Serif 4";src:url(vendor/schrift/SourceSerif4.woff) format("woff");font-weight:500 700;font-style:normal;font-display:swap}
 :root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}
 
 /* Layout: eine ruhige Spalte. Oben ein dunkles „Akten-Deckblatt“ mit der Summe, darunter Reiter wie bei einem Ordner: Ansprüche · Belege · Termine. */
@@ -11,8 +7,8 @@
   --money:#167a45; --money-2:#4fae7a; --money-3:#a3dcbb; --money-soft:#e6f6ec; --warn:#9d5600; --warn-soft:#fff3dc; --danger:#b3261e; --danger-soft:#fde7e5;
   --hero:var(--paper); --hero-fg:var(--ink); --hero-muted:var(--muted); --hero-money:var(--money); --tab:#ffffff;
   --shadow:0 1px 2px rgba(20,36,59,.04),0 4px 14px rgba(20,36,59,.05);
-  --f-display:"Source Serif 4", Georgia, "Times New Roman", serif;
-  --f-body:"Atkinson Hyperlegible", "Segoe UI", Arial, sans-serif;
+  --f-display:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --f-body:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
   --r:14px;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
@@ -32,6 +28,8 @@
 html{font-size:calc(100% * var(--fs,1))}
 body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:1.0625rem;line-height:1.55;padding-inline:16px;padding-block:16px 64px}
 .wrap{max-width:780px;margin:0 auto;display:flex;flex-direction:column;gap:18px;position:relative}
+/* Der Inhalt bekommt von Anfang an mindestens eine Bildschirmhöhe, damit der Fußbereich beim Laden nicht nach unten springt (CLS) */
+#main{min-height:100vh}
 h1,h2,h3{font-family:var(--f-display);line-height:1.18;text-wrap:balance;margin:0;font-weight:600}
 h1{font-size:clamp(1.8rem,7vw,2.4rem)}h2{font-size:1.5rem}h3{font-size:1.15rem}
 p{margin:0}
@@ -669,7 +667,7 @@ body{overflow-x:clip}
 /* Abschluss */
 .lp-schluss{background:var(--accent);color:#fff;padding-block:48px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:14px;margin-bottom:-16px}
 .lp-schluss h2{color:#fff;font-size:clamp(1.6rem,6.5vw,2.3rem);max-width:20ch}
-.lp-schluss p{color:rgba(255,255,255,.85)}
+.lp-schluss p{color:#fff}
 .lp-schluss .btn{background:#fff;color:var(--accent);border-color:#fff;min-width:260px}
 /* Kopfzeile: Anmelden */
 .kopf-anmelden{min-height:40px;padding:6px 14px;font-size:.95rem}

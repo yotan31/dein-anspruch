@@ -45,7 +45,7 @@ export function vhpAsk(){
   return `beantrage ich hiermit die Erstattung von Kosten der Verhinderungspflege nach § 39 SGB XI aus dem gemeinsamen Jahresbetrag nach § 42a SGB XI.\n\nDie Hauptpflegeperson ${v.haupt||"[Name]"} war ${zr} wegen ${v.grund==="termine"?"anderer wichtiger Gründe (z. B. Arzttermine, Erholung)":(VHP_GRUND[v.grund]||"[Grund]")} an der Pflege gehindert. In dieser Zeit hat die Pflege übernommen: ${v.eName||"[Name]"}, ${v.eAdresse||"[Anschrift]"}${who}.${stunden}\n\nAufwendungen:\n${kosten}\n\n${pay} Die Nachweise liegen bei.`;
 }
 export async function makeQuittung(){
-  const doc=newDoc(); if(!doc) return; const v=Z.S.vhp, c=vhpCalc(), a=v.ersatz==="angehoerig";
+  const doc=await newDoc(); if(!doc) return; const v=Z.S.vhp, c=vhpCalc(), a=v.ersatz==="angehoerig";
   const L0=25,W=160; let y=30;
   doc.setFont("helvetica","bold"); doc.setFontSize(15); doc.text(a?"Bestätigung über Ersatzpflege":"Quittung über Ersatzpflege",L0,y); y+=6;
   doc.setFont("helvetica","normal"); doc.setFontSize(9); doc.text("Verhinderungspflege nach § 39 SGB XI",L0,y); y+=12; doc.setFontSize(11);

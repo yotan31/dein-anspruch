@@ -54,7 +54,7 @@ function vorschau(){
   const summe=posten.reduce((a,[,v])=>a+v,0), tone=["var(--money)","var(--money-2)","var(--money-3)"];
   return `<div class="lp-vorschau" aria-hidden="true">
     <div class="lp-phone">
-      <div class="lp-phone-kopf"><img src="logo.png" width="30" height="30" alt=""><b>Dein Anspruch</b></div>
+      <div class="lp-phone-kopf"><img src="logo.webp" width="30" height="30" alt=""><b>Dein Anspruch</b></div>
       <div class="lp-karte">
         <span class="lp-k-label">Noch offen pro Jahr</span>
         <b class="lp-summe">${eur(summe)}</b>

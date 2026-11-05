@@ -1,4 +1,5 @@
 import { Z } from "./zustand.js";
+import { ladeJsPdf } from "./15-pdf.js";
 import { esc } from "./01-grundlagen.js";
 import { TODAY, ic, isoD, parseIso } from "./03-hilfsmittel.js";
 import { numDE } from "./04-verhinderungspflege.js";
@@ -168,7 +169,7 @@ async function bulkBlob(it){
   const B=Z.bulk;
   if(B.items.length===1 && it.pages.length===B.total && B.file.size<20e6) return {blob:B.file,type:"application/pdf"};
   const canvases=[]; for(const i of it.pages) canvases.push(await pageCanvas(await B.pdf.getPage(i),1300));
-  if(canvases.length===1 || !window.jspdf){ // ohne PDF-Bibliothek: Seiten untereinander zu einem Bild
+  if(canvases.length===1 || !(await ladeJsPdf())){ // ohne PDF-Bibliothek: Seiten untereinander zu einem Bild
     let c=canvases[0];
     if(canvases.length>1){ const w=Math.max(...canvases.map(x=>x.width)), h=canvases.reduce((s,x)=>s+x.height,0), k=Math.min(1,12000/h); c=document.createElement("canvas"); c.width=Math.round(w*k); c.height=Math.round(h*k); const g=c.getContext("2d"); g.fillStyle="#fff"; g.fillRect(0,0,c.width,c.height); let y=0; for(const x of canvases){ g.drawImage(x,0,y,x.width*k,x.height*k); y+=x.height*k } }
     const blob=await new Promise(r=>c.toBlob(r,"image/jpeg",0.8)); return {blob,type:"image/jpeg"} }

@@ -7,7 +7,30 @@ import { curLetter, docsFor, today } from "./12-reiter-ansprueche.js";
 import { toast } from "./18-bedienung.js";
 import { DL, blobUrl } from "./19-speicher.js";
 /* ---------- PDF ---------- */
-export function newDoc(){ if(!window.jspdf){toast("PDF-Erzeugung nicht geladen. Bitte Text kopieren.");return null} return new window.jspdf.jsPDF({unit:"mm",format:"a4"}) }
+/** Adresse der PDF-Bibliothek; kommt aus quelle/bauen.mjs, damit die Version nur an einer Stelle steht */
+const JSPDF_URL = "__JSPDF_URL__";
+/** @type {Promise<boolean>|null} */
+let jsPdfWirdGeladen = null;
+/**
+ * Lädt jsPDF (420 KB) erst beim ersten PDF, statt bei jedem Start der App.
+ * @returns {Promise<boolean>} true, wenn die Bibliothek bereitsteht
+ */
+export function ladeJsPdf(){
+  if(window.jspdf) return Promise.resolve(true);
+  jsPdfWirdGeladen ??= new Promise(fertig=>{
+    const skript=document.createElement("script"); skript.src=JSPDF_URL;
+    skript.onload=()=>fertig(true);
+    // bei Fehler (z. B. ohne Internet und noch nicht gespeichert) beim nächsten Versuch neu laden
+    skript.onerror=()=>{ jsPdfWirdGeladen=null; fertig(false) };
+    document.head.append(skript);
+  });
+  return jsPdfWirdGeladen;
+}
+/** Neues A4-Dokument; meldet verständlich, wenn die PDF-Erzeugung nicht geladen werden konnte. @returns {Promise<any>} */
+export async function newDoc(){
+  if(!(await ladeJsPdf())){ toast("PDF-Erzeugung konnte nicht geladen werden. Bitte Internet prüfen oder Text kopieren."); return null }
+  return new window.jspdf.jsPDF({unit:"mm",format:"a4"});
+}
 function drawLetter(doc,b){
   const p=Z.S.person, a=Z.S.rolle==="angehoerig", r=RECIP[b.to](), L=curLetter(b);
   const L0=25, W=165; let y;
@@ -32,7 +55,7 @@ export async function saveFile(filename,data,okMsg){
   try{ await dl.save({filename,data}); toast(okMsg||"Gespeichert") }
   catch(e){ if(e&&e.code==="declined") return; toast(e&&e.code==="rate_limited"?"Bitte kurz warten und erneut versuchen.":"Download nicht möglich.") }
 }
-export async function makePDF(b){ const doc=newDoc(); if(!doc) return; drawLetter(doc,b); await saveFile(`Antrag-${b.k}.pdf`,doc.output("blob"),"PDF gespeichert") }
+export async function makePDF(b){ const doc=await newDoc(); if(!doc) return; drawLetter(doc,b); await saveFile(`Antrag-${b.k}.pdf`,doc.output("blob"),"PDF gespeichert") }
 async function blobToDataURL(id){
   const res=await fetch(blobUrl(id)); if(!res.ok) throw new Error("fetch");
   const bl=await res.blob(); if(!/^image\//.test(bl.type)) return null;
@@ -41,7 +64,7 @@ async function blobToDataURL(id){
   return {url:c.toDataURL("image/jpeg",0.8),w:c.width,h:c.height};
 }
 export async function makeMappe(withLetter, onlyZZ, yearsArg){
-  const doc=newDoc(); if(!doc) return;
+  const doc=await newDoc(); if(!doc) return;
   toast("PDF wird erstellt …");
   const years=yearsArg||selYears(); const kf=Z.S.belegFilter.kat||"";
   const jahr=years.length===1?years[0]:years.slice().reverse().join("-");

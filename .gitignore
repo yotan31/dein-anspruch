@@ -3,6 +3,7 @@ node_modules/
 site/index.html
 site/app.js
 site/app.js.map
-site/app.css
 site/vendor/supabase.js
 site/sw.js
+# Ergebnis von npm run messen (ändert sich bei jedem Lauf)
+werkzeuge/messung.json

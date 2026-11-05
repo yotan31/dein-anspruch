@@ -8,14 +8,20 @@
     "pruefen": "tsc -p tsconfig.json",
     "test:rechnungen": "node --test tests/rechnungen.test.mjs",
     "test:oberflaeche": "node tests/oberflaeche.mjs",
-    "test": "npm run pruefen && npm run bauen && npm run test:rechnungen && npm run test:oberflaeche"
+    "test": "npm run pruefen && npm run bauen && npm run test:rechnungen && npm run test:oberflaeche",
+    "messen": "node werkzeuge/messen.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.45.4"
   },
   "devDependencies": {
+    "@eslint/js": "10.0.1",
     "esbuild": "0.28.2",
+    "eslint": "10.14.0",
+    "globals": "17.14.0",
+    "lighthouse": "13.6.0",
     "playwright": "1.48.2",
+    "prettier": "3.9.10",
     "typescript": "6.0.3"
   }
 }
