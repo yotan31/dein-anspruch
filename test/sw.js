@@ -5,14 +5,14 @@
 // - Seite (HTML): erst aus dem Netz (damit Neuerungen sofort ankommen), ohne Netz aus dem Speicher
 // - Programm, Aussehen, Schriften, Bibliotheken: aus dem Speicher (Adressen enthalten die Version)
 // - Daten der Nutzer (Datenbank, Belege-Fotos) werden NIE zwischengespeichert
-const VERSION = "9ac4fe8f";
+const VERSION = "74e5a8e9";
 // je Adresse eigener Speicher, damit echte App und Testversion sich nicht gegenseitig löschen
 const PREFIX = "dein-anspruch:" + new URL(self.registration.scope).pathname + ":";
 const CACHE = PREFIX + VERSION;
 const DATEIEN = [
  "./",
  "index.html",
- "app.js?v=9ac4fe8f",
+ "app.js?v=74e5a8e9",
  "vendor/supabase.js?v=2.45.4",
  "vendor/jspdf.umd.min.js?v=4.2.1",
  "manifest.webmanifest",
@@ -27,12 +27,18 @@ const DATEIEN = [
 
 self.addEventListener("install", (e) => {
   // einzeln laden: fehlt eine Datei, klappt der Rest trotzdem
-  e.waitUntil(caches.open(CACHE).then((c) => Promise.all(DATEIEN.map((u) => c.add(u).catch(() => {})))).then(() => self.skipWaiting()));
+  e.waitUntil(
+    caches
+      .open(CACHE)
+      .then((c) => Promise.all(DATEIEN.map((u) => c.add(u).catch(() => {}))))
+      .then(() => self.skipWaiting()),
+  );
 });
 
 self.addEventListener("activate", (e) => {
   e.waitUntil(
-    caches.keys()
+    caches
+      .keys()
       .then((keys) => Promise.all(keys.filter((k) => k.startsWith(PREFIX) && k !== CACHE).map((k) => caches.delete(k))))
       .then(() => self.clients.claim()),
   );
@@ -48,16 +54,33 @@ self.addEventListener("fetch", (e) => {
   if (req.mode === "navigate") {
     e.respondWith(
       fetch(req)
-        .then((res) => { const kopie = res.clone(); caches.open(CACHE).then((c) => c.put("./", kopie)).catch(() => {}); return res })
+        .then((res) => {
+          const kopie = res.clone();
+          caches
+            .open(CACHE)
+            .then((c) => c.put("./", kopie))
+            .catch(() => {});
+          return res;
+        })
         .catch(() => caches.match("./").then((r) => r || caches.match("index.html"))),
     );
     return;
   }
   e.respondWith(
-    caches.match(req).then((hit) => hit || fetch(req).then((res) => {
-      // große, selten gebrauchte Teile (pdf.js) beim ersten Gebrauch merken
-      if (res.ok && /\/vendor\//.test(url.pathname)) { const kopie = res.clone(); caches.open(CACHE).then((c) => c.put(req, kopie)).catch(() => {}) }
-      return res;
-    })),
+    caches.match(req).then(
+      (hit) =>
+        hit ||
+        fetch(req).then((res) => {
+          // große, selten gebrauchte Teile (pdf.js) beim ersten Gebrauch merken
+          if (res.ok && /\/vendor\//.test(url.pathname)) {
+            const kopie = res.clone();
+            caches
+              .open(CACHE)
+              .then((c) => c.put(req, kopie))
+              .catch(() => {});
+          }
+          return res;
+        }),
+    ),
   );
 });
