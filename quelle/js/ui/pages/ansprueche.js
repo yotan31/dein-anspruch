@@ -38,7 +38,7 @@ export function viewAnsprueche() {
      </div></section>`
        : ""
    }
-   ${langNotice()}
+   ${langNotice() && `<p class="notice info small">${ic("info")}<span>${langNotice()}</span></p>`}
    <div class="section-title"><h2>Deine offenen Ansprüche</h2>${fortschritt(all)}</div>
    ${areas.length > 2 ? `<div class="filters">${areas.map((a) => `<button type="button" class="chip" data-area="${esc(a)}" aria-pressed="${Z.areaFilter === a}">${esc(a)}</button>`).join("")}</div>` : ""}
    ${sorted.length ? `<div class="list">${sorted.map(itemHTML).join("")}</div>` : `<section class="panel leer">${bild("fertig")}<h3>Alles im Blick</h3><p class="muted">Ihr nutzt bereits alles, was wir für eure Lage prüfen konnten.</p></section>`}

@@ -4,7 +4,6 @@ import { VERBRAUCH, VHP_ERSATZ } from "../config/stammdaten.js";
 import { zuz } from "./belege.js";
 import { gdb } from "./lage.js";
 import { B, FA, KK, PK, RECIP, empfAdresse } from "./leistungen.js";
-import { save } from "../services/speicher.js";
 import { Z } from "../state/zustand.js";
 import { deD, parseIso } from "../utils/datum.js";
 import { eur, numDE } from "../utils/format.js";
@@ -744,7 +743,7 @@ export function ibanOk(v) {
 }
 
 /**
- * Antwort speichern; ein selbst bearbeiteter Antragstext wird verworfen, damit die neue Angabe drinsteht.
+ * Antwort übernehmen (speichern muss der Aufrufer); ein selbst bearbeiteter Antragstext wird verworfen, damit die neue Angabe drinsteht.
  * @param q Frage
  * @param v Antwort
  */
@@ -753,7 +752,6 @@ export function setQ(q, v) {
   else ansObj(Z.S.wiz.k)[q.k] = v;
   delete Z.S.texte[Z.S.wiz.k];
   delete Z.S.texte[Z.S.wiz.k + "_sub"];
-  save();
 }
 
 /** Wird beim Start der App einmal aufgerufen (siehe start.js). */

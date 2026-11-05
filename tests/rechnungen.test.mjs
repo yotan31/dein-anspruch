@@ -366,3 +366,31 @@ test("alle-module.js führt jede Programmdatei auf (sonst fehlt sie in Tests und
   const index = readFileSync(path.join(dir, "alle-module.js"), "utf8");
   for (const f of dateien) assert.ok(index.includes(`"./${f.replaceAll("\\", "/")}"`), f);
 });
+
+test("Ordner importieren nur, was ihre Schicht darf (siehe README, Ordner in quelle/js/)", async () => {
+  const { readdirSync, readFileSync } = await import("node:fs");
+  const path = await import("node:path");
+  const dir = path.join(path.dirname(new URL(import.meta.url).pathname), "..", "quelle", "js");
+  /** erlaubte Ziel-Ordner je Ordner; ui/ und services/ dürfen mehr und werden hier nicht eingeschränkt */
+  const ERLAUBT = {
+    config: ["config"],
+    state: ["state"],
+    utils: [],
+    logic: ["config", "state", "utils", "logic"],
+    i18n: ["state", "i18n"],
+  };
+  for (const f of readdirSync(dir, { recursive: true }).map((x) => String(x).replaceAll("\\", "/"))) {
+    const ordner = f.split("/")[0];
+    if (!f.endsWith(".js") || !ERLAUBT[ordner]) continue;
+    const code = readFileSync(path.join(dir, f), "utf8");
+    for (const [, ziel] of code.matchAll(/from "([^"]+)"/g)) {
+      const zielOrdner = path.relative(dir, path.join(dir, path.dirname(f), ziel)).split(path.sep)[0];
+      assert.ok(ERLAUBT[ordner].includes(zielOrdner), `${f} importiert ${ziel}`);
+    }
+  }
+  // services/ greift nie auf ganze Seiten zu (Seiten rufen Dienste auf, nicht umgekehrt)
+  for (const f of readdirSync(path.join(dir, "services")).map(String)) {
+    const code = readFileSync(path.join(dir, "services", f), "utf8");
+    assert.ok(!/from "\.\.\/ui\/pages\//.test(code), `services/${f} importiert eine Seite`);
+  }
+});

@@ -76,6 +76,7 @@ function assistentAuswahl(t) {
   const q = frage(t.dataset.wq);
   if (!q) return;
   setQ(q, t.value);
+  save();
   render();
   if (t.type !== "radio") return;
   const k = Z.S.wiz.k,
@@ -166,6 +167,7 @@ export function beiAenderung(e) {
     if (q) {
       const cur = Array.isArray(getQ(q)) ? getQ(q) : [];
       setQ(q, t.checked ? [...cur, t.value] : cur.filter((x) => x !== t.value));
+      save();
       render();
     }
     return;
@@ -216,6 +218,7 @@ export function beiEingabe(e) {
     const q = frage(t.dataset.wq);
     if (q) {
       setQ(q, t.value);
+      save();
       blendeUeberspringenAus(!!t.value.trim());
     }
     return;

@@ -2,7 +2,6 @@
 // Anträge bleiben bewusst Deutsch, weil Kassen und Ämter sie auf Deutsch erwarten.
 import { LANGS, T } from "./uebersetzungen.js";
 import { Z } from "../state/zustand.js";
-import { ic } from "../ui/symbole.js";
 
 const LIDX = { tr: 0, ru: 1, ar: 2, ti: 3 };
 
@@ -72,7 +71,7 @@ export function langSelect() {
   return `<select class="langsel" id="langsel" aria-label="Sprache">${LANGS.map(([k, n]) => `<option value="${k}" ${Z.LANG === k ? "selected" : ""}>${n}</option>`).join("")}</select>`;
 }
 
-/** Hinweis in der gewählten Sprache, dass Anträge Deutsch bleiben; auf Deutsch leer. */
+/** Hinweis in der gewählten Sprache, dass Anträge Deutsch bleiben (nur Text); auf Deutsch leer. */
 export function langNotice() {
   if (Z.LANG === "de") return "";
   const m = {
@@ -81,7 +80,7 @@ export function langNotice() {
     ar: "بعض الشروحات لا تزال باللغة الألمانية. الطلبات تبقى دائمًا بالألمانية لأن الجهات الرسمية تطلبها كذلك.",
     ti: "ገለ መግለጺታት ገና ብጀርመንኛ እዮም። መመልከቲታት ኩሉ ግዜ ብጀርመንኛ እዮም፡ ምኽንያቱ ቤት ጽሕፈታት ብጀርመንኛ ይደልይዎም።",
   };
-  return `<p class="notice info small">${ic("info")}<span>${m[Z.LANG]}</span></p>`;
+  return m[Z.LANG] || "";
 }
 
 /** Wird beim Start der App einmal aufgerufen (siehe start.js). */
