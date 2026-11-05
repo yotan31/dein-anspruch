@@ -60,6 +60,17 @@ npm run messen       # optional: Lighthouse-Messung, Ergebnis in werkzeuge/messu
 
 Der Workflow `.github/workflows/pruefen-und-veroeffentlichen.yml` prüft bei jedem Push den Code (TypeScript, ESLint, Prettier), baut die App, führt alle Tests aus und veröffentlicht **nur, wenn alles grün ist** (Branch `gh-pages`). `wachhalten.yml` pingt die kostenlose Datenbank täglich.
 
+## Vor dem öffentlichen Start: Auffindbarkeit (SEO)
+
+Solange die App nur getestet wird, sagen alle Seiten Suchmaschinen „nicht aufnehmen“ (`<meta name="robots" content="noindex, nofollow">`). Deshalb steht SEO in Lighthouse bei 63. Erst ändern, wenn alles Unternehmerische geklärt ist (Rechtsform, Impressum, rechtliche Prüfung, Datenschutz):
+
+1. `noindex, nofollow` entfernen in `quelle/index.html`, `site/datenschutz.html`, `site/impressum.html` und `site/nutzungsbedingungen.html`.
+2. Die Testversion muss gesperrt bleiben. Sie wird aus denselben Dateien gebaut, deshalb im Workflow beim Veröffentlichen nach `test/` die Zeile `<meta name="robots" content="noindex, nofollow">` wieder in `index.html` einsetzen.
+3. Eigene Domain (empfohlen): `og:url`, `og:image` und `<link rel="canonical">` auf die neue Adresse setzen, im Supabase-Dashboard und bei der Google-Anmeldung (siehe `dokumente/google-anmeldung.md`) die neue Adresse ergänzen, dazu `robots.txt` und `sitemap.xml` an der Wurzel der Domain. Unter `yotan31.github.io/dein-anspruch/` wirkt eine eigene `robots.txt` nicht, dort nur die Sitemap über die Search Console einreichen.
+4. Seitentitel und Beschreibung auf die Suchbegriffe prüfen, die Familien wirklich eingeben (z. B. „Entlastungsbetrag beantragen“, „Verhinderungspflege Antrag“).
+5. In der Google Search Console anmelden und die Sitemap einreichen.
+6. `npm run messen`: SEO sollte danach bei mindestens 95 liegen.
+
 ## Datenbank (Supabase-Projekt `dein-anspruch`, Frankfurt)
 
 Tabellen `fall`, `mitglied`, `einladung`, `belege`, `erinnerung`, `fehler`, `rueckmeldung`, alle mit Row Level Security. Privater Speicher `belege` (Ordner = Fall). Edge Function `erinnerungen` (täglich per pg_cron).
