@@ -13,12 +13,18 @@ const DATEIEN = __DATEIEN__;
 
 self.addEventListener("install", (e) => {
   // einzeln laden: fehlt eine Datei, klappt der Rest trotzdem
-  e.waitUntil(caches.open(CACHE).then((c) => Promise.all(DATEIEN.map((u) => c.add(u).catch(() => {})))).then(() => self.skipWaiting()));
+  e.waitUntil(
+    caches
+      .open(CACHE)
+      .then((c) => Promise.all(DATEIEN.map((u) => c.add(u).catch(() => {}))))
+      .then(() => self.skipWaiting()),
+  );
 });
 
 self.addEventListener("activate", (e) => {
   e.waitUntil(
-    caches.keys()
+    caches
+      .keys()
       .then((keys) => Promise.all(keys.filter((k) => k.startsWith(PREFIX) && k !== CACHE).map((k) => caches.delete(k))))
       .then(() => self.clients.claim()),
   );
@@ -34,16 +40,33 @@ self.addEventListener("fetch", (e) => {
   if (req.mode === "navigate") {
     e.respondWith(
       fetch(req)
-        .then((res) => { const kopie = res.clone(); caches.open(CACHE).then((c) => c.put("./", kopie)).catch(() => {}); return res })
+        .then((res) => {
+          const kopie = res.clone();
+          caches
+            .open(CACHE)
+            .then((c) => c.put("./", kopie))
+            .catch(() => {});
+          return res;
+        })
         .catch(() => caches.match("./").then((r) => r || caches.match("index.html"))),
     );
     return;
   }
   e.respondWith(
-    caches.match(req).then((hit) => hit || fetch(req).then((res) => {
-      // große, selten gebrauchte Teile (pdf.js) beim ersten Gebrauch merken
-      if (res.ok && /\/vendor\//.test(url.pathname)) { const kopie = res.clone(); caches.open(CACHE).then((c) => c.put(req, kopie)).catch(() => {}) }
-      return res;
-    })),
+    caches.match(req).then(
+      (hit) =>
+        hit ||
+        fetch(req).then((res) => {
+          // große, selten gebrauchte Teile (pdf.js) beim ersten Gebrauch merken
+          if (res.ok && /\/vendor\//.test(url.pathname)) {
+            const kopie = res.clone();
+            caches
+              .open(CACHE)
+              .then((c) => c.put(req, kopie))
+              .catch(() => {});
+          }
+          return res;
+        }),
+    ),
   );
 });

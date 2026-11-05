@@ -25,7 +25,12 @@ test("Beträge 2026: Pflegegeld, Sachleistung, Entlastung, Jahresbetrag", () => 
 });
 test("Beträge: alle Programmteile nutzen dieselben Werte", () => {
   const run = neu();
-  assert.equal(run("PG.pflegegeld === BETRAEGE.pflegegeld && ENTLASTUNG === BETRAEGE.entlastung && JAHRESBETRAG === BETRAEGE.jahresbetrag && KM_SATZ === BETRAEGE.kmPauschale"), true);
+  assert.equal(
+    run(
+      "PG.pflegegeld === BETRAEGE.pflegegeld && ENTLASTUNG === BETRAEGE.entlastung && JAHRESBETRAG === BETRAEGE.jahresbetrag && KM_SATZ === BETRAEGE.kmPauschale",
+    ),
+    true,
+  );
   assert.equal(run("Object.isFrozen(BETRAEGE)"), true);
 });
 test("Beträge: steigen mit dem Pflegegrad", () => {
@@ -40,7 +45,20 @@ test("Beträge: steigen mit dem Pflegegrad", () => {
 // ---------- Pflegegrad aus Punkten (§ 15 Abs. 3 SGB XI) ----------
 test("Pflegegrad aus Punkten: Grenzen nach § 15 SGB XI", () => {
   const run = neu();
-  const faelle = [[0, 0], [12.49, 0], [12.5, 1], [26.99, 1], [27, 2], [47.49, 2], [47.5, 3], [69.99, 3], [70, 4], [89.99, 4], [90, 5], [100, 5]];
+  const faelle = [
+    [0, 0],
+    [12.49, 0],
+    [12.5, 1],
+    [26.99, 1],
+    [27, 2],
+    [47.49, 2],
+    [47.5, 3],
+    [69.99, 3],
+    [70, 4],
+    [89.99, 4],
+    [90, 5],
+    [100, 5],
+  ];
   for (const [p, g] of faelle) assert.equal(run(`pgAusPunkten(${p})`), g, `${p} Punkte`);
 });
 
@@ -48,37 +66,43 @@ test("Pflegegrad aus Punkten: Grenzen nach § 15 SGB XI", () => {
 test("Rechner: alles selbstständig → 0 Punkte, kein Pflegegrad", () => {
   const run = neu();
   const e = run(`rechnerErgebnis(RQ.map(()=>"0"))`);
-  assert.equal(e.summe, 0); assert.equal(e.grad, 0);
+  assert.equal(e.summe, 0);
+  assert.equal(e.grad, 0);
 });
 test("Rechner: alles unselbstständig → 100 Punkte, Pflegegrad 5", () => {
   const run = neu();
   const e = run(`rechnerErgebnis(RQ.map(q=>q.o[q.o.length-1][0]))`);
-  assert.equal(e.summe, 100); assert.equal(e.grad, 5);
+  assert.equal(e.summe, 100);
+  assert.equal(e.grad, 5);
   assert.deepEqual([e.gew[1], e.m23, e.gew[4], e.gew[5], e.gew[6]], [10, 15, 40, 20, 15]); // Gewichtung der Module
 });
 test("Rechner: nur Mobilität „überwiegend selbstständig“ → 5 gewichtete Punkte", () => {
   const run = neu();
   const e = run(`rechnerErgebnis(RQ.map(q=>q.m===1?"1":"0"))`);
-  assert.equal(e.gew[1], 5); assert.equal(e.summe, 5); assert.equal(e.grad, 0);
+  assert.equal(e.gew[1], 5);
+  assert.equal(e.summe, 5);
+  assert.equal(e.grad, 0);
 });
 test("Rechner: von Modul 2 und 3 zählt nur das höhere", () => {
   const run = neu();
   const e = run(`rechnerErgebnis(RQ.map(q=>q.m===2||q.m===3?q.o[q.o.length-1][0]:"0"))`);
-  assert.equal(e.m23, 15); assert.equal(e.summe, 15);
+  assert.equal(e.m23, 15);
+  assert.equal(e.summe, 15);
 });
 test("Rechner: mehr Hilfebedarf ergibt nie weniger Punkte", () => {
   const run = neu();
   let vorher = -1;
   for (let stufe = 0; stufe < 4; stufe++) {
     const s = run(`rechnerErgebnis(RQ.map(q=>q.o[Math.min(${stufe},q.o.length-1)][0])).summe`);
-    assert.ok(s >= vorher, `Stufe ${stufe}`); vorher = s;
+    assert.ok(s >= vorher, `Stufe ${stufe}`);
+    vorher = s;
   }
 });
 
 // ---------- Offene Ansprüche ----------
 test("Ansprüche bei Pflegegrad 3 zu Hause: Jahreswerte", () => {
   const run = neu("2026-03-15", PFLEGE3);
-  const v = k => run(`B.find(b=>b.k==="${k}").val()`);
+  const v = (k) => run(`B.find(b=>b.k==="${k}").val()`);
   assert.equal(v("pflegegeld"), 599 * 12);
   assert.equal(v("entlastung"), 131 * 12);
   assert.equal(v("jahresbetrag"), 3539);
@@ -90,47 +114,83 @@ test("Ansprüche: bereits genutzte Leistungen zählen nicht mehr als offen", () 
   assert.equal(run("sums().cash"), 131 * 12 + 3539 + 42 * 12);
 });
 test("Behinderten-Pauschbetrag nach GdB und Merkzeichen (§ 33b EStG)", () => {
-  const frei = (sb, pg = "") => neu("2026-03-15", { pg, wohnen: "angehoerige", bereiche: { pflege: !!pg, sb: true }, sb: { status: "vorhanden", gdb: String(sb.gdb), mz: sb.mz || {}, arbeit: false, auto: false, grundsicherung: false } })(`B.find(b=>b.k==="behpausch").frei()`);
+  const frei = (sb, pg = "") =>
+    neu("2026-03-15", {
+      pg,
+      wohnen: "angehoerige",
+      bereiche: { pflege: !!pg, sb: true },
+      sb: {
+        status: "vorhanden",
+        gdb: String(sb.gdb),
+        mz: sb.mz || {},
+        arbeit: false,
+        auto: false,
+        grundsicherung: false,
+      },
+    })(`B.find(b=>b.k==="behpausch").frei()`);
   assert.equal(frei({ gdb: 50 }), 1140);
-  assert.equal(frei({ gdb: 55 }), 1140);   // abgerundet auf volle 10
+  assert.equal(frei({ gdb: 55 }), 1140); // abgerundet auf volle 10
   assert.equal(frei({ gdb: 100 }), 2840);
   assert.equal(frei({ gdb: 80, mz: { H: true } }), 7400);
   assert.equal(frei({ gdb: 0 }, "4"), 7400);
 });
 test("Rundfunkbeitrag: Ermäßigung und Befreiung", () => {
-  const val = mz => neu("2026-03-15", { bereiche: { pflege: false, sb: true }, sb: { status: "vorhanden", gdb: "80", mz, arbeit: false, auto: false, grundsicherung: false } })(`B.find(b=>b.k==="rundfunk").val()`);
+  const val = (mz) =>
+    neu("2026-03-15", {
+      bereiche: { pflege: false, sb: true },
+      sb: { status: "vorhanden", gdb: "80", mz, arbeit: false, auto: false, grundsicherung: false },
+    })(`B.find(b=>b.k==="rundfunk").val()`);
   assert.equal(val({ RF: true }), Math.round((18.36 - 6.12) * 12 * 100) / 100);
   assert.equal(val({ TBl: true }), Math.round(18.36 * 12 * 100) / 100);
 });
 
 // ---------- Verhinderungspflege ----------
 test("Verhinderungspflege durch nahe Angehörige: höchstens doppeltes Pflegegeld", () => {
-  const run = neu("2026-03-15", { ...PFLEGE3, vhp: { ersatz: "angehoerig", stunden: "88", satz: "15", km: "", verdienst: "", verbraucht: "" } });
+  const run = neu("2026-03-15", {
+    ...PFLEGE3,
+    vhp: { ersatz: "angehoerig", stunden: "88", satz: "15", km: "", verdienst: "", verbraucht: "" },
+  });
   const r = run("vhpCalc()");
   assert.equal(r.basis, 88 * 15);
   assert.equal(r.cap, 599 * 2);
-  assert.equal(r.pflege, 1198); assert.equal(r.total, 1198); assert.equal(r.gekappt, true);
+  assert.equal(r.pflege, 1198);
+  assert.equal(r.total, 1198);
+  assert.equal(r.gekappt, true);
 });
 test("Verhinderungspflege: Fahrtkosten 20 Cent je km und Verdienstausfall kommen dazu", () => {
-  const run = neu("2026-03-15", { ...PFLEGE3, vhp: { ersatz: "angehoerig", stunden: "10", satz: "15", km: "100", verdienst: "200", verbraucht: "" } });
+  const run = neu("2026-03-15", {
+    ...PFLEGE3,
+    vhp: { ersatz: "angehoerig", stunden: "10", satz: "15", km: "100", verdienst: "200", verbraucht: "" },
+  });
   const r = run("vhpCalc()");
-  assert.equal(r.pflege, 150); assert.equal(r.fahrt, 20); assert.equal(r.verd, 200); assert.equal(r.total, 370);
+  assert.equal(r.pflege, 150);
+  assert.equal(r.fahrt, 20);
+  assert.equal(r.verd, 200);
+  assert.equal(r.total, 370);
 });
 test("Verhinderungspflege durch Pflegedienst: nie mehr als der restliche Jahresbetrag", () => {
-  const run = neu("2026-03-15", { ...PFLEGE3, vhp: { ersatz: "dienst", rechnung: "3.000,00", km: "", verdienst: "", verbraucht: "1.000" } });
+  const run = neu("2026-03-15", {
+    ...PFLEGE3,
+    vhp: { ersatz: "dienst", rechnung: "3.000,00", km: "", verdienst: "", verbraucht: "1.000" },
+  });
   const r = run("vhpCalc()");
-  assert.equal(r.rest, 2539); assert.equal(r.total, 2539);
+  assert.equal(r.rest, 2539);
+  assert.equal(r.total, 2539);
 });
 
 // ---------- Zuzahlungen und Belastungsgrenze (§ 62 SGB V) ----------
 test("Belastungsgrenze: 2 % vom Brutto, chronisch krank 1 %", () => {
   const run = neu("2026-03-15", { pg: "", bruttoJahr: { 2026: "20.000" }, chronisch: "nein" });
-  run(`BEL=[{kat:"apo",jahr:2026,betrag:50},{kat:"heil",jahr:2026,betrag:30},{kat:"entl",jahr:2026,betrag:100},{kat:"apo",jahr:2025,betrag:99}]`);
+  run(
+    `BEL=[{kat:"apo",jahr:2026,betrag:50},{kat:"heil",jahr:2026,betrag:30},{kat:"entl",jahr:2026,betrag:100},{kat:"apo",jahr:2025,betrag:99}]`,
+  );
   let z = run("zuz(2026)");
-  assert.equal(z.sum, 80);           // nur Zuzahlungen des Jahres, kein Entlastungsbetrag
+  assert.equal(z.sum, 80); // nur Zuzahlungen des Jahres, kein Entlastungsbetrag
   assert.equal(z.grenze, 400);
-  run(`S.chronisch="ja"`); z = run("zuz(2026)");
-  assert.equal(z.pct, 1); assert.equal(z.grenze, 200);
+  run(`S.chronisch="ja"`);
+  z = run("zuz(2026)");
+  assert.equal(z.pct, 1);
+  assert.equal(z.grenze, 200);
 });
 test("Zahlen im deutschen Format werden richtig gelesen", () => {
   const run = neu();
@@ -143,10 +203,12 @@ test("Zahlen im deutschen Format werden richtig gelesen", () => {
 // ---------- Entlastungsbetrag-Konto ----------
 test("Entlastungsbetrag: monatlich 131 €, Vorjahresrest bis 30. Juni nutzbar", () => {
   const run = neu("2026-03-15", { ...PFLEGE3, entlSeit: "2025-01" });
-  run(`BEL=[{kat:"entl",jahr:2025,datum:"2025-05-10",betrag:500},{kat:"entl",jahr:2026,datum:"2026-02-01",betrag:100}]`);
+  run(
+    `BEL=[{kat:"entl",jahr:2025,datum:"2025-05-10",betrag:500},{kat:"entl",jahr:2026,datum:"2026-02-01",betrag:100}]`,
+  );
   const k = run("entlKonto()");
-  assert.equal(k.bisHeute, 131 * 3);                   // Januar bis März 2026
-  assert.equal(k.vorjOffen, 131 * 12 - 500 - 100);     // Vorjahresrest, Rechnung aus 2026 zuerst damit verrechnet
+  assert.equal(k.bisHeute, 131 * 3); // Januar bis März 2026
+  assert.equal(k.vorjOffen, 131 * 12 - 500 - 100); // Vorjahresrest, Rechnung aus 2026 zuerst damit verrechnet
   assert.equal(k.frei, 131 * 3 + (131 * 12 - 500 - 100));
 });
 test("Entlastungsbetrag: nach dem 30. Juni ist der Vorjahresrest verfallen", () => {
@@ -160,7 +222,10 @@ test("Widerspruchsfrist: ein Monat ab Eingang des Bescheids", () => {
   const run = neu("2026-03-15", { ...PFLEGE3, bescheid: { pg: "2", punkte: "44,5", eingang: "2026-03-10" } });
   const b = run("bescheidInfo()");
   assert.equal(run("isoD(bescheidInfo().frist)"), "2026-04-10");
-  assert.equal(b.g, 2); assert.equal(b.next, 47.5); assert.equal(b.fehlt, 3); assert.equal(b.knapp, true);
+  assert.equal(b.g, 2);
+  assert.equal(b.next, 47.5);
+  assert.equal(b.fehlt, 3);
+  assert.equal(b.knapp, true);
 });
 test("Beratungsbesuch: Pflicht je Halbjahr bei Pflegegeld", () => {
   const run = neu("2026-03-15", PFLEGE3);
@@ -174,13 +239,20 @@ test("Beratungsbesuch: Pflicht je Halbjahr bei Pflegegeld", () => {
 // ---------- Bescheid lesen ----------
 test("Bescheid: Pflegegrad, Punkte und Datum werden erkannt", () => {
   const run = neu();
-  const r = run(`parseBescheid("Bescheid vom 12.09.2026 ... Sie erhalten Pflegegrad 2. Gesamtpunkte: 44,25. Empfehlung: Duschstuhl und Pflegebett")`);
-  assert.equal(r.pg, "2"); assert.equal(r.punkte, "44,25"); assert.equal(r.datum, "2026-09-12");
-  assert.ok(r.hinweise.some(h => h.startsWith("Pflegebett")));
+  const r = run(
+    `parseBescheid("Bescheid vom 12.09.2026 ... Sie erhalten Pflegegrad 2. Gesamtpunkte: 44,25. Empfehlung: Duschstuhl und Pflegebett")`,
+  );
+  assert.equal(r.pg, "2");
+  assert.equal(r.punkte, "44,25");
+  assert.equal(r.datum, "2026-09-12");
+  assert.ok(r.hinweise.some((h) => h.startsWith("Pflegebett")));
 });
 test("Bescheid: Ablehnung wird erkannt", () => {
   const run = neu();
-  assert.equal(run(`parseBescheid("Ihr Antrag wird abgelehnt, da keine Pflegebedürftigkeit vorliegt.").art`), "ablehnung");
+  assert.equal(
+    run(`parseBescheid("Ihr Antrag wird abgelehnt, da keine Pflegebedürftigkeit vorliegt.").art`),
+    "ablehnung",
+  );
 });
 
 // ---------- Rechnungen in PDFs erkennen ----------
@@ -189,7 +261,7 @@ test("Rechnung: Datumsformate", () => {
   assert.deepEqual(run(`datesIn("Datum: 14.03.2024")`), ["2024-03-14"]);
   assert.deepEqual(run(`datesIn("vom 3. Februar 2026")`), ["2026-02-03"]);
   assert.deepEqual(run(`datesIn("2025-06-12")`), ["2025-06-12"]);
-  assert.deepEqual(run(`datesIn("Tel. 0711 12.34.567")`), []);  // keine Telefonnummern als Datum
+  assert.deepEqual(run(`datesIn("Tel. 0711 12.34.567")`), []); // keine Telefonnummern als Datum
 });
 test("Rechnung: Rechnungsdatum geht vor Fälligkeit und Geburtsdatum", () => {
   const run = neu();
@@ -204,12 +276,15 @@ test("Rechnung: Beträge und Gesamtbetrag", () => {
 });
 test("Rechnung: bei Apotheken zählt die Zuzahlung, nicht der Gesamtbetrag", () => {
   const run = neu();
-  assert.equal(run(`pickAmount(["Ibuprofen Zuzahlung 5,00","Metformin Zuzahlung 5,00","Gesamtbetrag 23,47"],"apo")`), 10);
+  assert.equal(
+    run(`pickAmount(["Ibuprofen Zuzahlung 5,00","Metformin Zuzahlung 5,00","Gesamtbetrag 23,47"],"apo")`),
+    10,
+  );
   assert.equal(run(`pickAmount(["Zuzahlung 5,00","Zuzahlung 5,00","Summe Zuzahlung: 10,00"],"apo")`), 10);
 });
 test("Rechnung: Art wird an Stichworten erkannt", () => {
   const run = neu();
-  const k = t => run(`guessKat(${JSON.stringify(t)})`);
+  const k = (t) => run(`guessKat(${JSON.stringify(t)})`);
   assert.equal(k("Löwen-Apotheke PZN 0123"), "apo");
   assert.equal(k("Leistungen nach § 45b SGB XI"), "entl");
   assert.equal(k("Verhinderungspflege nach § 39"), "vhp");
@@ -224,11 +299,17 @@ test("Rechnung: Folgeseite wird an die Rechnung davor gehängt", () => {
     { i: 1, lines: ["Pflegedienst Mobil", "Rechnung Nr. PD-77", "Datum 12.06.2025", "Seite 1 von 2"] },
     { i: 2, lines: ["Rechnung Nr. PD-77", "Seite 2 von 2", "Rechnungsbetrag 682,00 EUR"] },
     { i: 3, lines: ["Taxi Müller", "Quittung vom 03.02.2026", "Eigenanteil 10,00 €"] },
-  ].map(p => ({ ...p, text: p.lines.join("\n"), thumb: "" }));
-  const g = run(`groupPages(${JSON.stringify(pages)}).map(x=>({pages:x.pages,datum:x.datum,betrag:x.betrag,kat:x.kat}))`);
+  ].map((p) => ({ ...p, text: p.lines.join("\n"), thumb: "" }));
+  const g = run(
+    `groupPages(${JSON.stringify(pages)}).map(x=>({pages:x.pages,datum:x.datum,betrag:x.betrag,kat:x.kat}))`,
+  );
   assert.equal(g.length, 2);
-  assert.deepEqual(g[0].pages, [1, 2]); assert.equal(g[0].betrag, "682,00"); assert.equal(g[0].datum, "2025-06-12");
-  assert.deepEqual(g[1].pages, [3]); assert.equal(g[1].kat, "fahrt"); assert.equal(g[1].betrag, "10,00");
+  assert.deepEqual(g[0].pages, [1, 2]);
+  assert.equal(g[0].betrag, "682,00");
+  assert.equal(g[0].datum, "2025-06-12");
+  assert.deepEqual(g[1].pages, [3]);
+  assert.equal(g[1].kat, "fahrt");
+  assert.equal(g[1].betrag, "10,00");
 });
 
 // ---------- Nur passende Leistungen je Pflegegrad ----------

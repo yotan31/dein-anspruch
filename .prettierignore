@@ -1,0 +1,7 @@
+# Gebaute Dateien, fremde Bibliotheken und erzeugte Dateien nicht formatieren
+node_modules/
+site/
+package-lock.json
+werkzeuge/messung.json
+dokumente/*.pdf
+supabase/

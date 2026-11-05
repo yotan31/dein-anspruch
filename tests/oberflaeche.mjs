@@ -2,7 +2,9 @@
 // Startet die gebaute App aus site/ auf einem lokalen Server und spielt die wichtigsten Abläufe
 // in einem Handy-Browser durch. Die Datenbank wird durch einen Platzhalter ersetzt, es werden
 // also keine echten Daten gelesen oder geschrieben.
-// Aufruf: node tests/oberflaeche.mjs   (vorher: python3 quelle/bauen.py)
+// Aufruf: npm run bauen && node tests/oberflaeche.mjs
+// Code in page.evaluate(...) läuft im Browser; dort macht gehe() die Programmteile unter ihren Namen erreichbar:
+/* global ASSETS:writable, BEL, S:writable, USER, backupData, blank, bulk, empfAdresse, openFeedback, render, startWiz, wipeAsk:writable, wizSteps */
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
@@ -14,76 +16,262 @@ const SITE = path.join(ROOT, "site");
 const PDF = path.join(ROOT, "tests", "dateien", "sammel.pdf");
 
 // ---------- kleiner Webserver für site/ ----------
-const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".mjs": "text/javascript", ".css": "text/css", ".json": "application/json", ".webmanifest": "application/manifest+json", ".png": "image/png", ".svg": "image/svg+xml", ".woff2": "font/woff2", ".woff": "font/woff", ".wasm": "application/wasm", ".pfb": "application/octet-stream", ".ttf": "font/ttf", ".txt": "text/plain" };
+const TYPES = {
+  ".html": "text/html; charset=utf-8",
+  ".js": "text/javascript",
+  ".mjs": "text/javascript",
+  ".css": "text/css",
+  ".json": "application/json",
+  ".webmanifest": "application/manifest+json",
+  ".png": "image/png",
+  ".svg": "image/svg+xml",
+  ".woff2": "font/woff2",
+  ".woff": "font/woff",
+  ".wasm": "application/wasm",
+  ".pfb": "application/octet-stream",
+  ".ttf": "font/ttf",
+  ".txt": "text/plain",
+};
 const server = http.createServer((req, res) => {
   const p = decodeURIComponent(new URL(req.url, "http://x").pathname);
   let f = path.join(SITE, p.endsWith("/") ? p + "index.html" : p);
-  if (!f.startsWith(SITE) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { res.writeHead(404); return res.end("404") }
+  if (!f.startsWith(SITE) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) {
+    res.writeHead(404);
+    return res.end("404");
+  }
   res.writeHead(200, { "Content-Type": TYPES[path.extname(f)] || "application/octet-stream" });
   fs.createReadStream(f).pipe(res);
 });
-await new Promise(r => server.listen(0, "127.0.0.1", r));
+await new Promise((r) => server.listen(0, "127.0.0.1", r));
 const BASE = `http://127.0.0.1:${server.address().port}/`;
 
 // ---------- Test-Helfer ----------
-let failed = 0, passed = 0;
+let failed = 0,
+  passed = 0;
 let bereich = "";
 function check(name, ok, info = "") {
-  if (ok) { passed++; console.log("  ✓ " + name); return }
-  failed++; console.log("  ✗ " + name + (info ? "  → " + info : ""));
-  if (process.env.GITHUB_ACTIONS) console.log(`::error title=Test fehlgeschlagen (${bereich})::${name}${info ? " → " + String(info).replace(/[\r\n]+/g, " ").slice(0, 300) : ""}`);
+  if (ok) {
+    passed++;
+    console.log("  ✓ " + name);
+    return;
+  }
+  failed++;
+  console.log("  ✗ " + name + (info ? "  → " + info : ""));
+  if (process.env.GITHUB_ACTIONS)
+    console.log(
+      `::error title=Test fehlgeschlagen (${bereich})::${name}${
+        info
+          ? " → " +
+            String(info)
+              .replace(/[\r\n]+/g, " ")
+              .slice(0, 300)
+          : ""
+      }`,
+    );
 }
-const log = console.log; console.log = (...a) => { if (a.length === 1 && typeof a[0] === "string" && !a[0].startsWith(" ") && !a[0].startsWith("::") && !a[0].startsWith("\n")) bereich = a[0]; log(...a) };
-process.on("unhandledRejection", e => { console.log(`::error title=Testlauf abgebrochen (${bereich})::${String(e && e.message || e).replace(/[\r\n]+/g, " ").slice(0, 400)}`); process.exit(1) });
+const log = console.log;
+console.log = (...a) => {
+  if (
+    a.length === 1 &&
+    typeof a[0] === "string" &&
+    !a[0].startsWith(" ") &&
+    !a[0].startsWith("::") &&
+    !a[0].startsWith("\n")
+  )
+    bereich = a[0];
+  log(...a);
+};
+process.on("unhandledRejection", (e) => {
+  console.log(
+    `::error title=Testlauf abgebrochen (${bereich})::${String((e && e.message) || e)
+      .replace(/[\r\n]+/g, " ")
+      .slice(0, 400)}`,
+  );
+  process.exit(1);
+});
 const browser = await chromium.launch();
 async function newPage({ gast = null, stub = false } = {}) {
-  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, acceptDownloads: true });
+  const ctx = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    hasTouch: true,
+    isMobile: true,
+    acceptDownloads: true,
+  });
   const extern = [];
-  await ctx.route(/^https?:\/\/(?!127\.0\.0\.1)/, r => { extern.push(r.request().url()); r.abort() });
-  if (gast) await ctx.addInitScript(g => { if (!sessionStorage.x) { sessionStorage.x = 1; localStorage.setItem("dein-anspruch-modus", JSON.stringify("gast")); localStorage.setItem("dein-anspruch-gast", JSON.stringify(g)) } }, gast);
-  if (stub) await ctx.addInitScript((einwilligung) => {
-    // Platzhalter-Datenbank: angemeldeter Nutzer ohne Einwilligung
-    window.__ins = []; let user = { id: "u1", email: "test@example.org", user_metadata: einwilligung ? { einwilligung_am: "2026-10-01T00:00:00Z" } : {} }; const rows = { fall: [], mitglied: [], belege: [] };
-    const q = t => { const st = { op: "select" }; const api = {
-      select() { return api }, eq() { return api }, order() { return api },
-      single() { return Promise.resolve({ data: rows.fall[rows.fall.length - 1], error: null }) },
-      maybeSingle() { return Promise.resolve({ data: null, error: null }) },
-      insert(r) { window.__ins.push([t, r]); if (t === "fall") { rows.fall.push({ id: "f1", data: r.data, created_by: "u1", updated_at: "x" }); rows.mitglied.push({ fall_id: "f1", rolle: "besitzer", user_id: "u1" }) } st.op = "ins"; return api },
-      update() { st.op = "upd"; return api }, delete() { return api }, upsert() { return Promise.resolve({ error: null }) },
-      then(res) { return Promise.resolve({ data: st.op === "select" ? (rows[t] || []) : null, error: null }).then(res) } }; return api };
-    Object.defineProperty(window, "supabase", { configurable: true, get: () => ({ createClient: () => ({
-      auth: { onAuthStateChange() {}, getSession: async () => ({ data: { session: { user } } }), updateUser: async ({ data, password }) => { if (password) window.__pw = password; if (data) user = { ...user, user_metadata: { ...user.user_metadata, ...data } }; return { data: { user }, error: null } }, signOut: async () => {} },
-      from: q, rpc: async () => ({ data: null, error: null }), functions: { invoke: async (n, o) => { window.__fn = [n, o && o.body]; return { data: { ok: true }, error: null } } }, storage: { from: () => ({ createSignedUrls: async () => ({ data: [] }) }) } }) }), set() {} });
-  }, stub === "mitEinwilligung");
-  const page = await ctx.newPage(); const errors = [];
-  page.on("pageerror", e => errors.push(e.message));
+  await ctx.route(/^https?:\/\/(?!127\.0\.0\.1)/, (r) => {
+    extern.push(r.request().url());
+    r.abort();
+  });
+  if (gast)
+    await ctx.addInitScript((g) => {
+      if (!sessionStorage.x) {
+        sessionStorage.x = 1;
+        localStorage.setItem("dein-anspruch-modus", JSON.stringify("gast"));
+        localStorage.setItem("dein-anspruch-gast", JSON.stringify(g));
+      }
+    }, gast);
+  if (stub)
+    await ctx.addInitScript((einwilligung) => {
+      // Platzhalter-Datenbank: angemeldeter Nutzer ohne Einwilligung
+      window.__ins = [];
+      let user = {
+        id: "u1",
+        email: "test@example.org",
+        user_metadata: einwilligung ? { einwilligung_am: "2026-10-01T00:00:00Z" } : {},
+      };
+      const rows = { fall: [], mitglied: [], belege: [] };
+      const q = (t) => {
+        const st = { op: "select" };
+        const api = {
+          select() {
+            return api;
+          },
+          eq() {
+            return api;
+          },
+          order() {
+            return api;
+          },
+          single() {
+            return Promise.resolve({ data: rows.fall[rows.fall.length - 1], error: null });
+          },
+          maybeSingle() {
+            return Promise.resolve({ data: null, error: null });
+          },
+          insert(r) {
+            window.__ins.push([t, r]);
+            if (t === "fall") {
+              rows.fall.push({ id: "f1", data: r.data, created_by: "u1", updated_at: "x" });
+              rows.mitglied.push({ fall_id: "f1", rolle: "besitzer", user_id: "u1" });
+            }
+            st.op = "ins";
+            return api;
+          },
+          update() {
+            st.op = "upd";
+            return api;
+          },
+          delete() {
+            return api;
+          },
+          upsert() {
+            return Promise.resolve({ error: null });
+          },
+          then(res) {
+            return Promise.resolve({ data: st.op === "select" ? rows[t] || [] : null, error: null }).then(res);
+          },
+        };
+        return api;
+      };
+      Object.defineProperty(window, "supabase", {
+        configurable: true,
+        get: () => ({
+          createClient: () => ({
+            auth: {
+              onAuthStateChange() {},
+              getSession: async () => ({ data: { session: { user } } }),
+              updateUser: async ({ data, password }) => {
+                if (password) window.__pw = password;
+                if (data) user = { ...user, user_metadata: { ...user.user_metadata, ...data } };
+                return { data: { user }, error: null };
+              },
+              signOut: async () => {},
+            },
+            from: q,
+            rpc: async () => ({ data: null, error: null }),
+            functions: {
+              invoke: async (n, o) => {
+                window.__fn = [n, o && o.body];
+                return { data: { ok: true }, error: null };
+              },
+            },
+            storage: { from: () => ({ createSignedUrls: async () => ({ data: [] }) }) },
+          }),
+        }),
+        set() {},
+      });
+    }, stub === "mitEinwilligung");
+  const page = await ctx.newPage();
+  const errors = [];
+  page.on("pageerror", (e) => errors.push(e.message));
   return { page, ctx, errors, extern };
 }
 // wartet, bis fn() im Browser true liefert (ohne waitForFunction, das die Sicherheitsregeln der Seite blockieren)
-async function waitFor(page, fn, ms = 60000) { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (await page.evaluate(fn)) return true; await page.waitForTimeout(250) } throw new Error("Zeitüberschreitung beim Warten") }
+async function waitFor(page, fn, ms = 60000) {
+  const t0 = Date.now();
+  while (Date.now() - t0 < ms) {
+    if (await page.evaluate(fn)) return true;
+    await page.waitForTimeout(250);
+  }
+  throw new Error("Zeitüberschreitung beim Warten");
+}
 // Seite öffnen und die Programmteile für die Tests unter ihren Namen erreichbar machen
 // (die App legt sie unter window.__da ab, z. B. __da.Z.S für die Angaben oder __da.render)
 async function gehe(page, url, ms = 600) {
-  await page.goto(url); await page.waitForTimeout(ms);
+  await page.goto(url);
+  await page.waitForTimeout(ms);
   await page.evaluate(() => {
-    const d = window.__da; if (!d) throw new Error("window.__da fehlt");
-    for (const k of Object.keys(d.Z)) { try { Object.defineProperty(window, k, { configurable: true, get() { return d.Z[k] }, set(v) { d.Z[k] = v } }) } catch (e) { } }
-    for (const k of Object.keys(d)) { if (k === "Z" || k in window) continue; try { Object.defineProperty(window, k, { configurable: true, get() { return d[k] } }) } catch (e) { } }
+    const d = window.__da;
+    if (!d) throw new Error("window.__da fehlt");
+    for (const k of Object.keys(d.Z)) {
+      try {
+        Object.defineProperty(window, k, {
+          configurable: true,
+          get() {
+            return d.Z[k];
+          },
+          set(v) {
+            d.Z[k] = v;
+          },
+        });
+      } catch (e) {}
+    }
+    for (const k of Object.keys(d)) {
+      if (k === "Z" || k in window) continue;
+      try {
+        Object.defineProperty(window, k, {
+          configurable: true,
+          get() {
+            return d[k];
+          },
+        });
+      } catch (e) {}
+    }
   });
 }
-const GAST = { done: true, welcomeSeen: true, bereiche: { pflege: true, sb: false }, pg: "3", kasse: "aok", aokRegion: "bw", wohnen: "angehoerige", rolle: "angehoerig", step: 6, tab: "ansprueche", genutzt: { pflegegeld: true }, person: { name: "Testperson", ort: "70173 Stuttgart" } };
+const GAST = {
+  done: true,
+  welcomeSeen: true,
+  bereiche: { pflege: true, sb: false },
+  pg: "3",
+  kasse: "aok",
+  aokRegion: "bw",
+  wohnen: "angehoerige",
+  rolle: "angehoerig",
+  step: 6,
+  tab: "ansprueche",
+  genutzt: { pflegegeld: true },
+  person: { name: "Testperson", ort: "70173 Stuttgart" },
+};
 
 // ---------- 1. Fragebogen von vorn ----------
 console.log("Fragebogen");
 {
-  const { page, errors, extern } = await newPage({ gast: { } });
+  const { page, errors, extern } = await newPage({ gast: {} });
   await gehe(page, BASE, 600);
   for (let i = 0; i < 12; i++) {
-    const c = page.locator("#main .choice"); if (await c.count()) { await c.first().tap(); await page.waitForTimeout(120) }
-    const nx = page.locator('[data-act="next"]'); if (!(await nx.count())) break; await nx.tap(); await page.waitForTimeout(300);
+    const c = page.locator("#main .choice");
+    if (await c.count()) {
+      await c.first().tap();
+      await page.waitForTimeout(120);
+    }
+    const nx = page.locator('[data-act="next"]');
+    if (!(await nx.count())) break;
+    await nx.tap();
+    await page.waitForTimeout(300);
   }
   check("Fragebogen lässt sich bis zum Ende durchklicken", await page.evaluate(() => S.done === true));
-  check("keine Google-Schriften geladen", !extern.some(u => /fonts\.(googleapis|gstatic)/.test(u)), extern.join(" "));
+  check("keine Google-Schriften geladen", !extern.some((u) => /fonts\.(googleapis|gstatic)/.test(u)), extern.join(" "));
   check("keine Programmfehler", errors.length === 0, errors.join(" | "));
 }
 
@@ -94,22 +282,48 @@ console.log("Startseite: Schnellstart und Hilfe");
   await gehe(page, BASE, 600);
   check("Startseite zeigt Schnellstart-Kacheln", (await page.locator('[data-act="schnell"]').count()) >= 4);
   check("Startseite zeigt häufige Fragen", (await page.locator(".fragen .faq details").count()) >= 5);
-  check("Google-Anmeldung ist ausgeblendet, solange sie nicht eingerichtet ist", (await page.locator('[data-act="au-google"]').count()) === 0);
-  await page.locator(".kopf-anmelden").tap(); await page.waitForTimeout(200);
-  check("„Anmelden“ oben öffnet das Anmeldeformular", await page.locator("#au-mail").count() === 1 && await page.locator(".lp-hero").count() === 0 && await page.locator(".kopf-anmelden").count() === 0);
-  await page.locator('[data-act="au-start"]').tap(); await page.waitForTimeout(200);
-  check("„Zur Startseite“ führt zurück", await page.locator(".lp-hero").count() === 1);
-  await page.locator('footer [data-act="hilfe-open"]').tap(); await page.waitForTimeout(200);
-  check("Hilfe-Fenster öffnet sich", await page.locator("#hilfebox:not([hidden]) .faq").count() === 1);
-  await page.locator('[data-act="hilfe-close"]').tap(); await page.waitForTimeout(150);
-  check("Hilfe-Fenster schließt wieder", await page.locator("#hilfebox[hidden]").count() === 1);
-  await page.locator('[data-ziel="pg_antrag"]').tap(); await page.waitForTimeout(300);
-  check("Kachel führt in den Fragebogen mit Hinweis auf den Antrag", /Pflegegrad beantragen/.test(await page.textContent("#main .notice.info")));
+  check(
+    "Google-Anmeldung ist ausgeblendet, solange sie nicht eingerichtet ist",
+    (await page.locator('[data-act="au-google"]').count()) === 0,
+  );
+  await page.locator(".kopf-anmelden").tap();
+  await page.waitForTimeout(200);
+  check(
+    "„Anmelden“ oben öffnet das Anmeldeformular",
+    (await page.locator("#au-mail").count()) === 1 &&
+      (await page.locator(".lp-hero").count()) === 0 &&
+      (await page.locator(".kopf-anmelden").count()) === 0,
+  );
+  await page.locator('[data-act="au-start"]').tap();
+  await page.waitForTimeout(200);
+  check("„Zur Startseite“ führt zurück", (await page.locator(".lp-hero").count()) === 1);
+  await page.locator('footer [data-act="hilfe-open"]').tap();
+  await page.waitForTimeout(200);
+  check("Hilfe-Fenster öffnet sich", (await page.locator("#hilfebox:not([hidden]) .faq").count()) === 1);
+  await page.locator('[data-act="hilfe-close"]').tap();
+  await page.waitForTimeout(150);
+  check("Hilfe-Fenster schließt wieder", (await page.locator("#hilfebox[hidden]").count()) === 1);
+  await page.locator('[data-ziel="pg_antrag"]').tap();
+  await page.waitForTimeout(300);
+  check(
+    "Kachel führt in den Fragebogen mit Hinweis auf den Antrag",
+    /Pflegegrad beantragen/.test(await page.textContent("#main .notice.info")),
+  );
   for (let i = 0; i < 12; i++) {
-    const c = page.locator("#main .choice"); if (await c.count()) { await c.first().tap(); await page.waitForTimeout(120) }
-    const nx = page.locator('[data-act="next"]'); if (!(await nx.count())) break; await nx.tap(); await page.waitForTimeout(300);
+    const c = page.locator("#main .choice");
+    if (await c.count()) {
+      await c.first().tap();
+      await page.waitForTimeout(120);
+    }
+    const nx = page.locator('[data-act="next"]');
+    if (!(await nx.count())) break;
+    await nx.tap();
+    await page.waitForTimeout(300);
   }
-  check("nach dem Fragebogen öffnet sich direkt der gewählte Antrag", await page.evaluate(() => S.done && S.wiz && S.wiz.k === "pg_antrag" && !S.ziel));
+  check(
+    "nach dem Fragebogen öffnet sich direkt der gewählte Antrag",
+    await page.evaluate(() => S.done && S.wiz && S.wiz.k === "pg_antrag" && !S.ziel),
+  );
   check("keine Programmfehler", errors.length === 0, errors.join(" | "));
 }
 
@@ -120,33 +334,84 @@ console.log("Ansprüche und Antrag-Assistent");
   await gehe(page, BASE, 600);
   check("Betrag oben wird angezeigt", /\d.*€/.test(await page.textContent("#hero .figure")));
   check("Summe ist aufgeschlüsselt (Posten mit Betrag)", (await page.locator("#hero .hpost b").count()) >= 1);
-  await page.tap('#hero [data-act="menu"]'); await page.waitForTimeout(150);
-  check("Menü zeigt Sprache und Schriftgröße", (await page.locator("#hmenu #langsel").count()) === 1 && (await page.locator("#hmenu [data-font]").count()) === 3);
-  await page.tap('#hero [data-act="menu"]'); await page.waitForTimeout(150);
+  await page.tap('#hero [data-act="menu"]');
+  await page.waitForTimeout(150);
+  check(
+    "Menü zeigt Sprache und Schriftgröße",
+    (await page.locator("#hmenu #langsel").count()) === 1 && (await page.locator("#hmenu [data-font]").count()) === 3,
+  );
+  await page.tap('#hero [data-act="menu"]');
+  await page.waitForTimeout(150);
   check("Menü schließt wieder", (await page.locator("#hmenu").count()) === 0);
-  await page.tap('#hero [data-act="menu"]'); await page.waitForTimeout(150); await page.tap('#hmenu [data-font="1.3"]'); await page.waitForTimeout(150);
-  await page.evaluate(() => { S = blank(); render() }); await page.waitForTimeout(150);
-  check("Schriftgröße bleibt erhalten, auch wenn die Angaben zurückgesetzt werden (z. B. Abmelden)", await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--fs").trim()) === "1.3");
-  await page.evaluate(() => { localStorage.setItem("da-font", JSON.stringify("1")); S = Object.assign(blank(), JSON.parse(localStorage.getItem("dein-anspruch-gast"))); render() }); await page.waitForTimeout(150);
-  await page.locator("#main .infobtn").first().tap(); await page.waitForTimeout(200);
-  check("ⓘ-Knopf öffnet ein Fenster mit Erklärung", await page.locator("#infobox:not([hidden]) .sheet.info p").count() >= 1);
-  await page.locator('[data-act="info-close"]').tap(); await page.waitForTimeout(150);
-  check("Erklärung schließt mit „Verstanden“", await page.locator("#infobox[hidden]").count() === 1);
-  await page.evaluate(() => { window.__h = document.querySelector("#main .item .head") });
-  await page.tap(".item .head"); await page.waitForTimeout(350);
-  check("Leistung klappt auf", await page.locator(".detail").count() === 1);
-  check("Seite wird nicht komplett neu aufgebaut", await page.evaluate(() => window.__h === document.querySelector("#main .item .head")));
-  await page.locator("[data-wopen]").first().tap(); await page.waitForTimeout(350);
-  check("Assistent startet mit leichter Frage", !/Versichertennummer|wohnt/.test(await page.textContent("h2.wq")), await page.textContent("h2.wq"));
+  await page.tap('#hero [data-act="menu"]');
+  await page.waitForTimeout(150);
+  await page.tap('#hmenu [data-font="1.3"]');
+  await page.waitForTimeout(150);
+  await page.evaluate(() => {
+    S = blank();
+    render();
+  });
+  await page.waitForTimeout(150);
+  check(
+    "Schriftgröße bleibt erhalten, auch wenn die Angaben zurückgesetzt werden (z. B. Abmelden)",
+    (await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--fs").trim())) === "1.3",
+  );
+  await page.evaluate(() => {
+    localStorage.setItem("da-font", JSON.stringify("1"));
+    S = Object.assign(blank(), JSON.parse(localStorage.getItem("dein-anspruch-gast")));
+    render();
+  });
+  await page.waitForTimeout(150);
+  await page.locator("#main .infobtn").first().tap();
+  await page.waitForTimeout(200);
+  check(
+    "ⓘ-Knopf öffnet ein Fenster mit Erklärung",
+    (await page.locator("#infobox:not([hidden]) .sheet.info p").count()) >= 1,
+  );
+  await page.locator('[data-act="info-close"]').tap();
+  await page.waitForTimeout(150);
+  check("Erklärung schließt mit „Verstanden“", (await page.locator("#infobox[hidden]").count()) === 1);
+  await page.evaluate(() => {
+    window.__h = document.querySelector("#main .item .head");
+  });
+  await page.tap(".item .head");
+  await page.waitForTimeout(350);
+  check("Leistung klappt auf", (await page.locator(".detail").count()) === 1);
+  check(
+    "Seite wird nicht komplett neu aufgebaut",
+    await page.evaluate(() => window.__h === document.querySelector("#main .item .head")),
+  );
+  await page.locator("[data-wopen]").first().tap();
+  await page.waitForTimeout(350);
+  check(
+    "Assistent startet mit leichter Frage",
+    !/Versichertennummer|wohnt/.test(await page.textContent("h2.wq")),
+    await page.textContent("h2.wq"),
+  );
   let advanced = false;
   for (let k = 0; k < 15; k++) {
-    if (await page.locator(".wiz .choice input[type=radio]").count()) { const a = await page.textContent("h2.wq"); await page.locator(".wiz .choice").first().tap(); await page.waitForTimeout(700); advanced = a !== await page.textContent("h2.wq"); break }
-    const nx = page.locator('.wiz .nav [data-wnav="next"]').first(); if (!(await nx.count())) break; await nx.tap(); await page.waitForTimeout(300);
+    if (await page.locator(".wiz .choice input[type=radio]").count()) {
+      const a = await page.textContent("h2.wq");
+      await page.locator(".wiz .choice").first().tap();
+      await page.waitForTimeout(700);
+      advanced = a !== (await page.textContent("h2.wq"));
+      break;
+    }
+    const nx = page.locator('.wiz .nav [data-wnav="next"]').first();
+    if (!(await nx.count())) break;
+    await nx.tap();
+    await page.waitForTimeout(300);
   }
   check("Auswahl springt automatisch zur nächsten Frage", advanced);
-  await page.tap('.wiz [data-wnav="close"]'); await page.waitForTimeout(300);
-  await page.tap('[data-tab="termine"]'); await page.waitForTimeout(50);
-  check("Reiter wechselt sofort, ohne Animation", !/go-/.test(await page.getAttribute("#main", "class") || "") && await page.locator('[data-tab="termine"][aria-selected="true"]').count() === 1);
+  await page.tap('.wiz [data-wnav="close"]');
+  await page.waitForTimeout(300);
+  await page.tap('[data-tab="termine"]');
+  await page.waitForTimeout(50);
+  check(
+    "Reiter wechselt sofort, ohne Animation",
+    !/go-/.test((await page.getAttribute("#main", "class")) || "") &&
+      (await page.locator('[data-tab="termine"][aria-selected="true"]').count()) === 1,
+  );
   check("keine Programmfehler", errors.length === 0, errors.join(" | "));
 }
 
@@ -155,35 +420,85 @@ console.log("Antrag: Prüfhinweise und Anschrift");
 {
   const { page, errors } = await newPage({ gast: GAST });
   await gehe(page, BASE, 600);
-  await page.evaluate(() => { startWiz("entlastung"); });
+  await page.evaluate(() => {
+    startWiz("entlastung");
+  });
   await page.waitForTimeout(200);
-  const geheZu = async k => { await page.evaluate(k => { S.wiz.i = wizSteps().list.findIndex(q => q.k === k); render() }, k); await page.waitForTimeout(150) };
+  const geheZu = async (k) => {
+    await page.evaluate((k) => {
+      S.wiz.i = wizSteps().list.findIndex((q) => q.k === k);
+      render();
+    }, k);
+    await page.waitForTimeout(150);
+  };
   await geheZu("vnr");
   await page.fill("#wq-vnr", "Erika Muster");
-  await page.locator('.wiz .nav [data-wnav="next"]:not(.ghost)').tap(); await page.waitForTimeout(150);
+  await page.locator('.wiz .nav [data-wnav="next"]:not(.ghost)').tap();
+  await page.waitForTimeout(150);
   const i1 = await page.evaluate(() => S.wiz.i);
   await page.waitForTimeout(400);
-  check("Unplausible Versichertennummer: freundlicher Hinweis, Assistent bleibt stehen", await page.locator("#wqwarn:not([hidden])").count() === 1 && /10 Zeichen/.test(await page.textContent("#wqwarn")));
-  await page.locator('.wiz .nav [data-wnav="next"]:not(.ghost)').tap(); await page.waitForTimeout(150);
-  check("Beim zweiten Tippen wird die Angabe trotzdem übernommen", await page.evaluate(() => S.wiz.i) === i1 + 1);
-  // Doppeltippen auf „Weiter“ darf keine Frage überspringen
-  await page.evaluate(() => { S.wiz.i = 0; render() }); await page.waitForTimeout(400);
-  const i0 = await page.evaluate(() => S.wiz.i);
-  await page.evaluate(() => { const b = document.querySelector('.wiz .nav [data-wnav="next"]:not(.ghost)'); b.click(); b.click() });
+  check(
+    "Unplausible Versichertennummer: freundlicher Hinweis, Assistent bleibt stehen",
+    (await page.locator("#wqwarn:not([hidden])").count()) === 1 && /10 Zeichen/.test(await page.textContent("#wqwarn")),
+  );
+  await page.locator('.wiz .nav [data-wnav="next"]:not(.ghost)').tap();
   await page.waitForTimeout(150);
-  check("Doppeltippen auf „Weiter“ springt nur eine Frage weiter", await page.evaluate(() => S.wiz.i) === i0 + 1);
+  check("Beim zweiten Tippen wird die Angabe trotzdem übernommen", (await page.evaluate(() => S.wiz.i)) === i1 + 1);
+  // Doppeltippen auf „Weiter“ darf keine Frage überspringen
+  await page.evaluate(() => {
+    S.wiz.i = 0;
+    render();
+  });
+  await page.waitForTimeout(400);
+  const i0 = await page.evaluate(() => S.wiz.i);
+  await page.evaluate(() => {
+    const b = document.querySelector('.wiz .nav [data-wnav="next"]:not(.ghost)');
+    b.click();
+    b.click();
+  });
+  await page.waitForTimeout(150);
+  check("Doppeltippen auf „Weiter“ springt nur eine Frage weiter", (await page.evaluate(() => S.wiz.i)) === i0 + 1);
   await geheZu("absadresse");
-  check("Angehörige werden nach ihrer eigenen Anschrift als Absender gefragt", await page.locator("#wq-absstrasse").count() === 1 && await page.locator("#wq-absort").count() === 1);
+  check(
+    "Angehörige werden nach ihrer eigenen Anschrift als Absender gefragt",
+    (await page.locator("#wq-absstrasse").count()) === 1 && (await page.locator("#wq-absort").count()) === 1,
+  );
   await geheZu("empf");
-  check("Assistent fragt nach der Anschrift der Pflegekasse", await page.locator("#wq-estrasse").count() === 1);
-  await page.fill("#wq-estrasse", "Postfach 12 34 56"); await page.fill("#wq-eort", "20457 Hamburg");
-  check("Anschrift wird gespeichert und für die Krankenkasse mitgenutzt", await page.evaluate(() => empfAdresse("pflegekasse").ort === "20457 Hamburg" && empfAdresse("krankenkasse").strasse === "Postfach 12 34 56"));
-  await page.evaluate(() => { S.wiz.i = wizSteps().list.length - 1; render() }); await page.waitForTimeout(150);
-  check("Fertiger Antrag nennt die Anschrift beim Abschicken", /20457 Hamburg/.test(await page.textContent(".howsend")));
+  check("Assistent fragt nach der Anschrift der Pflegekasse", (await page.locator("#wq-estrasse").count()) === 1);
+  await page.fill("#wq-estrasse", "Postfach 12 34 56");
+  await page.fill("#wq-eort", "20457 Hamburg");
+  check(
+    "Anschrift wird gespeichert und für die Krankenkasse mitgenutzt",
+    await page.evaluate(
+      () =>
+        empfAdresse("pflegekasse").ort === "20457 Hamburg" &&
+        empfAdresse("krankenkasse").strasse === "Postfach 12 34 56",
+    ),
+  );
+  await page.evaluate(() => {
+    S.wiz.i = wizSteps().list.length - 1;
+    render();
+  });
+  await page.waitForTimeout(150);
+  check(
+    "Fertiger Antrag nennt die Anschrift beim Abschicken",
+    /20457 Hamburg/.test(await page.textContent(".howsend")),
+  );
   const gm = await page.getAttribute('.wiz a[href^="https://mail.google.com/"]', "href");
-  check("Knopf „In Gmail öffnen“ mit Betreff und Antragstext (AOK: ohne feste E-Mail-Adresse)", !!gm && /view=cm/.test(gm) && !/&to=/.test(gm) && /&su=/.test(gm) && /&body=[\s\S]*Entlastungsbetrag/.test(decodeURIComponent(gm)), gm);
+  check(
+    "Knopf „In Gmail öffnen“ mit Betreff und Antragstext (AOK: ohne feste E-Mail-Adresse)",
+    !!gm &&
+      /view=cm/.test(gm) &&
+      !/&to=/.test(gm) &&
+      /&su=/.test(gm) &&
+      /&body=[\s\S]*Entlastungsbetrag/.test(decodeURIComponent(gm)),
+    gm,
+  );
   check("Hinweis: PDF in der E-Mail anhängen", /PDF anhängen/.test(await page.textContent("#pdfhinweis")));
-  const [popup] = await Promise.all([page.waitForEvent("popup", { timeout: 3000 }).catch(() => null), page.locator('.wiz a[href^="https://mail.google.com/"]').tap()]);
+  const [popup] = await Promise.all([
+    page.waitForEvent("popup", { timeout: 3000 }).catch(() => null),
+    page.locator('.wiz a[href^="https://mail.google.com/"]').tap(),
+  ]);
   check("Gmail öffnet sich in einem neuen Fenster", !!popup);
   check("keine Programmfehler", errors.length === 0, errors.join(" | "));
 }
@@ -193,10 +508,15 @@ console.log("Pflegegrad-Rechner");
 {
   const { page, errors } = await newPage({ gast: GAST });
   await gehe(page, BASE + "?rechner", 600);
-  let n = 0; while (await page.locator("[data-rq]").count() && n < 30) { await page.locator(".choice").nth(1).tap(); await page.waitForTimeout(450); n++ }
+  let n = 0;
+  while ((await page.locator("[data-rq]").count()) && n < 30) {
+    await page.locator(".choice").nth(1).tap();
+    await page.waitForTimeout(450);
+    n++;
+  }
   check("alle 24 Fragen beantwortbar", n === 24, "beantwortet: " + n);
   check("Ergebnis wird angezeigt", /Pflegegrad/.test(await page.textContent("h2.wq")));
-  check("Weiterempfehlen-Knopf vorhanden", await page.locator('[data-act="teilen"]').count() > 0);
+  check("Weiterempfehlen-Knopf vorhanden", (await page.locator('[data-act="teilen"]').count()) > 0);
   check("keine Programmfehler", errors.length === 0, errors.join(" | "));
 }
 
@@ -205,16 +525,42 @@ console.log("Sammel-PDF mit mehreren Rechnungen");
 {
   const { page, errors } = await newPage({ gast: { ...GAST, tab: "belege" } });
   await gehe(page, BASE, 600);
-  await page.evaluate(() => { window.__up = []; ASSETS = { upload: async (b, { type }) => { window.__up.push(type); return { id: "f/" + window.__up.length, contentType: type } }, delete: async () => {} }; render() });
+  await page.evaluate(() => {
+    window.__up = [];
+    ASSETS = {
+      upload: async (b, { type }) => {
+        window.__up.push(type);
+        return { id: "f/" + window.__up.length, contentType: type };
+      },
+      delete: async () => {},
+    };
+    render();
+  });
   await page.setInputFiles("#fileAny", PDF);
   await waitFor(page, () => bulk && bulk.phase !== "lesen");
-  const items = await page.evaluate(() => bulk.items.map(i => [i.pages.join("+"), i.kat, i.datum, i.betrag]));
+  const items = await page.evaluate(() => bulk.items.map((i) => [i.pages.join("+"), i.kat, i.datum, i.betrag]));
   check("5 Rechnungen auf 6 Seiten erkannt", items.length === 5, JSON.stringify(items));
-  const want = [["1", "apo", "2024-03-14", "10,00"], ["2", "entl", "2025-01-31", "130,00"], ["3+4", "vhp", "2025-06-12", "682,00"], ["5", "fahrt", "2026-02-03", "10,00"], ["6", "heil", "2026-04-20", "31,80"]];
-  want.forEach((w, i) => check(`Rechnung ${i + 1}: Art, Datum, Betrag richtig`, JSON.stringify(items[i]) === JSON.stringify(w), JSON.stringify(items[i])));
-  await page.tap('[data-act="bulk-save"]'); await waitFor(page, () => !bulk);
-  check("alle Belege gespeichert", await page.evaluate(() => BEL.length) === 5);
-  check("Jahre 2024–2026 eingeblendet", await page.evaluate(() => ["2024", "2025", "2026"].every(y => S.belegFilter.jahre.includes(y))));
+  const want = [
+    ["1", "apo", "2024-03-14", "10,00"],
+    ["2", "entl", "2025-01-31", "130,00"],
+    ["3+4", "vhp", "2025-06-12", "682,00"],
+    ["5", "fahrt", "2026-02-03", "10,00"],
+    ["6", "heil", "2026-04-20", "31,80"],
+  ];
+  want.forEach((w, i) =>
+    check(
+      `Rechnung ${i + 1}: Art, Datum, Betrag richtig`,
+      JSON.stringify(items[i]) === JSON.stringify(w),
+      JSON.stringify(items[i]),
+    ),
+  );
+  await page.tap('[data-act="bulk-save"]');
+  await waitFor(page, () => !bulk);
+  check("alle Belege gespeichert", (await page.evaluate(() => BEL.length)) === 5);
+  check(
+    "Jahre 2024–2026 eingeblendet",
+    await page.evaluate(() => ["2024", "2025", "2026"].every((y) => S.belegFilter.jahre.includes(y))),
+  );
   check("keine Programmfehler", errors.length === 0, errors.join(" | "));
 }
 
@@ -226,12 +572,20 @@ console.log("Sicherung und Löschen");
   const [dl] = await Promise.all([page.waitForEvent("download"), page.evaluate(() => backupData())]);
   const file = await dl.path();
   check("Sicherung wird heruntergeladen", /dein-anspruch-sicherung/.test(dl.suggestedFilename()));
-  await page.evaluate(() => { wipeAsk = true; render() }); await page.waitForTimeout(100);
-  await page.locator('[data-act="wipe-yes"]').tap(); await page.waitForTimeout(150);
-  check("Löschen ohne Bestätigungswort wird verhindert", await page.evaluate(() => S.person.name) === "Testperson");
-  await page.fill("#wipe-word", "LÖSCHEN"); await page.locator('[data-act="wipe-yes"]').tap(); await page.waitForTimeout(300);
+  await page.evaluate(() => {
+    wipeAsk = true;
+    render();
+  });
+  await page.waitForTimeout(100);
+  await page.locator('[data-act="wipe-yes"]').tap();
+  await page.waitForTimeout(150);
+  check("Löschen ohne Bestätigungswort wird verhindert", (await page.evaluate(() => S.person.name)) === "Testperson");
+  await page.fill("#wipe-word", "LÖSCHEN");
+  await page.locator('[data-act="wipe-yes"]').tap();
+  await page.waitForTimeout(300);
   check("Löschen mit Bestätigungswort klappt", await page.evaluate(() => !S.done));
-  await page.setInputFiles("#fileJson", file); await page.waitForTimeout(500);
+  await page.setInputFiles("#fileJson", file);
+  await page.waitForTimeout(500);
   check("Sicherung lässt sich wieder einspielen", await page.evaluate(() => S.done && S.person.name === "Testperson"));
   check("keine Programmfehler", errors.length === 0, errors.join(" | "));
 }
@@ -242,33 +596,82 @@ console.log("Konto, Einwilligung und Feedback");
   const { page, errors } = await newPage({ stub: true });
   await gehe(page, BASE, 800);
   check("Einwilligung wird vor allem anderen abgefragt", (await page.textContent("#main h2")) === "Bevor es losgeht");
-  check("vor der Einwilligung wird nichts gespeichert", await page.evaluate(() => window.__ins.length) === 0);
-  await page.tap('[data-act="cs-yes"]'); await page.waitForTimeout(150);
+  check("vor der Einwilligung wird nichts gespeichert", (await page.evaluate(() => window.__ins.length)) === 0);
+  await page.tap('[data-act="cs-yes"]');
+  await page.waitForTimeout(150);
   check("ohne Häkchen geht es nicht weiter", (await page.textContent("#main h2")) === "Bevor es losgeht");
-  await page.locator('label[for="cs-ok"]').tap(); await page.tap('[data-act="cs-yes"]'); await page.waitForTimeout(800);
+  await page.locator('label[for="cs-ok"]').tap();
+  await page.tap('[data-act="cs-yes"]');
+  await page.waitForTimeout(800);
   check("nach der Einwilligung startet die App", (await page.textContent("#main h2")) !== "Bevor es losgeht");
   check("Einwilligung mit Datum gespeichert", await page.evaluate(() => !!USER.user_metadata.einwilligung_am));
-  await page.evaluate(() => openFeedback()); await page.fill("#fb-text", "Testnachricht"); await page.tap('[data-act="fb-send"]'); await page.waitForTimeout(300);
-  check("Feedback wird gesendet", await page.evaluate(() => window.__ins.some(x => x[0] === "rueckmeldung" && x[1].text === "Testnachricht")));
-  check("Feedback enthält Art und Bereich der App", await page.evaluate(() => window.__ins.some(x => x[0] === "rueckmeldung" && x[1].art === "idee" && typeof x[1].bereich === "string")));
-  check("Knopf „App verbessern“ ist oben sichtbar", await page.locator('#hero .ideebtn[data-act="fb-open"]').count() === 1);
-  await page.locator('#hero .ideebtn').tap(); await page.waitForTimeout(150);
-  await page.fill("#fb-text", "Bitte größere Schrift"); await page.locator('[data-fbart="fehler"]').tap(); await page.waitForTimeout(100);
-  check("Art lässt sich wählen, Text bleibt erhalten", await page.inputValue("#fb-text") === "Bitte größere Schrift" && await page.getAttribute('[data-act="fb-send"]', "data-art") === "fehler");
+  await page.evaluate(() => openFeedback());
+  await page.fill("#fb-text", "Testnachricht");
+  await page.tap('[data-act="fb-send"]');
+  await page.waitForTimeout(300);
+  check(
+    "Feedback wird gesendet",
+    await page.evaluate(() => window.__ins.some((x) => x[0] === "rueckmeldung" && x[1].text === "Testnachricht")),
+  );
+  check(
+    "Feedback enthält Art und Bereich der App",
+    await page.evaluate(() =>
+      window.__ins.some((x) => x[0] === "rueckmeldung" && x[1].art === "idee" && typeof x[1].bereich === "string"),
+    ),
+  );
+  check(
+    "Knopf „App verbessern“ ist oben sichtbar",
+    (await page.locator('#hero .ideebtn[data-act="fb-open"]').count()) === 1,
+  );
+  await page.locator("#hero .ideebtn").tap();
+  await page.waitForTimeout(150);
+  await page.fill("#fb-text", "Bitte größere Schrift");
+  await page.locator('[data-fbart="fehler"]').tap();
+  await page.waitForTimeout(100);
+  check(
+    "Art lässt sich wählen, Text bleibt erhalten",
+    (await page.inputValue("#fb-text")) === "Bitte größere Schrift" &&
+      (await page.getAttribute('[data-act="fb-send"]', "data-art")) === "fehler",
+  );
   await page.tap('[data-act="fb-close"]');
-  await page.evaluate(() => { setTimeout(() => { throw new Error("Testfehler test@example.org 123456789") }, 0) }); await page.waitForTimeout(200);
-  const f = await page.evaluate(() => (window.__ins.find(x => x[0] === "fehler") || [])[1]);
+  await page.evaluate(() => {
+    setTimeout(() => {
+      throw new Error("Testfehler test@example.org 123456789");
+    }, 0);
+  });
+  await page.waitForTimeout(200);
+  const f = await page.evaluate(() => (window.__ins.find((x) => x[0] === "fehler") || [])[1]);
   check("Fehler wird protokolliert", !!f);
-  check("Fehlerprotokoll enthält keine E-Mail und keine langen Zahlen", !!f && !/@|\d{5,}/.test(f.meldung), f && f.meldung);
-  await page.evaluate(() => { S.done = true; S.welcomeSeen = true; S.tab = "ansprueche"; render() }); await page.waitForTimeout(150);
-  await page.locator('[data-act="wipe"]').scrollIntoViewIfNeeded(); await page.locator('[data-act="wipe"]').tap(); await page.waitForTimeout(150);
+  check(
+    "Fehlerprotokoll enthält keine E-Mail und keine langen Zahlen",
+    !!f && !/@|\d{5,}/.test(f.meldung),
+    f && f.meldung,
+  );
+  await page.evaluate(() => {
+    S.done = true;
+    S.welcomeSeen = true;
+    S.tab = "ansprueche";
+    render();
+  });
+  await page.waitForTimeout(150);
+  await page.locator('[data-act="wipe"]').scrollIntoViewIfNeeded();
+  await page.locator('[data-act="wipe"]').tap();
+  await page.waitForTimeout(150);
   check("vor dem Löschen kommt die Frage „Bist du sicher?“", /Bist du sicher/.test(await page.textContent("#wipebox")));
-  await page.locator('[data-act="wipe-yes"]').tap(); await page.waitForTimeout(150);
+  await page.locator('[data-act="wipe-yes"]').tap();
+  await page.waitForTimeout(150);
   check("ohne Bestätigungswort wird nichts gelöscht", await page.evaluate(() => !window.__fn && !!USER));
-  await page.fill("#wipe-word", "LÖSCHEN"); await page.locator('[data-act="wipe-yes"]').tap(); await page.waitForTimeout(500);
-  check("mit Bestätigung wird das Konto gelöscht", await page.evaluate(() => window.__fn && window.__fn[0] === "konto-loeschen" && window.__fn[1].bestaetigung === "LÖSCHEN"));
+  await page.fill("#wipe-word", "LÖSCHEN");
+  await page.locator('[data-act="wipe-yes"]').tap();
+  await page.waitForTimeout(500);
+  check(
+    "mit Bestätigung wird das Konto gelöscht",
+    await page.evaluate(
+      () => window.__fn && window.__fn[0] === "konto-loeschen" && window.__fn[1].bestaetigung === "LÖSCHEN",
+    ),
+  );
   check("danach ist man abgemeldet", await page.evaluate(() => !USER));
-  check("keine anderen Programmfehler", errors.filter(e => !/Testfehler/.test(e)).length === 0, errors.join(" | "));
+  check("keine anderen Programmfehler", errors.filter((e) => !/Testfehler/.test(e)).length === 0, errors.join(" | "));
 }
 
 // ---------- 7. Passwort zurücksetzen ----------
@@ -276,17 +679,48 @@ console.log("Passwort zurücksetzen");
 {
   const { page, errors } = await newPage({ stub: "mitEinwilligung" });
   await gehe(page, BASE + "?passwort=neu#access_token=x&type=recovery", 800);
-  check("Link aus der E-Mail öffnet „Neues Passwort festlegen“", (await page.textContent("#main h2")) === "Neues Passwort festlegen");
-  check("Reiter sind dabei ausgeblendet", await page.getAttribute("#tabs", "hidden") !== null);
-  await page.fill("#au-pw", "neuesPasswort1"); await page.fill("#au-pw2", "anderesPasswort1"); await page.tap('[data-act="au-newpw"]'); await page.waitForTimeout(200);
-  check("unterschiedliche Eingaben werden abgelehnt", /nicht gleich/.test(await page.textContent("#main")) && await page.evaluate(() => !window.__pw));
-  await page.fill("#au-pw", "kurz"); await page.fill("#au-pw2", "kurz"); await page.tap('[data-act="au-newpw"]'); await page.waitForTimeout(200);
-  check("zu kurzes Passwort wird abgelehnt", /mindestens 8/.test(await page.textContent("#main")) && await page.evaluate(() => !window.__pw));
-  await page.fill("#au-pw", "neuesPasswort1"); await page.fill("#au-pw2", "neuesPasswort1"); await page.tap('[data-act="au-newpw"]'); await page.waitForTimeout(400);
+  check(
+    "Link aus der E-Mail öffnet „Neues Passwort festlegen“",
+    (await page.textContent("#main h2")) === "Neues Passwort festlegen",
+  );
+  check("Reiter sind dabei ausgeblendet", (await page.getAttribute("#tabs", "hidden")) !== null);
+  await page.fill("#au-pw", "neuesPasswort1");
+  await page.fill("#au-pw2", "anderesPasswort1");
+  await page.tap('[data-act="au-newpw"]');
+  await page.waitForTimeout(200);
+  check(
+    "unterschiedliche Eingaben werden abgelehnt",
+    /nicht gleich/.test(await page.textContent("#main")) && (await page.evaluate(() => !window.__pw)),
+  );
+  await page.fill("#au-pw", "kurz");
+  await page.fill("#au-pw2", "kurz");
+  await page.tap('[data-act="au-newpw"]');
+  await page.waitForTimeout(200);
+  check(
+    "zu kurzes Passwort wird abgelehnt",
+    /mindestens 8/.test(await page.textContent("#main")) && (await page.evaluate(() => !window.__pw)),
+  );
+  await page.fill("#au-pw", "neuesPasswort1");
+  await page.fill("#au-pw2", "neuesPasswort1");
+  await page.tap('[data-act="au-newpw"]');
+  await page.waitForTimeout(400);
   check("neues Passwort wird gespeichert", await page.evaluate(() => window.__pw === "neuesPasswort1"));
-  check("danach geht es normal in der App weiter", (await page.textContent("#main h2")) !== "Neues Passwort festlegen" && !/type=recovery|passwort=neu/.test(page.url()));
-  await page.evaluate(() => { S.done = true; S.welcomeSeen = true; S.tab = "ansprueche"; render() }); await page.waitForTimeout(150);
-  check("„Passwort ändern“ im Bereich Deine Daten vorhanden", await page.locator('[data-act="pw-aendern"]').count() === 1);
+  check(
+    "danach geht es normal in der App weiter",
+    (await page.textContent("#main h2")) !== "Neues Passwort festlegen" &&
+      !/type=recovery|passwort=neu/.test(page.url()),
+  );
+  await page.evaluate(() => {
+    S.done = true;
+    S.welcomeSeen = true;
+    S.tab = "ansprueche";
+    render();
+  });
+  await page.waitForTimeout(150);
+  check(
+    "„Passwort ändern“ im Bereich Deine Daten vorhanden",
+    (await page.locator('[data-act="pw-aendern"]').count()) === 1,
+  );
   check("keine Programmfehler", errors.length === 0, errors.join(" | "));
 }
 
@@ -295,23 +729,50 @@ console.log("Ohne Internet und als App");
 {
   const { page, ctx, errors } = await newPage({ gast: GAST });
   await gehe(page, BASE, 800);
-  const bereit = await page.evaluate(() => navigator.serviceWorker ? Promise.race([navigator.serviceWorker.ready.then(() => true), new Promise(r => setTimeout(() => r(false), 10000))]) : false);
+  const bereit = await page.evaluate(() =>
+    navigator.serviceWorker
+      ? Promise.race([
+          navigator.serviceWorker.ready.then(() => true),
+          new Promise((r) => setTimeout(() => r(false), 10000)),
+        ])
+      : false,
+  );
   check("Offline-Speicher (Service Worker) ist aktiv", bereit === true);
   await page.waitForTimeout(500);
   await ctx.setOffline(true);
-  await page.reload(); await page.waitForTimeout(1000);
-  check("App öffnet sich ohne Internet", (await page.locator("#hero .figure").count()) === 1 && /Ansprüche/.test(await page.textContent("#tabs")));
+  await page.reload();
+  await page.waitForTimeout(1000);
+  check(
+    "App öffnet sich ohne Internet",
+    (await page.locator("#hero .figure").count()) === 1 && /Ansprüche/.test(await page.textContent("#tabs")),
+  );
   check("Hinweis „Keine Internetverbindung“ erscheint", (await page.locator("#offlinebanner").count()) === 1);
-  await ctx.setOffline(false); await page.waitForTimeout(300);
-  check("Hinweis verschwindet wieder, wenn das Internet zurück ist", (await page.locator("#offlinebanner").count()) === 0);
-  await page.evaluate(() => { const e = new Event("beforeinstallprompt"); e.prompt = async () => { window.__prompted = 1 }; e.userChoice = Promise.resolve({ outcome: "accepted" }); window.dispatchEvent(e) });
+  await ctx.setOffline(false);
+  await page.waitForTimeout(300);
+  check(
+    "Hinweis verschwindet wieder, wenn das Internet zurück ist",
+    (await page.locator("#offlinebanner").count()) === 0,
+  );
+  await page.evaluate(() => {
+    const e = new Event("beforeinstallprompt");
+    e.prompt = async () => {
+      window.__prompted = 1;
+    };
+    e.userChoice = Promise.resolve({ outcome: "accepted" });
+    window.dispatchEvent(e);
+  });
   await page.waitForTimeout(200);
-  check("Karte „Als App auf den Startbildschirm“ erscheint, wenn das Handy es anbietet", (await page.locator('[data-act="inst-ja"]').count()) === 1);
-  await page.tap('[data-act="inst-ja"]'); await page.waitForTimeout(200);
+  check(
+    "Karte „Als App auf den Startbildschirm“ erscheint, wenn das Handy es anbietet",
+    (await page.locator('[data-act="inst-ja"]').count()) === 1,
+  );
+  await page.tap('[data-act="inst-ja"]');
+  await page.waitForTimeout(200);
   check("„Jetzt installieren“ öffnet die Installation", await page.evaluate(() => window.__prompted === 1));
   check("keine Programmfehler", errors.length === 0, errors.join(" | "));
 }
 
-await browser.close(); server.close();
+await browser.close();
+server.close();
 console.log(`\n${passed} bestanden, ${failed} fehlgeschlagen`);
 process.exit(failed ? 1 : 0);

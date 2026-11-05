@@ -5,7 +5,8 @@
   "description": "Web-App für Menschen mit Pflegegrad oder Schwerbehinderung und ihre Angehörigen",
   "scripts": {
     "bauen": "node quelle/bauen.mjs",
-    "pruefen": "tsc -p tsconfig.json",
+    "pruefen": "tsc -p tsconfig.json && eslint . && prettier --check .",
+    "formatieren": "prettier --write . && eslint --fix .",
     "test:rechnungen": "node --test tests/rechnungen.test.mjs",
     "test:oberflaeche": "node tests/oberflaeche.mjs",
     "test": "npm run pruefen && npm run bauen && npm run test:rechnungen && npm run test:oberflaeche",

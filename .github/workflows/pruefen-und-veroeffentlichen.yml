@@ -22,7 +22,7 @@ jobs:
           node-version: 22
       - name: Werkzeuge und Bibliotheken installieren
         run: npm install --no-audit --no-fund
-      - name: Code prüfen (TypeScript)
+      - name: Code prüfen (TypeScript, ESLint, Prettier)
         run: npm run pruefen
       - name: App bauen (esbuild)
         run: npm run bauen

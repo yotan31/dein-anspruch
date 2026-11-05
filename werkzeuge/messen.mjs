@@ -38,9 +38,14 @@ try {
   const ergebnis = {
     gemessen_am: new Date().toISOString(),
     punkte: Object.fromEntries(KATEGORIEN.map((k) => [k, median(laeufe.map((l) => l.punkte[k]))])),
-    ...Object.fromEntries(["lcp_ms", "cls", "tbt_ms", "fcp_ms", "kb_uebertragen"].map((k) => [k, median(laeufe.map((l) => l[k]))])),
+    ...Object.fromEntries(
+      ["lcp_ms", "cls", "tbt_ms", "fcp_ms", "kb_uebertragen"].map((k) => [k, median(laeufe.map((l) => l[k]))]),
+    ),
   };
-  fs.writeFileSync(path.join(path.dirname(SITE), "werkzeuge", "messung.json"), JSON.stringify(ergebnis, null, 2) + "\n");
+  fs.writeFileSync(
+    path.join(path.dirname(SITE), "werkzeuge", "messung.json"),
+    JSON.stringify(ergebnis, null, 2) + "\n",
+  );
   console.log(JSON.stringify(ergebnis, null, 2));
 } finally {
   await chrome.kill();

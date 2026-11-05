@@ -7,9 +7,15 @@ Z.installPrompt = null;
 
 /** Läuft die App schon als installierte App (Startbildschirm)? */
 function istInstalliert() {
-  try { return matchMedia("(display-mode: standalone)").matches || /** @type {any} */ (navigator).standalone === true } catch (e) { return false }
+  try {
+    return matchMedia("(display-mode: standalone)").matches || /** @type {any} */ (navigator).standalone === true;
+  } catch (e) {
+    return false;
+  }
 }
-function istIOS() { return /iPhone|iPad|iPod/.test(navigator.userAgent) }
+function istIOS() {
+  return /iPhone|iPad|iPod/.test(navigator.userAgent);
+}
 
 /** Kleine Karte mit Hinweis zum Installieren (nur wenn sinnvoll und nicht weggeklickt). */
 export function installKarte() {
@@ -22,18 +28,30 @@ export function installKarte() {
   </section>`;
 }
 export async function installieren() {
-  const p = Z.installPrompt; if (!p) return;
+  const p = Z.installPrompt;
+  if (!p) return;
   Z.installPrompt = null;
-  try { await p.prompt(); const r = await p.userChoice; if (r && r.outcome === "dismissed") lsSet("da-install-weg", true) } catch (e) { }
+  try {
+    await p.prompt();
+    const r = await p.userChoice;
+    if (r && r.outcome === "dismissed") lsSet("da-install-weg", true);
+  } catch (e) {}
   render();
 }
-export function installWeg() { lsSet("da-install-weg", true); render() }
+export function installWeg() {
+  lsSet("da-install-weg", true);
+  render();
+}
 
 function offlineHinweis(an) {
   let b = document.getElementById("offlinebanner");
   if (an && !b) {
-    b = document.createElement("div"); b.id = "offlinebanner"; b.className = "offlinebanner"; b.setAttribute("role", "status");
-    b.textContent = "Keine Internetverbindung. Du kannst alles ansehen; neue Eingaben werden erst wieder gespeichert, wenn du online bist.";
+    b = document.createElement("div");
+    b.id = "offlinebanner";
+    b.className = "offlinebanner";
+    b.setAttribute("role", "status");
+    b.textContent =
+      "Keine Internetverbindung. Du kannst alles ansehen; neue Eingaben werden erst wieder gespeichert, wenn du online bist.";
     document.body.prepend(b);
   }
   if (!an && b) b.remove();
@@ -41,12 +59,23 @@ function offlineHinweis(an) {
 
 /** Wird beim Start der App einmal aufgerufen (siehe 99-start.js). */
 export function start24() {
-  if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "127.0.0.1" || location.hostname === "localhost")) {
+  if (
+    "serviceWorker" in navigator &&
+    (location.protocol === "https:" || location.hostname === "127.0.0.1" || location.hostname === "localhost")
+  ) {
     navigator.serviceWorker.register("sw.js").catch(() => {});
   }
   window.addEventListener("offline", () => offlineHinweis(true));
   window.addEventListener("online", () => offlineHinweis(false));
   if (!navigator.onLine) offlineHinweis(true);
-  window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); Z.installPrompt = e; render() });
-  window.addEventListener("appinstalled", () => { Z.installPrompt = null; lsSet("da-install-weg", true); render() });
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    Z.installPrompt = e;
+    render();
+  });
+  window.addEventListener("appinstalled", () => {
+    Z.installPrompt = null;
+    lsSet("da-install-weg", true);
+    render();
+  });
 }

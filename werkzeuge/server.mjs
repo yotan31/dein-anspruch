@@ -9,10 +9,20 @@ import zlib from "node:zlib";
 export const SITE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "site");
 
 const INHALTSTYPEN = {
-  ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".mjs": "text/javascript", ".css": "text/css",
-  ".json": "application/json", ".webmanifest": "application/manifest+json", ".png": "image/png", ".svg": "image/svg+xml",
-  ".woff2": "font/woff2", ".woff": "font/woff", ".wasm": "application/wasm", ".pfb": "application/octet-stream",
-  ".ttf": "font/ttf", ".txt": "text/plain",
+  ".html": "text/html; charset=utf-8",
+  ".js": "text/javascript",
+  ".mjs": "text/javascript",
+  ".css": "text/css",
+  ".json": "application/json",
+  ".webmanifest": "application/manifest+json",
+  ".png": "image/png",
+  ".svg": "image/svg+xml",
+  ".woff2": "font/woff2",
+  ".woff": "font/woff",
+  ".wasm": "application/wasm",
+  ".pfb": "application/octet-stream",
+  ".ttf": "font/ttf",
+  ".txt": "text/plain",
 };
 
 /**
@@ -31,7 +41,8 @@ export async function starteServer() {
     }
     const typ = INHALTSTYPEN[path.extname(datei)] || "application/octet-stream";
     // Wie GitHub Pages: Text-Dateien komprimiert ausliefern, damit Messungen der echten Seite entsprechen
-    const komprimieren = /text|javascript|json|svg|manifest/.test(typ) && /gzip/.test(String(req.headers["accept-encoding"] || ""));
+    const komprimieren =
+      /text|javascript|json|svg|manifest/.test(typ) && /gzip/.test(String(req.headers["accept-encoding"] || ""));
     res.writeHead(200, { "Content-Type": typ, ...(komprimieren ? { "Content-Encoding": "gzip" } : {}) });
     const daten = fs.createReadStream(datei);
     (komprimieren ? daten.pipe(zlib.createGzip()) : daten).pipe(res);

@@ -30,4 +30,38 @@ import * as m26 from "./26-zaehlung.js";
 import * as m99 from "./99-start.js";
 
 // Zugang für die automatischen Tests und zur Fehlersuche im Browser (window.__da)
-Object.defineProperty(globalThis, "__da", { value: Object.freeze(Object.assign({ Z }, m00, m01, m02, m03, m04, m05, m06, m07, m08, m09, m10, m11, m12, m13, m14, m15, m16, m17, m18, m19, m20, m21, m22, m23, m24, m25, m26, m99)) });
+Object.defineProperty(globalThis, "__da", {
+  value: Object.freeze(
+    Object.assign(
+      { Z },
+      m00,
+      m01,
+      m02,
+      m03,
+      m04,
+      m05,
+      m06,
+      m07,
+      m08,
+      m09,
+      m10,
+      m11,
+      m12,
+      m13,
+      m14,
+      m15,
+      m16,
+      m17,
+      m18,
+      m19,
+      m20,
+      m21,
+      m22,
+      m23,
+      m24,
+      m25,
+      m26,
+      m99,
+    ),
+  ),
+});
