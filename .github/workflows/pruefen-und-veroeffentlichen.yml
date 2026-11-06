@@ -28,18 +28,17 @@ jobs:
         run: npm run bauen
       - name: Berechnungen prüfen
         run: npm run test:rechnungen
-      # Der Download (Browser und Systempakete) hängt gelegentlich. Statt 20 Minuten zu warten:
-      # jeder Versuch höchstens 150 Sekunden, bis zu drei Versuche.
+      # Nur den Browser laden: Das Ubuntu von GitHub bringt die nötigen Bibliotheken schon mit. Die Systempakete
+      # (vor allem Schriften) kamen über apt teils so langsam, dass der Schritt 20 Minuten hing. Nur wenn der
+      # Browser danach nicht startet, werden sie doch installiert.
       - name: Testbrowser installieren
-        timeout-minutes: 9
+        timeout-minutes: 10
         shell: bash
         run: |
-          for versuch in 1 2 3; do
-            timeout 150 npx playwright install --with-deps chromium && exit 0
-            echo "::warning title=Testbrowser::Versuch $versuch hing oder schlug fehl, neuer Versuch"
-            sleep 5
-          done
-          exit 1
+          npx playwright install chromium
+          if node -e "require('playwright').chromium.launch().then((b) => b.close())"; then exit 0; fi
+          echo "::warning title=Testbrowser::Browser startet nicht, Systempakete werden nachinstalliert"
+          npx playwright install --with-deps chromium
       - name: Oberfläche im Browser prüfen
         shell: bash
         run: |
