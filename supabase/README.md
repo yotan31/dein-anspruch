@@ -9,12 +9,13 @@ Die Dateien in `migrations/` in der Reihenfolge ihrer Nummern ausführen (z. B. 
 | Datei | Inhalt |
 | --- | --- |
 | `…_grundschema.sql` | erste Version: `faelle`, `belege`, Speicher-Bucket `belege`, `ping()` |
-| `…_vorlagen_uebernahme.sql` | Übernahme vorbereiteter Daten bei der ersten Registrierung |
+| `…_vorlagen_uebernahme.sql` | Übernahme vorbereiteter Daten bei der ersten Registrierung (seit 11/2026 erst nach bestätigter E-Mail) |
 | `…_mehrere_personen_und_familie.sql` | `fall`, `mitglied`, `einladung`, Zugriffsregeln je Fall, Einladungen |
 | `…_erinnerungen.sql` | E-Mail-Erinnerungen, Schema `intern`, täglicher Zeitplan |
 | `…_fehler_rueckmeldung_indizes.sql` | Fehlerprotokoll, Feedback, Indizes, Aufräum-Zeitplan |
 | `…_schritt_zaehlung.sql`, `…_korrektur.sql` | anonyme Schritt-Zählung `zaehler` (nur Monat, Schritt, Antrag-Art, Anzahl) und Funktion `zaehlen()`; lesen nur über die Auswertung |
 | `…_rueckmeldung_auswertung.sql` | Feedback mit Art (Idee, Fehler, Lob), Bereich der App und Stand der Bearbeitung (neu, geplant, erledigt, abgelehnt); Nutzer dürfen nur senden |
+| `…_sicherheit_belege_vorlagen.sql` | Sicherheitsprüfung 11/2026: Belege und Fotos nur noch über den Fall erreichbar (alte Regeln je Nutzer entfernt); Vorlagen werden erst nach bestätigter E-Mail übernommen |
 
 ## Server-Funktionen (`functions/`)
 
