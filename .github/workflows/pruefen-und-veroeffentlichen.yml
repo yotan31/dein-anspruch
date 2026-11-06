@@ -28,8 +28,18 @@ jobs:
         run: npm run bauen
       - name: Berechnungen prüfen
         run: npm run test:rechnungen
+      # Der Download (Browser und Systempakete) hängt gelegentlich. Statt 20 Minuten zu warten:
+      # jeder Versuch höchstens 150 Sekunden, bis zu drei Versuche.
       - name: Testbrowser installieren
-        run: npx playwright install --with-deps chromium
+        timeout-minutes: 9
+        shell: bash
+        run: |
+          for versuch in 1 2 3; do
+            timeout 150 npx playwright install --with-deps chromium && exit 0
+            echo "::warning title=Testbrowser::Versuch $versuch hing oder schlug fehl, neuer Versuch"
+            sleep 5
+          done
+          exit 1
       - name: Oberfläche im Browser prüfen
         shell: bash
         run: |
