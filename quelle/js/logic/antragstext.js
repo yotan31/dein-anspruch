@@ -4,7 +4,7 @@ import { beratungStatus } from "./fristen.js";
 import { pg } from "./lage.js";
 import { FA, KK, PK, kassePK, txt } from "./leistungen.js";
 import { Z } from "../state/zustand.js";
-import { deD } from "../utils/datum.js";
+import { deD, datumBrief } from "../utils/datum.js";
 
 /**
  * Unterlagen, die dem Antrag beiliegen sollten; bei Angehörigen zusätzlich die Vollmacht.
@@ -23,7 +23,7 @@ function letter(b) {
   const who = p.name || "[Name]";
   const ref = [
     p.vnr && (b.to === PK || b.to === KK) ? `Versichertennummer: ${p.vnr}` : "",
-    p.geb ? `geboren am ${p.geb}` : "",
+    p.geb ? `geboren am ${datumBrief(p.geb)}` : "",
   ]
     .filter(Boolean)
     .join(", ");

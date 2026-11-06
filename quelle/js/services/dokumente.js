@@ -7,8 +7,33 @@ import { newDoc, saveFile } from "./pdf.js";
 import { blobUrl } from "./speicher.js";
 import { Z } from "../state/zustand.js";
 import { toast } from "../ui/hinweise.js";
-import { deD, parseIso, today } from "../utils/datum.js";
+import { datumBrief, deD, parseIso, today } from "../utils/datum.js";
 import { eur, numDE } from "../utils/format.js";
+
+/** Text in Zeilen umbrechen, ohne Betrag und €-Zeichen zu trennen (sonst steht „€“ allein am Zeilenanfang) */
+function zeilen(doc, text, breite) {
+  return doc.splitTextToSize(String(text).replace(/(\d) €/g, "$1\u00a0€"), breite);
+}
+
+/** Falz- und Lochmarken am linken Rand nach DIN 5008: zum Falten für den Fensterumschlag und zum Lochen */
+function marken(doc) {
+  doc.setLineWidth(0.2);
+  doc.line(3, 105, 8, 105);
+  doc.line(3, 148.5, 6, 148.5);
+  doc.line(3, 210, 8, 210);
+}
+
+/** „Seite 1 von 2“ unten rechts, aber nur bei mehrseitigen Briefen */
+function seitenzahlen(doc) {
+  const n = doc.getNumberOfPages();
+  if (n < 2) return;
+  for (let i = 1; i <= n; i++) {
+    doc.setPage(i);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.text(`Seite ${i} von ${n}`, 190, 290, { align: "right" });
+  }
+}
 
 /** PDF-Quittung für die Verhinderungspflege durch Privatpersonen. */
 export async function makeQuittung() {
@@ -30,7 +55,10 @@ export async function makeQuittung() {
   y += 12;
   doc.setFontSize(11);
   const rows = [
-    ["Pflegebedürftige Person", `${Z.S.person.name || ""}${Z.S.person.geb ? ", geb. " + Z.S.person.geb : ""}`],
+    [
+      "Pflegebedürftige Person",
+      `${Z.S.person.name || ""}${Z.S.person.geb ? ", geb. " + datumBrief(Z.S.person.geb) : ""}`,
+    ],
     ["Versichertennummer", Z.S.person.vnr || ""],
     ["Hauptpflegeperson (verhindert)", v.haupt || ""],
     ["Grund", VHP_GRUND[v.grund] || ""],
@@ -57,7 +85,7 @@ export async function makeQuittung() {
   const txt = a
     ? `Ich bestätige, dass ich die Pflege in dem genannten Zeitraum übernommen habe.${sum ? ` Dafür sind mir Aufwendungen in Höhe von ${eur(sum, 2)} entstanden.` : ""}`
     : `Ich bestätige, dass ich die Pflege in dem genannten Zeitraum übernommen und dafür ${sum ? eur(sum, 2) : "________ €"} erhalten habe.`;
-  doc.text(doc.splitTextToSize(txt, W), L0, y);
+  doc.text(zeilen(doc, txt, W), L0, y);
   y += 24;
   doc.line(L0, y, L0 + 60, y);
   doc.line(L0 + 80, y, L0 + 160, y);
@@ -95,10 +123,12 @@ function drawLetter(doc, b) {
   const abs =
     [a ? p.absender : p.name, a ? p.absStrasse : p.strasse, a ? p.absOrt : p.ort].filter(Boolean).join(" · ") ||
     "[Absender]";
-  doc.text(abs, L0, 47);
+  marken(doc);
+  // DIN 5008 Form B: Rücksendeangabe 45–50 mm, Anschrift ab 62,7 mm von oben (passt ins Fenster eines DL-Umschlags)
+  doc.text(abs, L0, 49);
   doc.setFontSize(11);
   const ea = empfAdresse(b.to);
-  doc.text([r.name, ea.strasse || "[Straße / Postfach]", ea.ort || "[PLZ Ort]"], L0, 55);
+  doc.text([r.name, ea.strasse || "[Straße / Postfach]", ea.ort || "[PLZ Ort]"], L0, 66);
   const ortName = ((a ? p.absOrt : p.ort) || "").replace(/^\d{5}\s*/, "");
   doc.text(`${ortName ? ortName + ", " : ""}${today()}`, 190, 95, { align: "right" });
   doc.setFont("helvetica", "bold");
@@ -107,12 +137,16 @@ function drawLetter(doc, b) {
   doc.text(subl, L0, y);
   y += subl.length * 5.5 + 6;
   doc.setFont("helvetica", "normal");
-  for (const ln of doc.splitTextToSize(L.body, W)) {
-    if (y > 275) {
+  const zl = zeilen(doc, L.body, W);
+  // Grußformel, Name und Kontakt bleiben mit der Unterschrift zusammen auf einer Seite
+  const gruss = zl.findIndex((z) => /^Mit freundlichen Grüßen/.test(z));
+  for (let i = 0; i < zl.length; i++) {
+    const rest = i === gruss ? (zl.length - i) * 5.2 + 14 : 0;
+    if (y > 275 || (rest && y + rest > 280)) {
       doc.addPage();
       y = 20;
     }
-    doc.text(ln, L0, y);
+    doc.text(zl[i], L0, y);
     y += 5.2;
   }
   y += 10;
@@ -154,6 +188,7 @@ export async function makePDF(b) {
   const doc = await newDoc();
   if (!doc) return;
   drawLetter(doc, b);
+  seitenzahlen(doc);
   await saveFile(`Antrag-${b.k}.pdf`, doc.output("blob"), "PDF gespeichert");
 }
 

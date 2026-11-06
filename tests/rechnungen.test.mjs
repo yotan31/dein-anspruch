@@ -394,3 +394,10 @@ test("Ordner importieren nur, was ihre Schicht darf (siehe README, Ordner in que
     assert.ok(!/from "\.\.\/ui\/pages\//.test(code), `services/${f} importiert eine Seite`);
   }
 });
+
+test("Briefe: Datum nach DIN 5008 (TT.MM.JJJJ), auch das Geburtsdatum im Antrag", () => {
+  const run = neu("2026-11-06", { ...PFLEGE3, person: { name: "Erika Muster", geb: "1938-03-14" } });
+  assert.equal(run('datumBrief("1938-03-14")'), "14.03.1938");
+  assert.equal(run('datumBrief("14.3.38")'), "14.3.38");
+  assert.match(run('curLetter(B.find((x) => x.k === "entlastung")).body'), /geboren am 14\.03\.1938/);
+});

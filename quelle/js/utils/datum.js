@@ -33,6 +33,16 @@ export function deD(d) {
 }
 
 /**
+ * Datum für Briefe nach DIN 5008 (14.03.1938). Eingaben im Format JJJJ-MM-TT werden umgewandelt, alles andere bleibt,
+ * wie es eingetragen wurde (z. B. ein von Hand getipptes „14.3.38“).
+ * @param s Datum als Text
+ */
+export function datumBrief(s) {
+  const d = parseIso(s);
+  return d ? d.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }) : String(s || "");
+}
+
+/**
  * Tage von heute bis zum Datum (negativ: vorbei).
  * @param d Datum
  */
@@ -88,7 +98,7 @@ export function shiftHalf(H, n) {
   return halfOf(new Date(y, h === 1 ? 0 : 6, 1));
 }
 
-/** Heutiges Datum deutsch geschrieben, für Briefe. */
+/** Heutiges Datum für Briefe nach DIN 5008 (06.11.2026). */
 export function today() {
-  return new Date().toLocaleDateString("de-DE");
+  return new Date().toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
