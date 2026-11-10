@@ -2,7 +2,7 @@
 // Die Reihenfolge der Liste ist die Prüfreihenfolge: Trägt ein Element mehrere Attribute, gewinnt das erste.
 // Aufgerufen von ui/bedienung.js; jede Funktion bekommt den Wert des Attributs und das angetippte Element t.
 import { waehleSprache } from "../../i18n/sprachen.js";
-import { getQ, pruefeAngabe, wizSteps } from "../../logic/antraege.js";
+import { ansObj, getQ, pruefeAngabe, setQ, wizSteps } from "../../logic/antraege.js";
 import { curLetter } from "../../logic/antragstext.js";
 import { selYears } from "../../logic/belege.js";
 import { B } from "../../logic/leistungen.js";
@@ -54,6 +54,12 @@ function halteBeiUnplausiblerAngabe() {
   return true;
 }
 
+/** Zeigt die Frage einen vorbelegten Wert (gemerkte IBAN), gilt er mit „Weiter“ als Antwort für diesen Antrag. */
+function uebernimmVorbelegung() {
+  const step = wizSteps().list[Z.S.wiz.i];
+  if (step && step.k === "iban" && !ansObj(Z.S.wiz.k).iban && getQ(step)) setQ(step, getQ(step));
+}
+
 /** Schritt im Antrags-Assistenten: next, back, close oder goto:Nummer. @param {string} n @param {HTMLElement} t */
 function assistentNavigation(n, t) {
   if (n === "close") {
@@ -66,6 +72,7 @@ function assistentNavigation(n, t) {
   // „Weiß ich nicht“ (Knopf .ghost) überspringt ohne Prüfung
   if (n === "next" && !t.classList.contains("ghost") && halteBeiUnplausiblerAngabe()) return;
   const len = wizSteps().list.length;
+  if (n === "next" && !t.classList.contains("ghost")) uebernimmVorbelegung();
   if (n === "next") Z.S.wiz.i = Math.min(len - 1, Z.S.wiz.i + 1);
   else if (n === "back") Z.S.wiz.i = Math.max(0, Z.S.wiz.i - 1);
   else if (n.startsWith("goto:")) Z.S.wiz.i = Number(n.slice(5));

@@ -2,10 +2,25 @@
 import { KATS } from "./belege.js";
 import { bescheidInfo } from "./bescheid.js";
 import { gdb, isHome, pg } from "./lage.js";
+import { B } from "./leistungen.js";
 import { Z } from "../state/zustand.js";
 import { TODAY, addDays, daysUntil, deD, halfOf, isoD, parseIso, shiftHalf } from "../utils/datum.js";
 
 /* ---------- Termine ---------- */
+/**
+ * Letzter Tag für den Widerspruch: ein Monat nach dem Datum auf dem Bescheid. Gerechnet wird ab dem Datum des
+ * Bescheids und nicht ab dem Tag, an dem er ankam: Das ist etwas früher und damit auf der sicheren Seite.
+ * @param k Schlüssel der Leistung
+ * @returns {Date|null} null, solange kein Datum eingetragen ist
+ */
+export function widerspruchFrist(k) {
+  const d = parseIso((Z.S.ablehnung[k] || {}).datum);
+  if (!d) return null;
+  const f = new Date(d);
+  f.setMonth(f.getMonth() + 1);
+  return f;
+}
+
 export function beratungRelevant() {
   return pg() >= 2 && ["angehoerige", "gemischt", "wg"].includes(Z.S.wohnen);
 }
@@ -70,6 +85,19 @@ export function deadlines() {
             ? "Ein Widerspruch kann sich lohnen. Fristwahrend reicht ein kurzes Schreiben, die App hilft dabei."
             : "Bis zu diesem Tag kann Widerspruch gegen den Bescheid eingelegt werden.",
       });
+  }
+  for (const [k, abl] of Object.entries(Z.S.ablehnung || {})) {
+    const b = B.find((x) => x.k === k);
+    const frist = widerspruchFrist(k);
+    // nur solange der Antrag als abgelehnt geführt wird und noch kein Widerspruch raus ist
+    if (!b || !frist || Z.S.status[k] !== "abgelehnt" || abl.widerspruch) continue;
+    L.push({
+      k: "abl-" + k,
+      t: `Widerspruchsfrist: ${b.t}`,
+      d: frist,
+      remind: addDays(frist, -7),
+      s: "Bis zu diesem Tag muss der Widerspruch bei der Stelle sein, die abgelehnt hat. Ein kurzes Schreiben reicht, die App hat es vorbereitet.",
+    });
   }
   if (pg() >= 1 && isHome()) {
     const thisJune = new Date(y, 5, 30);

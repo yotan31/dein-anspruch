@@ -6,6 +6,7 @@ import { KM_SATZ, vhpCalc } from "../../logic/verhinderungspflege.js";
 import { save } from "../../services/speicher.js";
 import { zaehle } from "../../services/zaehlung.js";
 import { Z } from "../../state/zustand.js";
+import { vollmachtKnopf } from "../components/vollmacht-knopf.js";
 import { render, scrollTop } from "../render.js";
 import { ic } from "../symbole.js";
 import { deD, parseIso } from "../../utils/datum.js";
@@ -149,7 +150,7 @@ function viewDone(b) {
     <h3>So schickst du ihn ab</h3>
     <ol class="howsend">
       <li><strong>PDF ausdrucken und unterschreiben.</strong> Oder den Text in die App oder das Online-Postfach der Kasse kopieren.</li>
-      ${docs.length ? `<li><strong>Diese Unterlagen beilegen:</strong><ul class="checks">${docs.map((c, j) => `<li><label><input type="checkbox" data-check="${b.k}:${j}" ${Z.S.checks[b.k + ":" + j] ? "checked" : ""}><span>${esc(c)}</span></label></li>`).join("")}</ul>${priv ? `<button class="btn small soft mt-8" type="button" data-act="vhp-quittung">${ic("down")}${Z.S.vhp.ersatz === "angehoerig" ? "Bestätigung" : "Quittung"} zum Unterschreiben (PDF)</button>` : ""}</li>` : ""}
+      ${docs.length ? `<li><strong>Diese Unterlagen beilegen:</strong><ul class="checks">${docs.map((c, j) => `<li><label><input type="checkbox" data-check="${b.k}:${j}" ${Z.S.checks[b.k + ":" + j] ? "checked" : ""}><span>${esc(c)}</span></label></li>`).join("")}</ul>${vollmachtKnopf(docs)}${priv ? `<button class="btn small soft mt-8" type="button" data-act="vhp-quittung">${ic("down")}${Z.S.vhp.ersatz === "angehoerig" ? "Bestätigung" : "Quittung"} zum Unterschreiben (PDF)</button>` : ""}</li>` : ""}
       <li><strong>Abschicken an:</strong> ${esc([r.name, empfAdresse(b.to).strasse, empfAdresse(b.to).ort].filter(Boolean).join(", "))}.<br><span class="small muted">${esc(r.hint)}</span>${r.mail ? `<br><span class="small">E-Mail: <code>${esc(r.mail)}</code></span>` : ""}</li>
       <li><strong>Hier abhaken, wenn es raus ist.</strong> Wir erinnern dich in 4 Wochen, falls noch keine Antwort da ist.</li>
     </ol>

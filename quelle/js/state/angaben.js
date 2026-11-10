@@ -51,9 +51,15 @@ export function blank() {
     sb: { status: "", gdb: "", mz: {}, arbeit: false, auto: false, grundsicherung: false },
     genutzt: {},
     status: {},
+    /** abgelehnte Anträge: Leistung → { datum: Datum auf dem Bescheid, widerspruch: abgeschickt am } */
+    ablehnung: {},
+    /** Alter, wenn es um ein Kind geht: "" (erwachsen), "baby" (bis 18 Monate), "kind" (bis 10 Jahre), "jugend" (11–17) */
+    kindAlter: "",
     checks: {},
     texte: {},
     person: {
+      /** eigenes Konto für Erstattungen: einmal eingegeben, in weiteren Anträgen vorbelegt */
+      iban: "",
       name: "",
       geb: "",
       vnr: "",
@@ -88,6 +94,7 @@ export function merge(d) {
     bruttoJahr: { ...(d.bruttoJahr || {}) },
     ans: { ...(d.ans || {}) },
     sent: { ...(d.sent || {}) },
+    ablehnung: { ...(d.ablehnung || {}) },
   };
   if (d.done === undefined) m.done = (d.step || 0) >= 6 && !!d.rolle;
   delete m.updated;

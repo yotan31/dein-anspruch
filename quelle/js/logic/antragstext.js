@@ -1,23 +1,53 @@
 // Antragstexte: Betreff und Brieftext je Leistung, nötige Unterlagen, E-Mail- und Gmail-Links.
 // Der Text kann von der Familie überschrieben werden (Z.S.texte); dann gilt ihre Fassung.
 import { beratungStatus } from "./fristen.js";
-import { pg } from "./lage.js";
+import { istKind, pg } from "./lage.js";
 import { FA, KK, PK, kassePK, txt } from "./leistungen.js";
 import { Z } from "../state/zustand.js";
 import { deD, datumBrief } from "../utils/datum.js";
 
 /**
- * Unterlagen, die dem Antrag beiliegen sollten; bei Angehörigen zusätzlich die Vollmacht.
+ * Unterlagen, die dem Antrag beiliegen sollten; bei Angehörigen (außer Eltern) zusätzlich die Vollmacht.
  * @param b Leistung
  */
 export function docsFor(b) {
   const d = [...(txt(b.docs) || [])].filter(Boolean);
-  if (Z.S.rolle === "angehoerig" && b.to !== FA && b.to !== "arbeitgeber" && !d.some((x) => /Vollmacht/.test(x)))
+  // Eltern vertreten ihr Kind gesetzlich, alle anderen Angehörigen brauchen eine Vollmacht
+  if (
+    Z.S.rolle === "angehoerig" &&
+    !istKind() &&
+    b.to !== FA &&
+    b.to !== "arbeitgeber" &&
+    !d.some((x) => /Vollmacht/.test(x))
+  )
     d.push("Vollmacht oder Betreuungsurkunde");
   return d;
 }
 
-function letter(b) {
+/** Schlusssatz jedes Antrags: Eingang bestätigen lassen und die Frist wahren */
+const SCHLUSS_ANTRAG =
+  "Bitte bestätigen Sie mir den Eingang dieses Antrags. Falls Sie ein bestimmtes Formular oder weitere Unterlagen benötigen, senden Sie mir diese bitte zu. Dieses Schreiben gilt als fristwahrende Antragstellung (§ 16 SGB I).";
+
+/**
+ * Betreff mit Versichertennummer (Kasse) bzw. Name.
+ * @param b Leistung
+ * @param titel Text vor dem Strich, sonst der Name der Leistung
+ */
+export function betreff(b, titel = b.t) {
+  const p = Z.S.person,
+    who = p.name || "[Name]";
+  return `${titel} – ${(b.to === PK || b.to === KK) && p.vnr ? "Versichertennr. " + p.vnr : who}`;
+}
+
+/**
+ * Ganzer Brief um einen Kern herum: Anrede, Einleitung je nach Rolle, Schlusssatz, Gruß.
+ * Die Einleitung unterscheidet drei Fälle: selbst betroffen, Angehörige mit Vollmacht, Eltern für ihr Kind
+ * (Eltern vertreten ihr Kind gesetzlich und brauchen keine Vollmacht).
+ * @param b Leistung (bestimmt, ob die Versichertennummer genannt wird)
+ * @param kern Satz in der Form „beantrage ich hiermit …“
+ * @param schluss Schlusssatz vor dem Gruß
+ */
+export function briefText(b, kern, schluss) {
   const p = Z.S.person,
     a = Z.S.rolle === "angehoerig";
   const who = p.name || "[Name]";
@@ -27,15 +57,20 @@ function letter(b) {
   ]
     .filter(Boolean)
     .join(", ");
-  const subject = `${b.t}${b.to === PK || b.to === KK ? " – " + (p.vnr ? "Versichertennr. " + p.vnr : who) : " – " + who}`;
-  const intro = a
-    ? `ich wende mich als ${p.beziehung || "[Beziehung]"} im Namen von ${who}${ref ? " (" + ref + ")" : ""} an Sie. Eine Vollmacht liegt bei.\n\nFür ${who}`
-    : `${ref ? "(" + ref + ")\n\n" : ""}hiermit`;
+  const klammer = ref ? " (" + ref + ")" : "";
+  const intro = istKind()
+    ? `ich wende mich als ${p.beziehung || "sorgeberechtigter Elternteil"} für mein Kind ${who}${klammer} an Sie.\n\nFür ${who}`
+    : a
+      ? `ich wende mich als ${p.beziehung || "[Beziehung]"} im Namen von ${who}${klammer} an Sie. Eine Vollmacht liegt bei.\n\nFür ${who}`
+      : `${ref ? "(" + ref + ")\n\n" : ""}hiermit`;
+  if (!a) kern = kern.replace(/^(\S+) ich hiermit /, "$1 ich ");
+  const gruss = `Mit freundlichen Grüßen\n\n${a ? p.absender || "[Dein Name]" : who}${p.tel ? "\nTel. " + p.tel : ""}${p.mail ? "\n" + p.mail : ""}`;
+  return `Sehr geehrte Damen und Herren,\n\n${intro} ${kern}${schluss ? "\n\n" + schluss : ""}\n\n${gruss}`;
+}
+
+function letter(b) {
   const pgline = pg() >= 1 && (b.to === PK || b.to === KK) ? `\n\nEs ist Pflegegrad ${pg()} festgestellt.` : "";
-  let ask = txt(b.ask);
-  if (!a) ask = ask.replace(/^(\S+) ich hiermit /, "$1 ich ");
-  const body = `Sehr geehrte Damen und Herren,\n\n${intro} ${ask}${pgline}\n\nBitte bestätigen Sie mir den Eingang dieses Antrags. Falls Sie ein bestimmtes Formular oder weitere Unterlagen benötigen, senden Sie mir diese bitte zu. Dieses Schreiben gilt als fristwahrende Antragstellung (§ 16 SGB I).\n\nMit freundlichen Grüßen\n\n${a ? p.absender || "[Dein Name]" : who}${p.tel ? "\nTel. " + p.tel : ""}${p.mail ? "\n" + p.mail : ""}`;
-  return { subject, body };
+  return { subject: betreff(b), body: briefText(b, txt(b.ask) + pgline, SCHLUSS_ANTRAG) };
 }
 
 /**

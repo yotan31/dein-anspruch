@@ -872,14 +872,13 @@ export const T = {
       "The care level calculator estimates which care level is possible, using the points system of the care insurance. No sign-up, about 5 minutes.",
     ],
   "Was kostet „Dein Anspruch“?": ["", "", "", "", "What does “Dein Anspruch” cost?"],
-  "Nichts. Es gibt kein Abo und keine Werbung. Für die Links zu Pflegediensten oder Beratungsstellen bekommen wir kein Geld.":
-    [
-      "",
-      "",
-      "",
-      "",
-      "Nothing. There is no subscription and no advertising. We don't receive any money for the links to care services or counselling centres.",
-    ],
+  "Nichts. Es gibt kein Abo und keine Werbung.": [
+    "",
+    "",
+    "",
+    "",
+    "Nothing. There is no subscription and no advertising.",
+  ],
   "Für wen ist die App?": ["", "", "", "", "Who is the app for?"],
   "Für Menschen mit Pflegegrad oder Schwerbehinderung und für Angehörige, die sich kümmern. Gesetzlich und privat Versicherte können sie nutzen. Wer privat versichert ist, wählt bei der Krankenkasse „Andere“.":
     [

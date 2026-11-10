@@ -13,6 +13,7 @@ import * as m_logic_belegerkennung from "./logic/belegerkennung.js";
 import * as m_logic_bescheid from "./logic/bescheid.js";
 import * as m_logic_entlastung from "./logic/entlastung.js";
 import * as m_logic_fragebogen from "./logic/fragebogen.js";
+import * as m_logic_folgebriefe from "./logic/folgebriefe.js";
 import * as m_logic_fristen from "./logic/fristen.js";
 import * as m_logic_lage from "./logic/lage.js";
 import * as m_logic_leistungen from "./logic/leistungen.js";
@@ -56,6 +57,7 @@ import * as m_ui_components_feedback_fenster from "./ui/components/feedback-fens
 import * as m_ui_components_fenster from "./ui/components/fenster.js";
 import * as m_ui_components_fragen from "./ui/components/fragen.js";
 import * as m_ui_components_install_karte from "./ui/components/install-karte.js";
+import * as m_ui_components_vollmacht_knopf from "./ui/components/vollmacht-knopf.js";
 import * as m_ui_hinweise from "./ui/hinweise.js";
 import * as m_ui_kopf from "./ui/kopf.js";
 import * as m_ui_morph from "./ui/morph.js";
@@ -93,6 +95,7 @@ Object.defineProperty(globalThis, "__da", {
       m_logic_bescheid,
       m_logic_entlastung,
       m_logic_fragebogen,
+      m_logic_folgebriefe,
       m_logic_fristen,
       m_logic_lage,
       m_logic_leistungen,
@@ -136,6 +139,7 @@ Object.defineProperty(globalThis, "__da", {
       m_ui_components_fenster,
       m_ui_components_fragen,
       m_ui_components_install_karte,
+      m_ui_components_vollmacht_knopf,
       m_ui_hinweise,
       m_ui_kopf,
       m_ui_morph,

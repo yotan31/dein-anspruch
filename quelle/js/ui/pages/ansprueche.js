@@ -1,6 +1,8 @@
 // Reiter „Ansprüche“: Liste der Leistungen mit Filter, Stand und aufklappbaren Details.
 import { langNotice } from "../../i18n/sprachen.js";
 import { docsFor } from "../../logic/antragstext.js";
+import { kannNachfragen, mitWiderspruch } from "../../logic/folgebriefe.js";
+import { widerspruchFrist } from "../../logic/fristen.js";
 import { sums, txt } from "../../logic/leistungen.js";
 import { Z } from "../../state/zustand.js";
 import { finderHTML } from "../components/anbieter.js";
@@ -8,7 +10,9 @@ import { bescheidCard } from "../components/bescheid-karte.js";
 import { datenBox } from "../components/datenbox.js";
 import { entlCard } from "../components/entlastung-karte.js";
 import { installKarte } from "../components/install-karte.js";
+import { vollmachtKnopf } from "../components/vollmacht-knopf.js";
 import { AREA_ICON, CLAIM_ICON, bild, ic } from "../symbole.js";
+import { daysUntil, deD, parseIso } from "../../utils/datum.js";
 import { esc, eur } from "../../utils/format.js";
 
 /* ---------- Reiter: Ansprüche ---------- */
@@ -64,7 +68,48 @@ function valueLabel(b) {
   return `<span class="val neutral">${b.opt ? "Prüfen lohnt sich" : "Kostenlos"}</span>`;
 }
 
-const ST_TXT = { beantragt: "Beantragt", bewilligt: "Bewilligt" };
+const ST_TXT = {
+  beantragt: "Beantragt",
+  bewilligt: "Bewilligt",
+  abgelehnt: "Abgelehnt",
+  widerspruch: "Widerspruch läuft",
+};
+
+/** Nach dem Abschicken: nachfragen, wenn keine Antwort kommt */
+function nachfrageBox(b) {
+  if (!kannNachfragen(b)) return "";
+  const seit = Z.S.sent && Z.S.sent[b.k];
+  return `<div class="folge">
+    <p><strong>Noch keine Antwort?</strong> ${seit ? `Abgeschickt am ${deD(parseIso(seit))}. ` : ""}Mit diesem Brief fragst du nach dem Stand.</p>
+    <span class="btnrow"><button class="btn small soft" type="button" data-act="nachfrage-pdf" data-k="${b.k}">${ic("down")}Nachfrage als PDF</button><button class="btn small ghost" type="button" data-act="nachfrage-copy" data-k="${b.k}">Text kopieren</button></span>
+  </div>`;
+}
+
+/** Nach einer Ablehnung: Frist zeigen und den Widerspruch vorbereiten */
+function ablehnungBox(b) {
+  if ((Z.S.status[b.k] || "offen") !== "abgelehnt") return "";
+  const datum = (Z.S.ablehnung[b.k] || {}).datum || "",
+    frist = widerspruchFrist(b.k),
+    tage = frist ? daysUntil(frist) : null;
+  const fristText = !frist
+    ? "Trage das Datum ein, das oben auf dem Bescheid steht. Dann rechnet die App die Frist aus."
+    : tage < 0
+      ? `Die Frist ist am ${deD(frist)} abgelaufen. Lass dich beraten, ob ein neuer Antrag sinnvoll ist.`
+      : `Widerspruch möglich bis ${deD(frist)} (${tage === 0 ? "heute" : tage === 1 ? "noch 1 Tag" : `noch ${tage} Tage`}).`;
+  const brief = !mitWiderspruch(b)
+    ? `<p class="small muted">Beim Finanzamt heißt der Widerspruch „Einspruch“. Er geht am einfachsten über ELSTER oder mit Hilfe der Steuerberatung.</p>`
+    : ["pg_antrag", "pg_hoch"].includes(b.k)
+      ? `<span class="btnrow"><button class="btn small" type="button" data-wopen="widerspruch">${ic("file")}Widerspruch mit Begründung schreiben</button></span>`
+      : `<span class="btnrow"><button class="btn small" type="button" data-act="wid-pdf" data-k="${b.k}">${ic("down")}Widerspruch als PDF</button><button class="btn small ghost" type="button" data-act="wid-copy" data-k="${b.k}">Text kopieren</button></span>
+         <button class="linkbtn" type="button" data-act="wid-sent" data-k="${b.k}">Ich habe den Widerspruch abgeschickt</button>`;
+  return `<div class="folge">
+    <p><strong>Abgelehnt? Das muss nicht das letzte Wort sein.</strong> Ein kurzer Widerspruch wahrt die Frist, die Begründung kannst du nachreichen.</p>
+    <span class="field max-260"><label for="abl-${b.k}">Datum auf dem Bescheid</label><input type="date" id="abl-${b.k}" data-abl="${b.k}" value="${esc(datum)}"></span>
+    <p class="${frist && tage >= 0 && tage <= 7 ? "frist knapp" : "frist"}">${fristText}</p>
+    ${brief}
+    <p class="small muted">Unsicher, ob ein Widerspruch Aussicht hat? Kostenlos beraten der Pflegestützpunkt und die Pflegeberatung der Kasse, Mitglieder auch VdK oder SoVD.</p>
+  </div>`;
+}
 
 function itemHTML(b) {
   const st = Z.S.status[b.k] || "offen";
@@ -75,7 +120,7 @@ function itemHTML(b) {
       <span class="ttl">${esc(b.t)}</span>${valueLabel(b)}
       <span class="chev">${ic("chev")}</span>
       <span class="short">${esc(txt(b.short))}</span>
-      ${b.opt || st !== "offen" ? `<span class="tags">${st !== "offen" ? `<span class="tag st-${st}">${ic("check")}${ST_TXT[st] || st}</span>` : ""}${b.opt ? '<span class="tag">je nach Lage</span>' : ""}</span>` : ""}
+      ${b.opt || st !== "offen" ? `<span class="tags">${st !== "offen" ? `<span class="tag st-${st}">${ic(st === "abgelehnt" ? "alert" : "check")}${ST_TXT[st] || st}</span>` : ""}${b.opt ? '<span class="tag">je nach Lage</span>' : ""}</span>` : ""}
     </button>
     ${open ? detailHTML(b) : ""}
   </article>`;
@@ -106,15 +151,18 @@ function detailHTML(b) {
     <div><h3 class="unter">So läuft es ab</h3><ol class="steps">${b.steps.map((s) => `<li>${esc(s)}</li>`).join("")}</ol></div>
     <div class="akk">
       ${naehe ? akk(b.k + ":naehe", "pin", "In der Nähe finden", "", naehe) : ""}
-      ${checks.length ? akk(b.k + ":docs", "list", "Unterlagen", `${erledigt} von ${checks.length} erledigt`, `<ul class="checks">${checks.map((c, i) => `<li><label><input type="checkbox" data-check="${b.k}:${i}" ${Z.S.checks[b.k + ":" + i] ? "checked" : ""}><span>${esc(c)}</span></label></li>`).join("")}</ul>`) : ""}
+      ${checks.length ? akk(b.k + ":docs", "list", "Unterlagen", `${erledigt} von ${checks.length} erledigt`, `<ul class="checks">${checks.map((c, i) => `<li><label><input type="checkbox" data-check="${b.k}:${i}" ${Z.S.checks[b.k + ":" + i] ? "checked" : ""}><span>${esc(c)}</span></label></li>`).join("")}</ul>${vollmachtKnopf(checks)}`) : ""}
       <div class="akk-row status">${ic("check")}<label for="st-${b.k}">Stand</label><select id="st-${b.k}" data-status="${b.k}">${[
         ["offen", "noch nicht beantragt"],
         ["beantragt", "beantragt, warte auf Antwort"],
         ["bewilligt", "bewilligt"],
+        ["abgelehnt", "abgelehnt"],
+        ["widerspruch", "Widerspruch eingelegt"],
       ]
         .map(([v, t]) => `<option value="${v}" ${st === v ? "selected" : ""}>${t}</option>`)
         .join("")}</select></div>
     </div>
+    ${nachfrageBox(b)}${ablehnungBox(b)}
     <div class="detail-fuss">
       <label class="gen" for="gn-${b.k}"><input type="checkbox" id="gn-${b.k}" data-gen="${b.k}" ${Z.S.genutzt[b.k] ? "checked" : ""}><span>Bekommen wir schon</span></label>
       <button type="button" class="linkbtn zu" data-open="${b.k}">Zuklappen</button>

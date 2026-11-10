@@ -401,3 +401,47 @@ test("Briefe: Datum nach DIN 5008 (TT.MM.JJJJ), auch das Geburtsdatum im Antrag"
   assert.equal(run('datumBrief("14.3.38")'), "14.3.38");
   assert.match(run('curLetter(B.find((x) => x.k === "entlastung")).body'), /geboren am 14\.03\.1938/);
 });
+
+test("IBAN: einmal eingegeben, im nächsten Antrag vorbelegt, aber nicht für das Konto der Ersatzperson", () => {
+  const run = neu("2026-11-06", PFLEGE3);
+  const iban = "DE89 3704 0044 0532 0130 00";
+  run(`S.wiz = { k: "pflegegeld", i: 0, pq: [] }; setQ({ k: "iban" }, "${iban}")`);
+  assert.equal(run("S.person.iban"), iban);
+  assert.equal(run('S.wiz = { k: "entlastung", i: 0, pq: [] }, getQ({ k: "iban" })'), iban);
+  assert.equal(
+    run('S.wiz = { k: "jahresbetrag", i: 0, pq: [] }, S.vhp.auszahlung = "ersatz", getQ({ k: "iban" })'),
+    "",
+  );
+  run('S.wiz = { k: "entlastung", i: 0, pq: [] }; setQ({ k: "iban" }, "DE00 123")');
+  assert.equal(run("S.person.iban"), iban, "eine unvollständige IBAN überschreibt die gemerkte nicht");
+});
+
+test("Nachfrage: Brief nennt das Antragsdatum, beim Pflegegrad nach 25 Arbeitstagen auch die Frist", () => {
+  const run = neu("2026-11-06", { ...PFLEGE3, person: { name: "Erika Muster", absender: "Jan Muster" } });
+  run('S.status.entlastung = "beantragt"; S.sent.entlastung = "2026-10-01"');
+  const L = JSON.parse(run('JSON.stringify(nachfrageBrief(B.find((x) => x.k === "entlastung")))'));
+  assert.match(L.subject, /^Sachstandsanfrage: Entlastungsbetrag/);
+  assert.match(L.body, /Stand des Antrags „Entlastungsbetrag“ vom 01\.10\.2026/);
+  assert.doesNotMatch(L.body, /18c/);
+  assert.equal(run('arbeitstageSeit("2026-10-30")'), 5); // Fr 30.10. → Fr 6.11.: Mo–Fr = 5
+  run('S.sent.pg_hoch = "2026-09-01"');
+  assert.match(run('nachfrageBrief(B.find((x) => x.k === "pg_hoch")).body'), /25 Arbeitstagen.*§ 18c Abs\. 1/);
+  run('S.sent.pg_hoch = "2026-10-20"');
+  assert.doesNotMatch(run('nachfrageBrief(B.find((x) => x.k === "pg_hoch")).body'), /18c/);
+});
+
+test("Ablehnung: Widerspruchsfrist ein Monat ab Bescheiddatum, erscheint bei den Fristen, Brief wahrt die Frist", () => {
+  const run = neu("2026-11-06", { ...PFLEGE3, person: { name: "Erika Muster", absender: "Jan Muster" } });
+  run('S.status.technisch = "abgelehnt"; S.ablehnung.technisch = { datum: "2026-10-20" }');
+  assert.equal(run('isoD(widerspruchFrist("technisch"))'), "2026-11-20");
+  assert.equal(run('deadlines().filter((x) => x.k === "abl-technisch").length'), 1);
+  const body = run('widerspruchBrief(B.find((x) => x.k === "technisch")).body');
+  assert.match(body, /Widerspruch gegen Ihren Bescheid vom 20\.10\.2026 ein/);
+  assert.match(body, /Eine Vollmacht liegt bei/);
+  run('S.ablehnung.technisch.widerspruch = "2026-11-06"; S.status.technisch = "widerspruch"');
+  assert.equal(
+    run('deadlines().filter((x) => x.k === "abl-technisch").length'),
+    0,
+    "nach dem Widerspruch keine Frist mehr",
+  );
+});

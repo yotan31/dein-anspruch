@@ -43,6 +43,7 @@ const FRAGEBOGEN_FELDER = {
  */
 const DATEN_FELDER = {
   status: (t, k) => (Z.S.status[k] = t.value),
+  abl: (t, k) => (Z.S.ablehnung[k] = { ...(Z.S.ablehnung[k] || {}), datum: t.value }),
   gen: (t, k) => {
     Z.S.genutzt[k] = t.checked;
     Z.openKey = null;

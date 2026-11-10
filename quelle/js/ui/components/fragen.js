@@ -4,10 +4,7 @@ import { esc } from "../../utils/format.js";
 
 /* ---------- Hilfe: häufige Fragen und wo es persönliche Beratung gibt ---------- */
 const FRAGEN = [
-  [
-    "Was kostet „Dein Anspruch“?",
-    "Nichts. Es gibt kein Abo und keine Werbung. Für die Links zu Pflegediensten oder Beratungsstellen bekommen wir kein Geld.",
-  ],
+  ["Was kostet „Dein Anspruch“?", "Nichts. Es gibt kein Abo und keine Werbung."],
   [
     "Für wen ist die App?",
     "Für Menschen mit Pflegegrad oder Schwerbehinderung und für Angehörige, die sich kümmern. Gesetzlich und privat Versicherte können sie nutzen. Wer privat versichert ist, wählt bei der Krankenkasse „Andere“.",

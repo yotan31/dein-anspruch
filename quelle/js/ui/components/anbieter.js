@@ -62,5 +62,5 @@ export function finderHTML(k, mitTitel = true) {
         : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q + " " + (p || ""))}`;
       return `<a class="extlink" href="${url}" target="_blank" rel="noopener">${esc(t)}${ic("ext")}</a>`;
     }).join("")}</div>
-    <p class="small muted">Neutral: Wir bekommen für diese Links kein Geld. Bei Anrufen „im Auftrag der Pflegekasse“ bitte vorsichtig sein.</p></div>`;
+    <p class="small muted">Bei Anrufen „im Auftrag der Pflegekasse“ bitte vorsichtig sein.</p></div>`;
 }

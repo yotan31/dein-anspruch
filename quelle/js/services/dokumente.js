@@ -1,5 +1,6 @@
 // Erzeugt die Dokumente zum Herunterladen: Antrag als PDF, Belegmappe, Quittung, Tabelle (CSV).
 import { curLetter, docsFor } from "../logic/antragstext.js";
+import { vollmachtInhalt } from "../logic/folgebriefe.js";
 import { KATS, selYears } from "../logic/belege.js";
 import { B, RECIP, empfAdresse, kasseName } from "../logic/leistungen.js";
 import { KM_SATZ, VHP_GRUND, vhpCalc, vhpZeitraum } from "../logic/verhinderungspflege.js";
@@ -110,11 +111,10 @@ export async function makeQuittung() {
   );
 }
 
-function drawLetter(doc, b) {
+function drawLetter(doc, b, L = curLetter(b), docs = docsFor(b)) {
   const p = Z.S.person,
     a = Z.S.rolle === "angehoerig",
-    r = RECIP[b.to](),
-    L = curLetter(b);
+    r = RECIP[b.to]();
   const L0 = 25,
     W = 165;
   let y;
@@ -157,7 +157,6 @@ function drawLetter(doc, b) {
   doc.line(L0, y, L0 + 70, y);
   doc.setFontSize(8);
   doc.text("Unterschrift", L0, y + 4);
-  const docs = docsFor(b);
   if (docs.length) {
     y += 14;
     if (y > 260) {
@@ -178,6 +177,78 @@ function drawLetter(doc, b) {
       y += 5;
     }
   }
+}
+
+/**
+ * Folgebrief zu einem Antrag (Nachfrage oder Widerspruch) als PDF im selben Briefformat.
+ * @param b Leistung (für Empfänger und Absender)
+ * @param L Betreff und Text
+ * @param datei Dateiname
+ * @param anlagen Liste der Anlagen
+ */
+export async function makeBrief(b, L, datei, anlagen = []) {
+  const doc = await newDoc();
+  if (!doc) return;
+  drawLetter(doc, b, L, anlagen);
+  seitenzahlen(doc);
+  await saveFile(datei, doc.output("blob"), "PDF gespeichert");
+}
+
+/** Vollmacht für Angehörige als PDF zum Ausdrucken und Unterschreiben. */
+export async function makeVollmacht() {
+  const doc = await newDoc();
+  if (!doc) return;
+  const v = vollmachtInhalt(),
+    L0 = 25,
+    W = 160,
+    LEER = "________________________________________";
+  let y = 30;
+  const absatz = (text, abstand = 8) => {
+    const z = zeilen(doc, text, W);
+    doc.text(z, L0, y);
+    y += z.length * 5.2 + abstand;
+  };
+  const felder = (liste) => {
+    for (const [k, val] of liste) {
+      doc.setFont("helvetica", "bold");
+      doc.text(k + ":", L0, y);
+      doc.setFont("helvetica", "normal");
+      doc.text(val || LEER, L0 + 45, y);
+      y += 7;
+    }
+    y += 3;
+  };
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.text("Vollmacht", L0, y);
+  y += 6;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.text("für Angelegenheiten bei Kranken- und Pflegekasse und bei Behörden", L0, y);
+  y += 12;
+  doc.setFontSize(11);
+  absatz("Ich,", 2);
+  felder(v.geber);
+  absatz("bevollmächtige hiermit", 2);
+  felder(v.nehmer);
+  absatz(v.umfang, 1);
+  for (const pkt of v.punkte) absatz("–  " + pkt, 0);
+  y += 6;
+  absatz(v.daten);
+  absatz(v.dauer, 22);
+  doc.line(L0, y, L0 + 70, y);
+  doc.line(L0 + 90, y, L0 + 160, y);
+  doc.setFontSize(8);
+  doc.text("Ort, Datum", L0, y + 4);
+  doc.text("Unterschrift der Person, die die Vollmacht gibt", L0 + 90, y + 4);
+  y += 20;
+  doc.line(L0 + 90, y, L0 + 160, y);
+  doc.text("Unterschrift der bevollmächtigten Person", L0 + 90, y + 4);
+  y += 16;
+  doc.setFontSize(9);
+  doc.setTextColor(90);
+  doc.text(doc.splitTextToSize(v.hinweis, W), L0, y);
+  await saveFile("Vollmacht.pdf", doc.output("blob"), "PDF gespeichert");
 }
 
 /**

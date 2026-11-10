@@ -529,6 +529,34 @@ console.log("Antrag: Prüfhinweise und Anschrift");
   check("keine Programmfehler", errors.length === 0, errors.join(" | "));
 }
 
+// ---------- 2c. Nach dem Antrag: nachfragen, Ablehnung, Vollmacht ----------
+console.log("Nach dem Antrag: Nachfrage, Widerspruch, Vollmacht");
+{
+  const { page, errors } = await newPage({
+    gast: { ...GAST, status: { entlastung: "beantragt" }, sent: { entlastung: "2026-10-01" } },
+  });
+  await gehe(page, BASE, 600);
+  await page.tap('[data-open="entlastung"]');
+  await page.waitForTimeout(300);
+  check("beantragt: Nachfrage-Brief wird angeboten", (await page.locator('[data-act="nachfrage-pdf"]').count()) === 1);
+  const [nachfrage] = await Promise.all([page.waitForEvent("download"), page.tap('[data-act="nachfrage-pdf"]')]);
+  check("Nachfrage lädt als PDF", /^Nachfrage-entlastung\.pdf$/.test(nachfrage.suggestedFilename()));
+  await page.selectOption("#st-entlastung", "abgelehnt");
+  await page.waitForTimeout(300);
+  check(
+    "abgelehnt: Datum des Bescheids und Widerspruch werden angeboten",
+    (await page.locator("#abl-entlastung").count()) === 1 && (await page.locator('[data-act="wid-pdf"]').count()) === 1,
+  );
+  await page.fill("#abl-entlastung", "2030-01-15");
+  await page.locator("#abl-entlastung").dispatchEvent("change");
+  await page.waitForTimeout(300);
+  check("Frist für den Widerspruch wird berechnet", /15\.2\.2030/.test(await page.textContent(".folge .frist")));
+  await page.tap('[data-act="wid-sent"]');
+  await page.waitForTimeout(300);
+  check("Widerspruch abgeschickt: Stand wechselt", await page.evaluate(() => S.status.entlastung === "widerspruch"));
+  check("keine Programmfehler", errors.length === 0, errors.join(" | "));
+}
+
 // ---------- 3. Pflegegrad-Rechner ----------
 console.log("Pflegegrad-Rechner");
 {

@@ -691,7 +691,15 @@ export function getQ(q) {
     const e = empfAdresse(wizTo());
     return [e.strasse, e.ort].filter(Boolean).join(", ");
   }
-  return ansObj(Z.S.wiz.k)[q.k];
+  const v = ansObj(Z.S.wiz.k)[q.k];
+  // IBAN: einmal eingegeben, in jedem weiteren Antrag vorbelegt (nicht, wenn das Geld an die Ersatzperson gehen soll)
+  if (q.k === "iban" && !v && eigenesKonto()) return Z.S.person.iban || "";
+  return v;
+}
+
+/** Geht die Erstattung dieses Antrags auf das eigene Konto der Familie? */
+function eigenesKonto() {
+  return !(Z.S.wiz.k === "jahresbetrag" && Z.S.vhp.auszahlung === "ersatz");
 }
 
 /** Empfänger des laufenden Antrags (z. B. pflegekasse) */
@@ -750,6 +758,7 @@ export function ibanOk(v) {
 export function setQ(q, v) {
   if (q.store === "person") Z.S.person[q.k] = v;
   else ansObj(Z.S.wiz.k)[q.k] = v;
+  if (q.k === "iban" && eigenesKonto() && ibanOk(v)) Z.S.person.iban = v;
   delete Z.S.texte[Z.S.wiz.k];
   delete Z.S.texte[Z.S.wiz.k + "_sub"];
 }
