@@ -11,11 +11,12 @@ import { finderHTML } from "../components/anbieter.js";
 import { bescheidCard } from "../components/bescheid-karte.js";
 import { datenBox } from "../components/datenbox.js";
 import { entlCard } from "../components/entlastung-karte.js";
+import { folgeBox } from "../components/folge-box.js";
 import { installKarte } from "../components/install-karte.js";
 import { rueckblickCard, toepfeCard } from "../components/toepfe-karte.js";
 import { vollmachtKnopf } from "../components/vollmacht-knopf.js";
 import { AREA_ICON, CLAIM_ICON, bild, ic } from "../symbole.js";
-import { daysUntil, deD, parseIso } from "../../utils/datum.js";
+import { MON, daysUntil, deD, parseIso } from "../../utils/datum.js";
 import { esc, eur } from "../../utils/format.js";
 
 /* ---------- Reiter: Ansprüche ---------- */
@@ -49,7 +50,7 @@ export function viewAnsprueche() {
    ${rueckblickCard()}
    ${kindKarte()}
    <div class="section-title"><h2>Deine offenen Ansprüche</h2>${fortschritt(all)}</div>
-   ${areas.length > 2 ? `<div class="filters">${areas.map((a) => `<button type="button" class="chip" data-area="${esc(a)}" aria-pressed="${Z.areaFilter === a}">${esc(a)}</button>`).join("")}</div>` : ""}
+   ${areas.length > 2 ? `<div class="filters">${areas.map((a) => `<button type="button" class="chip" data-area="${esc(a)}" aria-pressed="${Z.areaFilter === a}">${a === "Alle" ? "" : `<i class="punkt a-${esc(a)}"></i>`}${esc(a)}</button>`).join("")}</div>` : ""}
    ${sorted.length ? `<div class="list">${sorted.map(itemHTML).join("")}</div>` : `<section class="panel leer">${bild("fertig")}<h3>Alles im Blick</h3><p class="muted">Ihr nutzt bereits alles, was wir für eure Lage prüfen konnten.</p></section>`}
    ${genutzt.length ? `<details class="used"><summary>${ic("chev")}Bereits genutzt (${genutzt.length})</summary><div class="list mt-10">${genutzt.map(itemHTML).join("")}</div></details>` : ""}
    ${bescheidCard() || entlCard() || toepfeCard() ? `<div class="section-title"><h3>Weitere Hilfen</h3></div><div class="minis">${bescheidCard()}${entlCard()}${toepfeCard()}</div>` : ""}
@@ -77,10 +78,10 @@ function valueLabel(b) {
 function kindKarte() {
   if (!istKind()) return "";
   return `<section class="panel kindkarte"><details data-akk="kindkarte" ${Z.akk && Z.akk.kindkarte ? "open" : ""}>
-    <summary><h2>${ic("people")} Das ist bei Kindern anders</h2></summary>
-    <ul>${kindUnterschiede()
-      .map(([t, u]) => `<li><strong>${esc(t)}</strong><span>${esc(u)}</span></li>`)
-      .join("")}</ul>
+    <summary><span class="ico a-Kind">${ic("people")}</span><span class="kk-t"><h2>Das ist bei Kindern anders</h2><small>Begutachtung, Leistungen und zusätzliche Hilfen</small></span>${ic("chev")}</summary>
+    <dl>${kindUnterschiede()
+      .map(([t, u]) => `<div><dt>${esc(t)}</dt><dd>${esc(u)}</dd></div>`)
+      .join("")}</dl>
   </details></section>`;
 }
 
@@ -95,10 +96,12 @@ const ST_TXT = {
 function nachfrageBox(b) {
   if (!kannNachfragen(b)) return "";
   const seit = Z.S.sent && Z.S.sent[b.k];
-  return `<div class="folge">
-    <p><strong>Noch keine Antwort?</strong> ${seit ? `Abgeschickt am ${deD(parseIso(seit))}. ` : ""}Mit diesem Brief fragst du nach dem Stand.</p>
-    <span class="btnrow"><button class="btn small soft" type="button" data-act="nachfrage-pdf" data-k="${b.k}">${ic("down")}Nachfrage als PDF</button><button class="btn small ghost" type="button" data-act="nachfrage-copy" data-k="${b.k}">Text kopieren</button></span>
-  </div>`;
+  return folgeBox(
+    "cal",
+    "Noch keine Antwort?",
+    `${seit ? `Abgeschickt am ${deD(parseIso(seit))}. ` : ""}Mit diesem Brief fragst du nach dem Stand.`,
+    `<span class="btnrow"><button class="btn small soft" type="button" data-act="nachfrage-pdf" data-k="${b.k}">${ic("down")}Nachfrage als PDF</button><button class="btn small ghost" type="button" data-act="nachfrage-copy" data-k="${b.k}">Text kopieren</button></span>`,
+  );
 }
 
 /** Nach einer Ablehnung: Frist zeigen und den Widerspruch vorbereiten */
@@ -118,13 +121,17 @@ function ablehnungBox(b) {
       ? `<span class="btnrow"><button class="btn small" type="button" data-wopen="widerspruch">${ic("file")}Widerspruch mit Begründung schreiben</button></span>`
       : `<span class="btnrow"><button class="btn small" type="button" data-act="wid-pdf" data-k="${b.k}">${ic("down")}Widerspruch als PDF</button><button class="btn small ghost" type="button" data-act="wid-copy" data-k="${b.k}">Text kopieren</button></span>
          <button class="linkbtn" type="button" data-act="wid-sent" data-k="${b.k}">Ich habe den Widerspruch abgeschickt</button>`;
-  return `<div class="folge">
-    <p><strong>Abgelehnt? Das muss nicht das letzte Wort sein.</strong> Ein kurzer Widerspruch wahrt die Frist, die Begründung kannst du nachreichen.</p>
-    <span class="field max-260"><label for="abl-${b.k}">Datum auf dem Bescheid</label><input type="date" id="abl-${b.k}" data-abl="${b.k}" value="${esc(datum)}"></span>
-    <p class="${frist && tage >= 0 && tage <= 7 ? "frist knapp" : "frist"}">${fristText}</p>
+  const knapp = frist && tage >= 0 && tage <= 7;
+  return folgeBox(
+    "alert",
+    "Abgelehnt? Das muss nicht das letzte Wort sein.",
+    "Ein kurzer Widerspruch wahrt die Frist, die Begründung kannst du nachreichen.",
+    `<span class="field max-260"><label for="abl-${b.k}">Datum auf dem Bescheid</label><input type="date" id="abl-${b.k}" data-abl="${b.k}" value="${esc(datum)}"></span>
+    <div class="frist-zeile${knapp ? " knapp" : frist && tage < 0 ? " vorbei" : ""}">${frist ? `<div class="cal" aria-hidden="true"><b>${MON[frist.getMonth()]}</b><span>${frist.getDate()}</span></div>` : ""}<p class="frist">${fristText}</p></div>
     ${brief}
-    <p class="small muted">Unsicher, ob ein Widerspruch Aussicht hat? Kostenlos beraten der Pflegestützpunkt und die Pflegeberatung der Kasse, Mitglieder auch VdK oder SoVD.</p>
-  </div>`;
+    <p class="small muted folge-rat">Unsicher, ob ein Widerspruch Aussicht hat? Kostenlos beraten der Pflegestützpunkt und die Pflegeberatung der Kasse, Mitglieder auch VdK oder SoVD.</p>`,
+    "warn",
+  );
 }
 
 function itemHTML(b) {

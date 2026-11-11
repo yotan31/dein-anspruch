@@ -5,6 +5,7 @@ import { pg, istKind } from "../../logic/lage.js";
 import { MOD, RQ, rechnerErgebnis } from "../../logic/rechner.js";
 import { Z } from "../../state/zustand.js";
 import { bar } from "./assistent.js";
+import { folgeBox } from "../components/folge-box.js";
 import { render, scrollTop } from "../render.js";
 import { ic } from "../symbole.js";
 import { esc } from "../../utils/format.js";
@@ -47,8 +48,12 @@ export function viewRechner() {
           : `<button class="btn" type="button" data-act="r-konto">Antrag vorbereiten (kostenlos)</button>`
       }
         <button class="btn ghost" type="button" data-act="r-neu">Noch einmal</button></div>
-      <div class="folge"><p><strong>Termin mit dem Gutachter?</strong> Mit deinen Antworten entsteht ein Blatt zum Ausdrucken: was du bereitlegst, worauf du achtest und wo Hilfe gebraucht wird.</p>
-        <button class="btn small soft" type="button" data-act="gutachter-pdf">${ic("down")}Vorbereitung als PDF</button></div>
+      ${folgeBox(
+        "people",
+        "Termin mit dem Gutachter?",
+        "Mit deinen Antworten entsteht ein Blatt zum Ausdrucken: was du bereitlegst, worauf du achtest und wo Hilfe gebraucht wird.",
+        `<button class="btn small soft" type="button" data-act="gutachter-pdf">${ic("down")}Vorbereitung als PDF</button>`,
+      )}
       <button class="linkbtn self-start" type="button" data-act="teilen">Rechner an Familie oder Freunde weiterempfehlen</button>
     </section>`;
   }

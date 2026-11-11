@@ -1895,4 +1895,11 @@ export const T = {
     "",
     "Please be careful with calls claiming to be “on behalf of the care insurer”.",
   ],
+  "Begutachtung, Leistungen und zusätzliche Hilfen": [
+    "Değerlendirme, yardımlar ve ek destekler",
+    "Освидетельствование, выплаты и дополнительная помощь",
+    "التقييم والخدمات والمساعدات الإضافية",
+    "",
+    "Assessment, benefits and additional help",
+  ],
 };

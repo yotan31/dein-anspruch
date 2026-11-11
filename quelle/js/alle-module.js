@@ -58,6 +58,7 @@ import * as m_ui_components_entlastung_karte from "./ui/components/entlastung-ka
 import * as m_ui_components_erinnerung_karte from "./ui/components/erinnerung-karte.js";
 import * as m_ui_components_feedback_fenster from "./ui/components/feedback-fenster.js";
 import * as m_ui_components_fenster from "./ui/components/fenster.js";
+import * as m_ui_components_folge_box from "./ui/components/folge-box.js";
 import * as m_ui_components_fragen from "./ui/components/fragen.js";
 import * as m_ui_components_install_karte from "./ui/components/install-karte.js";
 import * as m_ui_components_toepfe_karte from "./ui/components/toepfe-karte.js";
@@ -144,6 +145,7 @@ Object.defineProperty(globalThis, "__da", {
       m_ui_components_erinnerung_karte,
       m_ui_components_feedback_fenster,
       m_ui_components_fenster,
+      m_ui_components_folge_box,
       m_ui_components_fragen,
       m_ui_components_install_karte,
       m_ui_components_toepfe_karte,
