@@ -2,6 +2,8 @@
 import { langNotice } from "../../i18n/sprachen.js";
 import { docsFor } from "../../logic/antragstext.js";
 import { kannNachfragen, mitWiderspruch } from "../../logic/folgebriefe.js";
+import { kindHinweis, kindUnterschiede } from "../../logic/kinder.js";
+import { istKind } from "../../logic/lage.js";
 import { widerspruchFrist } from "../../logic/fristen.js";
 import { sums, txt } from "../../logic/leistungen.js";
 import { Z } from "../../state/zustand.js";
@@ -43,6 +45,7 @@ export function viewAnsprueche() {
        : ""
    }
    ${langNotice() && `<p class="notice info small">${ic("info")}<span>${langNotice()}</span></p>`}
+   ${kindKarte()}
    <div class="section-title"><h2>Deine offenen Ansprüche</h2>${fortschritt(all)}</div>
    ${areas.length > 2 ? `<div class="filters">${areas.map((a) => `<button type="button" class="chip" data-area="${esc(a)}" aria-pressed="${Z.areaFilter === a}">${esc(a)}</button>`).join("")}</div>` : ""}
    ${sorted.length ? `<div class="list">${sorted.map(itemHTML).join("")}</div>` : `<section class="panel leer">${bild("fertig")}<h3>Alles im Blick</h3><p class="muted">Ihr nutzt bereits alles, was wir für eure Lage prüfen konnten.</p></section>`}
@@ -66,6 +69,17 @@ function valueLabel(b) {
   if (b.once) return `<span class="val">bis ${eur(b.once)}</span>`;
   if (b.frei) return `<span class="val">${eur(b.frei())} Freibetrag</span>`;
   return `<span class="val neutral">${b.opt ? "Prüfen lohnt sich" : "Kostenlos"}</span>`;
+}
+
+/** Für Eltern: was bei Kindern anders ist (aufklappbar, damit die Liste nicht nach unten rutscht) */
+function kindKarte() {
+  if (!istKind()) return "";
+  return `<section class="panel kindkarte"><details data-akk="kindkarte" ${Z.akk && Z.akk.kindkarte ? "open" : ""}>
+    <summary><h2>${ic("people")} Das ist bei Kindern anders</h2></summary>
+    <ul>${kindUnterschiede()
+      .map(([t, u]) => `<li><strong>${esc(t)}</strong><span>${esc(u)}</span></li>`)
+      .join("")}</ul>
+  </details></section>`;
 }
 
 const ST_TXT = {
@@ -146,8 +160,9 @@ function detailHTML(b) {
         ${["pg_antrag", "pg_hoch"].includes(b.k) ? `<button class="btn ghost" type="button" data-act="r-start">Erst selbst einschätzen: Pflegegrad-Rechner</button>` : ""}
         <p class="small muted">${nQ ? `${nQ} einfache Fragen. Nichts wird ohne dich abgeschickt.` : "Der Antrag ist schon vorbereitet. Du musst nur noch prüfen."}</p>
       </div>`
-        : `<p class="notice info">${ic("info")}<span>Dafür ist kein Antrag nötig. Trage den Betrag einfach in der Steuererklärung ein (oder gib diese Info an deine Steuerberatung weiter).</span></p>`
+        : `<p class="notice info">${ic("info")}<span>${esc(b.hinweis || "Dafür ist kein Antrag nötig. Trage den Betrag einfach in der Steuererklärung ein (oder gib diese Info an deine Steuerberatung weiter).")}</span></p>`
     }
+    ${kindHinweis(b.k) ? `<p class="notice info">${ic("people")}<span><strong>Bei Kindern:</strong> ${esc(kindHinweis(b.k))}</span></p>` : ""}
     <div><h3 class="unter">So läuft es ab</h3><ol class="steps">${b.steps.map((s) => `<li>${esc(s)}</li>`).join("")}</ol></div>
     <div class="akk">
       ${naehe ? akk(b.k + ":naehe", "pin", "In der Nähe finden", "", naehe) : ""}

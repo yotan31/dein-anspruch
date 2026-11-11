@@ -13,7 +13,7 @@ import {
   WG,
   WOHNUMFELD,
 } from "../config/stammdaten.js";
-import { gdb, isHome, mz, pg } from "./lage.js";
+import { gdb, isHome, istKind, mz, pg } from "./lage.js";
 import { vhpAsk, vhpDocs } from "./verhinderungspflege.js";
 import { Z } from "../state/zustand.js";
 import { eur } from "../utils/format.js";
@@ -443,7 +443,7 @@ export const B = [
     area: "Krankenkasse",
     t: "Zuzahlungen begrenzen (1 % statt 2 %)",
     p: "§ 62 SGB V",
-    when: () => pg() >= 3 || gdb() >= 60,
+    when: () => (pg() >= 3 || gdb() >= 60) && !istKind(),
     val: () => null,
     short:
       "Wer als schwerwiegend chronisch krank gilt (z. B. ab Pflegegrad 3 oder GdB 60 wegen der Erkrankung), zahlt höchstens 1 % des Bruttoeinkommens pro Jahr zu. Darüber gibt es Befreiung.",

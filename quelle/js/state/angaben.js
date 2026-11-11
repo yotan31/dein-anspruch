@@ -53,7 +53,7 @@ export function blank() {
     status: {},
     /** abgelehnte Anträge: Leistung → { datum: Datum auf dem Bescheid, widerspruch: abgeschickt am } */
     ablehnung: {},
-    /** Alter, wenn es um ein Kind geht: "" (erwachsen), "baby" (bis 18 Monate), "kind" (bis 10 Jahre), "jugend" (11–17) */
+    /** Geht es um ein Kind? "" (nicht gefragt), "erw" (erwachsen), "baby" (bis 18 Monate), "kind" (bis 10 Jahre), "jugend" (11–17) */
     kindAlter: "",
     checks: {},
     texte: {},

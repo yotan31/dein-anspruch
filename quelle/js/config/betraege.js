@@ -29,6 +29,11 @@ export const BETRAEGE = Object.freeze({
   behindertenPauschbetrag: { 20: 384, 30: 620, 40: 860, 50: 1140, 60: 1440, 70: 1780, 80: 2120, 90: 2460, 100: 2840 }, // § 33b Abs. 3
   behindertenPauschbetragErhoeht: 7400, // § 33b Abs. 3 Satz 3: Merkzeichen H, Bl, TBl oder Pflegegrad 4/5
 
+  // Kinderkrankengeld (§ 45 Abs. 2a SGB V): Arbeitstage je Kind und Elternteil bzw. für Alleinerziehende.
+  // 2026 erhöht und befristet bis 31.12.2026. Für 2027 prüfen: ohne Verlängerung wieder 10 bzw. 20 Tage.
+  kinderkrankTage: 15,
+  kinderkrankTageAllein: 30,
+
   // Sonstiges
   rundfunkVoll: 18.36,
   rundfunkErmaessigt: 6.12, // Rundfunkbeitrag pro Monat

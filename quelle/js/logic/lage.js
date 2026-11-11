@@ -8,7 +8,7 @@ export function isHome() {
 
 /** Geht es um ein Kind oder einen Jugendlichen unter 18? Dann schreiben die Eltern als gesetzliche Vertretung. */
 export function istKind() {
-  return Z.S.rolle === "angehoerig" && !!Z.S.kindAlter;
+  return Z.S.rolle === "angehoerig" && ["baby", "kind", "jugend"].includes(Z.S.kindAlter);
 }
 
 /** Pflegegrad als Zahl, 0 ohne Pflegegrad. */

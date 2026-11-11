@@ -2908,6 +2908,29 @@ h3 {
   background: #7a5fc2;
   color: #fff;
 }
+.ico.a-Kind {
+  background: #2f80c9;
+  color: #fff;
+}
+/* Kinder: was anders ist als bei Erwachsenen */
+.kindkarte ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.kindkarte li {
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+.kindkarte li strong {
+  display: block;
+}
+.kindkarte li span {
+  color: var(--muted);
+  font-size: 0.95rem;
+}
 .item .ttl {
   font-weight: 600;
   font-size: 1.02rem;

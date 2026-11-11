@@ -557,6 +557,26 @@ console.log("Nach dem Antrag: Nachfrage, Widerspruch, Vollmacht");
   check("keine Programmfehler", errors.length === 0, errors.join(" | "));
 }
 
+// ---------- 2d. Kinder mit Pflegegrad ----------
+console.log("Kinder mit Pflegegrad");
+{
+  const { page, errors } = await newPage({ gast: { ...GAST, kindAlter: "kind", rolle: "angehoerig" } });
+  await gehe(page, BASE, 600);
+  check("Karte „Das ist bei Kindern anders“ erscheint", (await page.locator(".kindkarte").count()) === 1);
+  check("eigener Filter „Kind“", (await page.locator('[data-area="Kind"]').count()) === 1);
+  await page.tap('[data-open="kind_krankengeld"]');
+  await page.waitForTimeout(300);
+  check("Kinder-Hilfe ohne Brief erklärt den Weg", /Kinderarztpraxis/.test(await page.textContent(".detail")));
+  await page.evaluate(() => {
+    S.done = false;
+    S.step = 0;
+    render();
+  });
+  await page.waitForTimeout(200);
+  check("Fragebogen fragt nach dem Kind", (await page.locator('input[name="kindAlter"]').count()) === 4);
+  check("keine Programmfehler", errors.length === 0, errors.join(" | "));
+}
+
 // ---------- 3. Pflegegrad-Rechner ----------
 console.log("Pflegegrad-Rechner");
 {

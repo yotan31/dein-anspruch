@@ -2,6 +2,7 @@
 // dann werden Sprache, Neuzeichnen, Bedienung, Speicher, Fehlerprotokoll und Installation verbunden,
 // danach wird die Oberfläche das erste Mal gezeichnet und der Speicher geladen.
 import { ergaenzeBefreiungsantrag, ergaenzeWiderspruch, verbindeAssistenten } from "./logic/antraege.js";
+import { ergaenzeKinderLeistungen } from "./logic/kinder.js";
 import { ladeSprache } from "./i18n/sprachen.js";
 import { aktiviereSanftesNeuzeichnen } from "./ui/morph.js";
 import { verbindeBedienung } from "./ui/bedienung.js";
@@ -15,6 +16,7 @@ import { render } from "./ui/render.js";
 ergaenzeBefreiungsantrag();
 verbindeAssistenten();
 ergaenzeWiderspruch();
+ergaenzeKinderLeistungen();
 ladeSprache();
 aktiviereSanftesNeuzeichnen();
 verbindeBedienung();

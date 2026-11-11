@@ -112,7 +112,7 @@ export function ladeApp({ heute = "2026-03-15" } = {}) {
   // Vorbereitung wie beim echten Start (ohne die Teile, die die Oberfläche und den Speicher anschließen)
   // dieselben Datenschritte wie beim Start der App (quelle/js/start.js), ohne Oberfläche
   vm.runInContext(
-    `__da.ergaenzeBefreiungsantrag(); __da.verbindeAssistenten(); __da.ergaenzeWiderspruch(); __da.ladeSprache();`,
+    `__da.ergaenzeBefreiungsantrag(); __da.verbindeAssistenten(); __da.ergaenzeWiderspruch(); __da.ergaenzeKinderLeistungen(); __da.ladeSprache();`,
     ctx,
   );
   // Programmteile unter ihren Namen erreichbar machen (wie früher als globale Namen)

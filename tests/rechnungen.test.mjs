@@ -445,3 +445,32 @@ test("Ablehnung: Widerspruchsfrist ein Monat ab Bescheiddatum, erscheint bei den
     "nach dem Widerspruch keine Frist mehr",
   );
 });
+
+test("Kinder: eigene Hilfen je Alter, Eltern schreiben ohne Vollmacht, keine 1-%-Regel", () => {
+  const KIND = {
+    ...PFLEGE3,
+    kindAlter: "kind",
+    person: { name: "Lena Muster", absender: "Anna Muster", beziehung: "Mutter" },
+  };
+  const run = neu("2026-11-06", KIND);
+  const ks = JSON.parse(run("JSON.stringify(applicable().map((b) => b.k))"));
+  for (const k of ["kind_krankengeld", "kind_zuzahlung", "kind_fruehfoerderung", "kind_schule", "kind_merkzeichen"])
+    assert.ok(ks.includes(k), k);
+  assert.ok(!ks.includes("kind_kindergeld"), "Kindergeld-Hinweis erst ab 11");
+  assert.ok(!ks.includes("chroniker"), "unter 18 keine Zuzahlungen, also keine 1-%-Regel");
+  const body = run('curLetter(B.find((x) => x.k === "entlastung")).body');
+  assert.match(body, /als Mutter für mein Kind Lena Muster/);
+  assert.doesNotMatch(body, /Vollmacht/);
+  assert.ok(!run('docsFor(B.find((x) => x.k === "entlastung"))').some((d) => /Vollmacht/.test(d)));
+  assert.match(run('B.find((x) => x.k === "kind_krankengeld").short()'), /15 Arbeitstage/);
+  assert.match(run('kindHinweis("pg_antrag")'), /Gleichaltrigen/);
+
+  const jugend = neu("2026-11-06", { ...KIND, kindAlter: "jugend" });
+  const kj = JSON.parse(jugend("JSON.stringify(applicable().map((b) => b.k))"));
+  assert.ok(kj.includes("kind_kindergeld") && !kj.includes("kind_fruehfoerderung"));
+  assert.match(jugend('kindHinweis("pg_antrag")'), /Ab 11 Jahren/);
+
+  const erw = neu("2026-11-06", { ...PFLEGE3, kindAlter: "erw" });
+  assert.equal(erw('applicable().filter((b) => b.area === "Kind").length'), 0);
+  assert.match(erw('curLetter(B.find((x) => x.k === "entlastung")).body'), /Eine Vollmacht liegt bei/);
+});

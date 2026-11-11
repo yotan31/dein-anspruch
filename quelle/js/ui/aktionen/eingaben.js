@@ -21,6 +21,7 @@ const ASSISTENT_WEITER_NACH = 200;
  */
 const FRAGEBOGEN_FELDER = {
   rolle: (t) => (Z.S.rolle = t.value),
+  kindAlter: (t) => (Z.S.kindAlter = t.value),
   bereich: (t) => (Z.S.bereiche[t.value] = t.checked),
   kasse: (t) => (Z.S.kasse = t.value),
   aokRegion: (t) => (Z.S.aokRegion = t.value),

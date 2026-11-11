@@ -1,5 +1,6 @@
 // Fragebogen: ein Bildschirm pro Schritt (Kasse, Pflegegrad, Pflegeperson, Schwerbehinderung …).
 import { AOK_REGIONEN, KASSEN, MZ, WOHNEN } from "../../config/stammdaten.js";
+import { KIND_ALTER } from "../../logic/kinder.js";
 import { visSteps } from "../../logic/fragebogen.js";
 import { B, applicable } from "../../logic/leistungen.js";
 import { Z } from "../../state/zustand.js";
@@ -34,11 +35,18 @@ export const VIEWS = {
      ${choice("rolle", "selbst", "Für mich selbst", "ich bin pflegebedürftig oder schwerbehindert", "radio", Z.S.rolle === "selbst")}
      ${choice("rolle", "angehoerig", "Für eine angehörige Person", "ich pflege oder kümmere mich", "radio", Z.S.rolle === "angehoerig")}
    </div></fieldset>
+   ${
+     Z.S.rolle === "angehoerig"
+       ? `<fieldset class="q"><legend>Geht es um ein Kind unter 18?</legend><p class="hint">Bei Kindern gelten bei der Begutachtung eigene Regeln, und es gibt zusätzliche Hilfen.</p><div class="choices">
+     ${KIND_ALTER.map(([v, t, s]) => choice("kindAlter", v, t, s, "radio", Z.S.kindAlter === v)).join("")}
+   </div></fieldset>`
+       : ""
+   }
    <fieldset class="q"><legend>Worum geht es?</legend><p class="hint">Beides ist möglich.</p><div class="choices">
      ${choice("bereich", "pflege", "Pflegegrad / Pflegebedürftigkeit", "", "checkbox", Z.S.bereiche.pflege)}
      ${choice("bereich", "sb", "Schwerbehinderung / GdB", "", "checkbox", Z.S.bereiche.sb)}
    </div></fieldset>
-   ${nav(Z.S.rolle && (Z.S.bereiche.pflege || Z.S.bereiche.sb), "Los geht's", !Z.S.rolle ? "Bitte wähle zuerst oben aus, für wen du die App nutzt." : "Bitte wähle mindestens ein Thema aus: Pflegegrad oder Schwerbehinderung.")}
+   ${nav(Z.S.rolle && (Z.S.rolle !== "angehoerig" || Z.S.kindAlter) && (Z.S.bereiche.pflege || Z.S.bereiche.sb), "Los geht's", !Z.S.rolle ? "Bitte wähle zuerst oben aus, für wen du die App nutzt." : Z.S.rolle === "angehoerig" && !Z.S.kindAlter ? "Bitte sag noch, ob es um ein Kind unter 18 geht." : "Bitte wähle mindestens ein Thema aus: Pflegegrad oder Schwerbehinderung.")}
  </section>`,
   kasse: () => `<section class="panel">${stepper()}
    <div class="titelzeile"><h2>Bei welcher Krankenkasse ${Z.S.rolle === "angehoerig" ? "ist die Person" : "bist du"} versichert?</h2>${infoBtn("Krankenkasse und Pflegekasse", "Die Pflegekasse gehört immer zur Krankenkasse. Dorthin gehen die Anträge.\n\nPrivat versichert? Die Leistungen der Pflegepflichtversicherung sind gleich hoch, Anträge gehen dann an die private Pflegeversicherung. Wähle „Andere“.")}</div>

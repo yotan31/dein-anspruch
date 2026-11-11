@@ -138,4 +138,5 @@ export const AREA_ICON = {
   Krankenkasse: "cross",
   Schwerbehinderung: "access",
   Arbeit: "case",
+  Kind: "people",
 };
