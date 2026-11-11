@@ -17,6 +17,7 @@ import * as m_logic_folgebriefe from "./logic/folgebriefe.js";
 import * as m_logic_fristen from "./logic/fristen.js";
 import * as m_logic_gutachter from "./logic/gutachter.js";
 import * as m_logic_kinder from "./logic/kinder.js";
+import * as m_logic_toepfe from "./logic/toepfe.js";
 import * as m_logic_lage from "./logic/lage.js";
 import * as m_logic_leistungen from "./logic/leistungen.js";
 import * as m_logic_rechner from "./logic/rechner.js";
@@ -59,6 +60,7 @@ import * as m_ui_components_feedback_fenster from "./ui/components/feedback-fens
 import * as m_ui_components_fenster from "./ui/components/fenster.js";
 import * as m_ui_components_fragen from "./ui/components/fragen.js";
 import * as m_ui_components_install_karte from "./ui/components/install-karte.js";
+import * as m_ui_components_toepfe_karte from "./ui/components/toepfe-karte.js";
 import * as m_ui_components_vollmacht_knopf from "./ui/components/vollmacht-knopf.js";
 import * as m_ui_hinweise from "./ui/hinweise.js";
 import * as m_ui_kopf from "./ui/kopf.js";
@@ -101,6 +103,7 @@ Object.defineProperty(globalThis, "__da", {
       m_logic_fristen,
       m_logic_gutachter,
       m_logic_kinder,
+      m_logic_toepfe,
       m_logic_lage,
       m_logic_leistungen,
       m_logic_rechner,
@@ -143,6 +146,7 @@ Object.defineProperty(globalThis, "__da", {
       m_ui_components_fenster,
       m_ui_components_fragen,
       m_ui_components_install_karte,
+      m_ui_components_toepfe_karte,
       m_ui_components_vollmacht_knopf,
       m_ui_hinweise,
       m_ui_kopf,

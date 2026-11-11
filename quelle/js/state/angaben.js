@@ -55,6 +55,8 @@ export function blank() {
     ablehnung: {},
     /** letzte Antworten des Pflegegrad-Rechners (für das Vorbereitungsblatt zum Gutachter-Termin) */
     rechner: [],
+    /** Jahr, dessen Rückblick weggeklickt wurde */
+    rueckblick: 0,
     /** Geht es um ein Kind? "" (nicht gefragt), "erw" (erwachsen), "baby" (bis 18 Monate), "kind" (bis 10 Jahre), "jugend" (11–17) */
     kindAlter: "",
     checks: {},

@@ -41,6 +41,11 @@ export const AKTIONEN_ANTRAG = {
   "vhp-quittung": (t) => {
     makeQuittung();
   },
+  "rueckblick-weg": () => {
+    Z.S.rueckblick = TODAY().getFullYear() - 1;
+    save();
+    render();
+  },
   vollmacht: () => {
     makeVollmacht();
   },

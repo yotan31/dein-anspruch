@@ -12,6 +12,7 @@ import { bescheidCard } from "../components/bescheid-karte.js";
 import { datenBox } from "../components/datenbox.js";
 import { entlCard } from "../components/entlastung-karte.js";
 import { installKarte } from "../components/install-karte.js";
+import { rueckblickCard, toepfeCard } from "../components/toepfe-karte.js";
 import { vollmachtKnopf } from "../components/vollmacht-knopf.js";
 import { AREA_ICON, CLAIM_ICON, bild, ic } from "../symbole.js";
 import { daysUntil, deD, parseIso } from "../../utils/datum.js";
@@ -45,12 +46,13 @@ export function viewAnsprueche() {
        : ""
    }
    ${langNotice() && `<p class="notice info small">${ic("info")}<span>${langNotice()}</span></p>`}
+   ${rueckblickCard()}
    ${kindKarte()}
    <div class="section-title"><h2>Deine offenen Ansprüche</h2>${fortschritt(all)}</div>
    ${areas.length > 2 ? `<div class="filters">${areas.map((a) => `<button type="button" class="chip" data-area="${esc(a)}" aria-pressed="${Z.areaFilter === a}">${esc(a)}</button>`).join("")}</div>` : ""}
    ${sorted.length ? `<div class="list">${sorted.map(itemHTML).join("")}</div>` : `<section class="panel leer">${bild("fertig")}<h3>Alles im Blick</h3><p class="muted">Ihr nutzt bereits alles, was wir für eure Lage prüfen konnten.</p></section>`}
    ${genutzt.length ? `<details class="used"><summary>${ic("chev")}Bereits genutzt (${genutzt.length})</summary><div class="list mt-10">${genutzt.map(itemHTML).join("")}</div></details>` : ""}
-   ${bescheidCard() || entlCard() ? `<div class="section-title"><h3>Weitere Hilfen</h3></div><div class="minis">${bescheidCard()}${entlCard()}</div>` : ""}
+   ${bescheidCard() || entlCard() || toepfeCard() ? `<div class="section-title"><h3>Weitere Hilfen</h3></div><div class="minis">${bescheidCard()}${entlCard()}${toepfeCard()}</div>` : ""}
    <div class="nav endnav"><button class="btn ghost" type="button" data-act="edit">Angaben ändern</button><button class="linkbtn danger" type="button" data-act="reset">Antworten zurücksetzen</button></div>
    <div id="resetconfirm" hidden class="notice bad">${ic("alert")}<span>Alle Antworten aus dem Fragebogen zurücksetzen und neu anfangen? Belege und Fristen bleiben erhalten. <span class="btnrow mt-8"><button class="btn small danger" type="button" data-act="reset-yes">Ja, löschen</button><button class="btn small ghost" type="button" data-act="reset-no">Abbrechen</button></span></span></div>
    ${datenBox()}`;

@@ -3528,6 +3528,35 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* Jahresbudgets und Rückblick */
+.topf {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+.topf .nums {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.topf .track {
+  height: 8px;
+  border-radius: var(--r-rund);
+  background: var(--paper-2);
+  overflow: hidden;
+}
+.topf .track i {
+  display: block;
+  height: 100%;
+  background: var(--money);
+}
+.rueckblick {
+  gap: 8px;
+}
+
 /* ---------- Kopfzeile: Sprache, Navigation der Startseite, Handy ----------
    Am Ende, weil diese Regeln ältere Kopf-Regeln weiter oben gezielt überschreiben. */
 /* Weltkugel: Sprache wählen. Das Kürzel daneben zeigt die aktuelle Sprache auf einen Blick */

@@ -496,3 +496,28 @@ test("Gutachter-Blatt: nur Punkte mit Hilfebedarf, nach Bereichen; bei Kindern e
   const kind = neu("2026-11-06", { ...PFLEGE3, kindAlter: "kind" });
   assert.match(kind("gutachterBlatt([]).tipps[0]"), /Gleichaltrigen/);
 });
+
+test("Töpfe: Budgets aus den Belegen, Rückblick nur im ersten Quartal", () => {
+  const run = neu("2026-11-06", PFLEGE3);
+  run(
+    'BEL.push({ kat: "vhp", jahr: "2026", betrag: 1000 }, { kat: "pflhm", jahr: "2026", betrag: 84 }, { kat: "entl", jahr: "2025", betrag: 500 })',
+  );
+  const t = JSON.parse(run("JSON.stringify(toepfe())"));
+  const vhp = t.find((x) => x.k === "vhp"),
+    phm = t.find((x) => x.k === "pflhm");
+  assert.equal(vhp.budget, 3539);
+  assert.equal(vhp.rest, 2539);
+  assert.equal(phm.budget, 42 * 11, "bis November: 11 Monate");
+  assert.equal(phm.rest, 42 * 11 - 84);
+  assert.equal(run("rueckblickFaellig()"), false, "im November kein Rückblick");
+
+  const jan = neu("2027-01-15", PFLEGE3);
+  jan('BEL.push({ kat: "entl", jahr: "2026", betrag: 500 }, { kat: "vhp", jahr: "2026", betrag: 3539 })');
+  assert.equal(jan("rueckblickFaellig()"), true);
+  const r = JSON.parse(jan("JSON.stringify(rueckblick())"));
+  assert.equal(r.jahr, 2026);
+  assert.equal(r.genutzt, 4039);
+  assert.equal(r.toepfe.find((x) => x.k === "entl").rest, 131 * 12 - 500);
+  jan("S.rueckblick = 2026");
+  assert.equal(jan("rueckblickFaellig()"), false, "weggeklickt");
+});
