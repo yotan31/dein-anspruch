@@ -157,7 +157,7 @@ function detailHTML(b) {
       b.ask
         ? `<div class="startbox">
         <button class="btn big" type="button" data-wopen="${b.k}">${ic("file")}${st === "offen" ? "Antrag ausfüllen" : "Antrag ansehen"}</button>
-        ${["pg_antrag", "pg_hoch"].includes(b.k) ? `<button class="btn ghost" type="button" data-act="r-start">Erst selbst einschätzen: Pflegegrad-Rechner</button>` : ""}
+        ${["pg_antrag", "pg_hoch"].includes(b.k) ? `<button class="btn ghost" type="button" data-act="r-start">Erst selbst einschätzen: Pflegegrad-Rechner</button><button class="btn ghost" type="button" data-act="gutachter-pdf">${ic("down")}Vorbereitung auf den Gutachter (PDF)</button>` : ""}
         <p class="small muted">${nQ ? `${nQ} einfache Fragen. Nichts wird ohne dich abgeschickt.` : "Der Antrag ist schon vorbereitet. Du musst nur noch prüfen."}</p>
       </div>`
         : `<p class="notice info">${ic("info")}<span>${esc(b.hinweis || "Dafür ist kein Antrag nötig. Trage den Betrag einfach in der Steuererklärung ein (oder gib diese Info an deine Steuerberatung weiter).")}</span></p>`

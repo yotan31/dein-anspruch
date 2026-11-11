@@ -55,6 +55,7 @@ const NUR_EINMAL = new Set([
   "vollmacht",
   "nachfrage-pdf",
   "wid-pdf",
+  "gutachter-pdf",
 ]);
 /** Zwei Tipper innerhalb dieser Zeit gelten als Doppeltippen (ms); ein bewusstes zweites Tippen dauert länger */
 const DOPPELTIPPEN_MS = 350;

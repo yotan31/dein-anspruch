@@ -474,3 +474,25 @@ test("Kinder: eigene Hilfen je Alter, Eltern schreiben ohne Vollmacht, keine 1-%
   assert.equal(erw('applicable().filter((b) => b.area === "Kind").length'), 0);
   assert.match(erw('curLetter(B.find((x) => x.k === "entlastung")).body'), /Eine Vollmacht liegt bei/);
 });
+
+test("Gutachter-Blatt: nur Punkte mit Hilfebedarf, nach Bereichen; bei Kindern eigene Tipps", () => {
+  const run = neu("2026-11-06", PFLEGE3);
+  const leer = JSON.parse(run("JSON.stringify(gutachterBlatt([]))"));
+  assert.equal(leer.bereiche.length, 0);
+  assert.ok(leer.unterlagen.includes("Medikamentenplan"));
+  const a = JSON.stringify(RQ_ANTWORTEN());
+  function RQ_ANTWORTEN() {
+    const x = new Array(25).fill("0");
+    x[0] = "2"; // Mobilität: Lage im Bett, überwiegend unselbstständig
+    x[13] = "3"; // Selbstversorgung: Duschen, unselbstständig
+    return x;
+  }
+  const g = JSON.parse(run(`JSON.stringify(gutachterBlatt(${a}))`));
+  assert.deepEqual(
+    g.bereiche.map((b) => b.titel),
+    ["Mobilität", "Selbstversorgung"],
+  );
+  assert.match(g.bereiche[0].punkte[0][1], /Überwiegend unselbstständig/);
+  const kind = neu("2026-11-06", { ...PFLEGE3, kindAlter: "kind" });
+  assert.match(kind("gutachterBlatt([]).tipps[0]"), /Gleichaltrigen/);
+});

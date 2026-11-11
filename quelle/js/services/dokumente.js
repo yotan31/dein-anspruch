@@ -1,6 +1,7 @@
 // Erzeugt die Dokumente zum Herunterladen: Antrag als PDF, Belegmappe, Quittung, Tabelle (CSV).
 import { curLetter, docsFor } from "../logic/antragstext.js";
 import { vollmachtInhalt } from "../logic/folgebriefe.js";
+import { gutachterBlatt } from "../logic/gutachter.js";
 import { KATS, selYears } from "../logic/belege.js";
 import { B, RECIP, empfAdresse, kasseName } from "../logic/leistungen.js";
 import { KM_SATZ, VHP_GRUND, vhpCalc, vhpZeitraum } from "../logic/verhinderungspflege.js";
@@ -192,6 +193,84 @@ export async function makeBrief(b, L, datei, anlagen = []) {
   drawLetter(doc, b, L, anlagen);
   seitenzahlen(doc);
   await saveFile(datei, doc.output("blob"), "PDF gespeichert");
+}
+
+/**
+ * Vorbereitung auf den Termin mit dem Medizinischen Dienst als PDF: Unterlagen, Tipps und, wenn der Pflegegrad-Rechner
+ * ausgefüllt ist, die Punkte mit Hilfebedarf nach Bereichen. Freie Zeilen für eigene Notizen.
+ * @param antworten Antworten des Pflegegrad-Rechners
+ */
+export async function makeGutachterBlatt(antworten) {
+  const doc = await newDoc();
+  if (!doc) return;
+  const g = gutachterBlatt(antworten || []),
+    p = Z.S.person,
+    L0 = 25,
+    W = 160;
+  let y = 28;
+  const platz = (h) => {
+    if (y + h > 280) {
+      doc.addPage();
+      y = 22;
+    }
+  };
+  const ueberschrift = (t) => {
+    platz(16);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.text(t, L0, y);
+    y += 7;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10.5);
+  };
+  const punkt = (t, zeichen = "–") => {
+    const z = zeilen(doc, t, W - 7);
+    platz(z.length * 4.8);
+    doc.text(zeichen, L0, y);
+    doc.text(z, L0 + 6, y);
+    y += z.length * 4.8 + 1.5;
+  };
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.text("Vorbereitung auf den Gutachter-Termin", L0, y);
+  y += 6;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.text(`Medizinischer Dienst${p.name ? " – für " + p.name : ""}`, L0, y);
+  y += 12;
+  ueberschrift("Bereitlegen");
+  for (const u of g.unterlagen) punkt(u, "[  ]");
+  y += 4;
+  ueberschrift("Beim Termin");
+  for (const t of g.tipps) punkt(t);
+  y += 4;
+  if (g.bereiche.length) {
+    ueberschrift("Hier wird Hilfe gebraucht (aus dem Pflegegrad-Rechner)");
+    for (const b of g.bereiche) {
+      platz(12);
+      doc.setFont("helvetica", "bold");
+      doc.text(b.titel, L0, y);
+      doc.setFont("helvetica", "normal");
+      y += 5.5;
+      for (const [frage, antwort] of b.punkte) punkt(`${frage}${frage.endsWith("?") ? "" : ":"} ${antwort}`);
+      y += 2;
+    }
+  } else {
+    ueberschrift("Wo wird Hilfe gebraucht?");
+    punkt(
+      "Tipp: Mit dem Pflegegrad-Rechner in der App ausfüllen, dann stehen deine Antworten hier nach Bereichen geordnet.",
+    );
+  }
+  y += 4;
+  ueberschrift("Eigene Notizen");
+  for (let i = 0; i < 6; i++) {
+    platz(9);
+    y += 7;
+    doc.setDrawColor(190);
+    doc.line(L0, y, L0 + W, y);
+  }
+  seitenzahlen(doc);
+  await saveFile("Vorbereitung-Gutachter.pdf", doc.output("blob"), "PDF gespeichert");
 }
 
 /** Vollmacht für Angehörige als PDF zum Ausdrucken und Unterschreiben. */

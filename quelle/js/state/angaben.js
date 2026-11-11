@@ -53,6 +53,8 @@ export function blank() {
     status: {},
     /** abgelehnte Anträge: Leistung → { datum: Datum auf dem Bescheid, widerspruch: abgeschickt am } */
     ablehnung: {},
+    /** letzte Antworten des Pflegegrad-Rechners (für das Vorbereitungsblatt zum Gutachter-Termin) */
+    rechner: [],
     /** Geht es um ein Kind? "" (nicht gefragt), "erw" (erwachsen), "baby" (bis 18 Monate), "kind" (bis 10 Jahre), "jugend" (11–17) */
     kindAlter: "",
     checks: {},

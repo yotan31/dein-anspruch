@@ -15,6 +15,7 @@ import * as m_logic_entlastung from "./logic/entlastung.js";
 import * as m_logic_fragebogen from "./logic/fragebogen.js";
 import * as m_logic_folgebriefe from "./logic/folgebriefe.js";
 import * as m_logic_fristen from "./logic/fristen.js";
+import * as m_logic_gutachter from "./logic/gutachter.js";
 import * as m_logic_kinder from "./logic/kinder.js";
 import * as m_logic_lage from "./logic/lage.js";
 import * as m_logic_leistungen from "./logic/leistungen.js";
@@ -98,6 +99,7 @@ Object.defineProperty(globalThis, "__da", {
       m_logic_fragebogen,
       m_logic_folgebriefe,
       m_logic_fristen,
+      m_logic_gutachter,
       m_logic_kinder,
       m_logic_lage,
       m_logic_leistungen,

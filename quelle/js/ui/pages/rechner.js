@@ -47,6 +47,8 @@ export function viewRechner() {
           : `<button class="btn" type="button" data-act="r-konto">Antrag vorbereiten (kostenlos)</button>`
       }
         <button class="btn ghost" type="button" data-act="r-neu">Noch einmal</button></div>
+      <div class="folge"><p><strong>Termin mit dem Gutachter?</strong> Mit deinen Antworten entsteht ein Blatt zum Ausdrucken: was du bereitlegst, worauf du achtest und wo Hilfe gebraucht wird.</p>
+        <button class="btn small soft" type="button" data-act="gutachter-pdf">${ic("down")}Vorbereitung als PDF</button></div>
       <button class="linkbtn self-start" type="button" data-act="teilen">Rechner an Familie oder Freunde weiterempfehlen</button>
     </section>`;
   }
