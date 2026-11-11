@@ -1,4 +1,6 @@
 // Bescheid fotografieren und lesen: lädt die Texterkennung (Tesseract) erst bei Bedarf und speichert das Ergebnis.
+// Programm, Rechenkern und deutsche Sprachdaten liegen auf dem eigenen Server (site/vendor/tesseract), damit beim
+// Lesen keine Verbindung zu fremden Diensten entsteht. Gelesen wird auf dem Gerät, hochgeladen wird nichts.
 import { parseBescheid } from "../logic/bescheid.js";
 import { pg } from "../logic/lage.js";
 import { prepareFile } from "./belege.js";
@@ -8,12 +10,24 @@ import { toast } from "../ui/hinweise.js";
 import { render } from "../ui/render.js";
 import { TODAY, isoD, parseIso } from "../utils/datum.js";
 
-/** Lädt die Texterkennung beim ersten Bedarf; sie ist groß und wird sonst nicht gebraucht. */
+/** Ordner der Texterkennung auf dem eigenen Server */
+const TESS = "vendor/tesseract/";
+
+/**
+ * Wo die Texterkennung ihre Teile findet. Vollständige Adressen, weil der Hintergrundprozess sonst relative
+ * Pfade falsch auflöst; ohne diese Angaben würde die Bibliothek alles von cdn.jsdelivr.net laden.
+ */
+export function tesseractOptionen() {
+  const abs = (p) => new URL(TESS + p, location.href).href;
+  return { workerPath: abs("worker.min.js"), corePath: abs("core/"), langPath: abs("lang"), workerBlobURL: false };
+}
+
+/** Lädt die Texterkennung beim ersten Bedarf; sie ist groß (etwa 5 MB) und wird sonst nicht gebraucht. */
 export async function loadTesseract() {
   if (window.Tesseract) return window.Tesseract;
   return new Promise((res, rej) => {
     const s = document.createElement("script");
-    s.src = "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js";
+    s.src = TESS + "tesseract.min.js";
     s.integrity = "sha256-qOKZGNCYsrBuEBK9rv+0rsBEXF1WVHCQI+C9H0QqgOg=";
     s.crossOrigin = "anonymous";
     s.onload = () => res(window.Tesseract);
@@ -34,7 +48,7 @@ export async function scanBescheid(file) {
   render();
   try {
     const T = await loadTesseract();
-    const { data } = await T.recognize(file, "deu");
+    const { data } = await T.recognize(file, "deu", tesseractOptionen());
     const r = parseBescheid(data.text || "");
     Object.assign(
       Z.bescheidDraft,

@@ -2,7 +2,7 @@
 // pdf.js wird erst bei Bedarf geladen, damit der Start schnell bleibt.
 import { selYears } from "../logic/belege.js";
 import { groupPages } from "../logic/belegerkennung.js";
-import { loadTesseract } from "./bescheid.js";
+import { loadTesseract, tesseractOptionen } from "./bescheid.js";
 import { ladeJsPdf } from "./pdf.js";
 import { save } from "./speicher.js";
 import { Z } from "../state/zustand.js";
@@ -99,7 +99,7 @@ export async function importPdf(file) {
         try {
           if (!ocr) {
             const T = await loadTesseract();
-            ocr = await T.createWorker("deu");
+            ocr = await T.createWorker("deu", 1, tesseractOptionen());
           }
           const c = await pageCanvas(page, 1700);
           const { data } = await ocr.recognize(c);

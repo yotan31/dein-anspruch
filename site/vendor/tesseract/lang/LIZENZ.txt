@@ -1,0 +1,2 @@
+Deutsche Sprachdaten (4.0.0_best_int) aus dem npm-Paket @tesseract.js-data/deu 1.0.0, Lizenz: MIT.
+Ursprung: tesseract-ocr/tessdata_best (Apache-2.0).

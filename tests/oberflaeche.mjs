@@ -4,7 +4,7 @@
 // also keine echten Daten gelesen oder geschrieben.
 // Aufruf: npm run bauen && node tests/oberflaeche.mjs
 // Code in page.evaluate(...) läuft im Browser; dort macht gehe() die Programmteile unter ihren Namen erreichbar:
-/* global ASSETS:writable, BEL, S:writable, USER, backupData, blank, bulk, empfAdresse, openFeedback, render, startWiz, wipeAsk:writable, wizSteps */
+/* global ASSETS:writable, loadTesseract, tesseractOptionen, BEL, S:writable, USER, backupData, blank, bulk, empfAdresse, openFeedback, render, startWiz, wipeAsk:writable, wizSteps */
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
@@ -574,6 +574,30 @@ console.log("Kinder mit Pflegegrad");
   });
   await page.waitForTimeout(200);
   check("Fragebogen fragt nach dem Kind", (await page.locator('input[name="kindAlter"]').count()) === 4);
+  check("keine Programmfehler", errors.length === 0, errors.join(" | "));
+}
+
+// ---------- 2e. Texterkennung vom eigenen Server ----------
+console.log("Texterkennung ohne fremde Dienste");
+{
+  const { page, errors, extern } = await newPage();
+  await gehe(page, BASE, 600);
+  const text = await page.evaluate(async () => {
+    const c = document.createElement("canvas");
+    c.width = 900;
+    c.height = 140;
+    const g = c.getContext("2d");
+    g.fillStyle = "#fff";
+    g.fillRect(0, 0, 900, 140);
+    g.fillStyle = "#000";
+    g.font = "48px Arial";
+    g.fillText("Pflegegrad 3", 30, 90);
+    const T = await loadTesseract();
+    const { data } = await T.recognize(c, "deu", tesseractOptionen());
+    return data.text;
+  });
+  check("Texterkennung liest Text", /Pflegegrad 3/.test(text), text);
+  check("keine Verbindung zu fremden Diensten", extern.length === 0, extern.join(" | "));
   check("keine Programmfehler", errors.length === 0, errors.join(" | "));
 }
 
