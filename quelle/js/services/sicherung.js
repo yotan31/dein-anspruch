@@ -7,6 +7,7 @@ import { Z } from "../state/zustand.js";
 import { toast } from "../ui/hinweise.js";
 import { $, render } from "../ui/render.js";
 import { TODAY, isoD } from "../utils/datum.js";
+import { zufallsId } from "../utils/format.js";
 
 function WIPE_WORD(v) {
   return /^l(ö|oe|o)schen$/i.test(String(v || "").trim());
@@ -172,7 +173,7 @@ export async function restoreData(file) {
                     : type === "image/webp"
                       ? "webp"
                       : "jpg";
-              const path = `${id}/${crypto.randomUUID ? crypto.randomUUID() : Date.now() + Math.random().toString(16).slice(2)}.${ext}`;
+              const path = `${id}/${zufallsId()}.${ext}`;
               const { error } = await Z.sb.storage
                 .from("belege")
                 .upload(path, blob, { contentType: type, upsert: false });

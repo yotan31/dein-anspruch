@@ -521,3 +521,29 @@ test("Töpfe: Budgets aus den Belegen, Rückblick nur im ersten Quartal", () => 
   jan("S.rueckblick = 2026");
   assert.equal(jan("rueckblickFaellig()"), false, "weggeklickt");
 });
+
+test("Kennungen kommen nie aus Math.random, auch nicht in alten Browsern", async () => {
+  const { readdirSync, readFileSync } = await import("node:fs");
+  const path = await import("node:path");
+  const dir = path.join(path.dirname(new URL(import.meta.url).pathname), "..", "quelle", "js");
+  for (const f of readdirSync(dir, { recursive: true }).map(String)) {
+    if (f.endsWith(".js")) assert.ok(!readFileSync(path.join(dir, f), "utf8").includes("Math.random("), f);
+  }
+  const { zufallsId } = await import("../quelle/js/utils/format.js");
+  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+  assert.match(zufallsId(), UUID);
+  // alter Browser: crypto.randomUUID fehlt, getRandomValues gibt es
+  const echt = globalThis.crypto;
+  Object.defineProperty(globalThis, "crypto", {
+    value: { getRandomValues: (a) => echt.getRandomValues(a) },
+    configurable: true,
+  });
+  try {
+    const a = zufallsId(),
+      b = zufallsId();
+    assert.match(a, UUID);
+    assert.notEqual(a, b);
+  } finally {
+    Object.defineProperty(globalThis, "crypto", { value: echt, configurable: true });
+  }
+});

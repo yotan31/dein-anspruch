@@ -6,6 +6,7 @@ import { blank, merge } from "../state/angaben.js";
 import { Z } from "../state/zustand.js";
 import { toast } from "../ui/hinweise.js";
 import { $, render, scrollTop } from "../ui/render.js";
+import { zufallsId } from "../utils/format.js";
 
 /**
  * Adresse eines vorab geladenen Belegfotos.
@@ -156,7 +157,7 @@ const ASSETS_SB = {
   async upload(blob, { type }) {
     const ext =
       type === "application/pdf" ? "pdf" : type === "image/png" ? "png" : type === "image/webp" ? "webp" : "jpg";
-    const id = crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2);
+    const id = zufallsId();
     const path = `${Z.FALL_ID}/${id}.${ext}`;
     const { error } = await Z.sb.storage.from("belege").upload(path, blob, { contentType: type, upsert: false });
     if (error) throw { code: /size|large|exceed/i.test(error.message || "") ? "too_large" : "upload" };
