@@ -34,7 +34,7 @@ export function vergleichHTML(zeilen) {
 export function ausfuehrlich(e) {
   return `<div class="erklaerung">${e.abschnitte
     .map(
-      (a) => `<section><h4>${esc(a.titel)}</h4>
+      (a) => `<section${a.achtung ? ' class="achtung"' : ""}><h4>${a.achtung ? ic("alert") : ""}${esc(a.titel)}</h4>
         ${a.punkte ? `<ul>${a.punkte.map((p) => `<li>${esc(p)}</li>`).join("")}</ul>` : ""}
         ${a.vergleich ? vergleichHTML(a.vergleich) : ""}
         ${a.beispiel ? `<p class="beispiel">${esc(a.beispiel)}</p>` : ""}

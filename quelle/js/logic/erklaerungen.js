@@ -1,8 +1,8 @@
 // Ausführliche Erklärungen zu einzelnen Leistungen: Was ist das, passt es zu uns, was bekommen wir, wer darf helfen,
 // was brauchen wir, was passiert danach. Ziel: Man soll sich sicher fühlen, bevor man einen Antrag abschickt.
 // Jede Erklärung hat dieselbe Reihenfolge, damit man sich überall gleich zurechtfindet.
-// Bewusst ohne Abschnitt „Was kann schiefgehen?“ (Wunsch des Betreibers); Dinge, die über Geld entscheiden,
-// stehen sachlich dabei (z. B. was mit dem Pflegegeld passiert).
+// „Worauf ihr achten solltet“ nennt offen, wo man Geld verlieren oder etwas falsch machen kann (Wunsch des Betreibers):
+// Wer das vorher weiß, schickt sicherer ab.
 // Beträge kommen aus config/betraege.js, damit die jährliche Anpassung nur an einer Stelle passiert.
 // Jede Aussage ist mit Gesetz oder Kassen-Information belegt (siehe quellen) und wird monatlich mitgeprüft.
 import { BETRAEGE } from "../config/betraege.js";
@@ -15,7 +15,7 @@ import { eur } from "../utils/format.js";
  * @typedef {{
  *   kurz: [string, string][],
  *   passt: {ja: boolean, text: string},
- *   abschnitte: {titel: string, punkte?: string[], vergleich?: VergleichZeile[], beispiel?: string}[],
+ *   abschnitte: {titel: string, achtung?: boolean, punkte?: string[], vergleich?: VergleichZeile[], beispiel?: string}[],
  *   quellen: string,
  *   geprueft: string
  * }} Erklaerung
@@ -106,6 +106,18 @@ const ERKLAERUNGEN = {
           ],
         },
         {
+          titel: "Worauf ihr achten solltet",
+          achtung: true,
+          punkte: [
+            "Die Frist ist streng: Kosten, die nicht bis zum 31. Dezember des folgenden Jahres bei der Kasse sind, erstattet sie nicht mehr.",
+            "Ohne Beleg kein Geld. Die Quittung oder Bestätigung braucht Zeitraum, Stunden, Betrag und Unterschrift. Am besten gleich ausfüllen, nicht erst Monate später.",
+            `Bei nahen Angehörigen zahlt die Kasse für die Pflege selbst höchstens ${eur(doppelt)}. Habt ihr mehr vereinbart, zahlt ihr den Rest selbst.`,
+            `Verhinderungspflege und Kurzzeitpflege teilen sich die ${eur(JAHRESBETRAG)}. Was ihr für das eine ausgebt, fehlt beim anderen. Was darüber hinausgeht, zahlt ihr selbst.`,
+            "Bei ganzen Tagen gibt es für diese Zeit nur das halbe Pflegegeld. Wer stundenweise plant (unter 8 Stunden am Tag), behält das volle.",
+            "Für die Person, die einspringt, zählt das Geld als Einkommen. Bekommt sie Bürgergeld oder eine andere Sozialleistung, kann es angerechnet werden. Ob Steuern anfallen, hängt von ihrer Lage ab.",
+          ],
+        },
+        {
           titel: "Was ihr braucht",
           punkte: [
             "Den Zeitraum: von wann bis wann.",
@@ -127,7 +139,6 @@ const ERKLAERUNGEN = {
           punkte: [
             "Ihr könnt den Betrag frei aufteilen: mehrmals im Jahr, tageweise oder stundenweise.",
             "Was vom Jahresbetrag noch übrig ist, zeigt die Karte „Budgets“ weiter unten.",
-            "Für die Person, die einspringt, ist das Geld Einkommen. Ob sie dafür Steuern zahlen muss, hängt von ihrer Lage ab.",
           ],
         },
       ],

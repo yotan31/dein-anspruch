@@ -4224,3 +4224,18 @@ textarea.wq-langtext {
   flex-direction: column;
   gap: 6px;
 }
+/* „Worauf ihr achten solltet“: farbig abgesetzt, damit man es beim Überfliegen nicht übersieht */
+.erklaerung section.achtung {
+  padding: 12px 14px;
+  border-radius: var(--r-mittel);
+  background: var(--warn-soft);
+}
+.erklaerung section.achtung h4 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.erklaerung section.achtung h4 svg.i {
+  flex: none;
+  color: var(--warn);
+}

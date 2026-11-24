@@ -671,6 +671,10 @@ test("Erklärung Verhinderungspflege: Beträge wie in der Berechnung, Reihenfolg
   const run = neu(undefined, PFLEGE3);
   const e = run('erklaerung("jahresbetrag")');
   assert.equal(e.passt.ja, true);
+  assert.ok(
+    e.abschnitte.some((a) => a.titel === "Worauf ihr achten solltet" && a.punkte.length >= 4),
+    "Abschnitt mit den Risiken",
+  );
   const text = JSON.stringify(e);
   assert.match(text, /3\.539 €/, "Jahresbetrag");
   // nahe Angehörige: zwei Monate Pflegegeld, genau wie vhpCalc() rechnet
