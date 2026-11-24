@@ -1,11 +1,13 @@
 // Antrags-Assistent als Seite: eine Frage pro Bildschirm, am Ende der fertige Antrag.
 import { getQ, personQs, wizSteps, wizTo } from "../../logic/antraege.js";
 import { curLetter, docsFor, gmailLink, mailto } from "../../logic/antragstext.js";
+import { SICHER_ABSCHICKEN, vhpVergleich } from "../../logic/erklaerungen.js";
 import { B, FA, RECIP, empfAdresse, txt } from "../../logic/leistungen.js";
 import { KM_SATZ, vhpCalc } from "../../logic/verhinderungspflege.js";
 import { save } from "../../services/speicher.js";
 import { zaehle } from "../../services/zaehlung.js";
 import { Z } from "../../state/zustand.js";
+import { vergleichHTML } from "../components/erklaerung.js";
 import { sicherungHinweis } from "../components/sicherung-hinweis.js";
 import { vollmachtKnopf } from "../components/vollmacht-knopf.js";
 import { render, scrollTop } from "../render.js";
@@ -99,6 +101,7 @@ export function viewWizard() {
     <h2 class="wq"><label for="wq-${step.k}">${esc(lab(step))}</label></h2>
     ${step.help ? `<p class="whelp">${ic("info")}<span>${esc(step.help)}</span></p>` : ""}
     ${qInput(step)}
+    ${b.k === "jahresbetrag" && step.k === "ersatz" ? `<details class="unterschied"><summary>${ic("info")}Was ist der Unterschied?</summary>${vergleichHTML(vhpVergleich())}</details>` : ""}
     <p class="notice" id="wqwarn" hidden>${ic("alert")}<span></span></p>
     <div class="nav big go">
       ${i > 0 ? `<button class="btn ghost" type="button" data-wnav="back">Zurück</button>` : `<button class="btn ghost" type="button" data-wnav="close">Abbrechen</button>`}
@@ -153,8 +156,11 @@ function viewDone(b) {
       <li><strong>PDF ausdrucken und unterschreiben.</strong> Oder den Text in die App oder das Online-Postfach der Kasse kopieren.</li>
       ${docs.length ? `<li><strong>Diese Unterlagen beilegen:</strong><ul class="checks">${docs.map((c, j) => `<li><label><input type="checkbox" data-check="${b.k}:${j}" ${Z.S.checks[b.k + ":" + j] ? "checked" : ""}><span>${esc(c)}</span></label></li>`).join("")}</ul>${vollmachtKnopf(docs)}${priv ? `<button class="btn small soft mt-8" type="button" data-act="vhp-quittung">${ic("down")}${Z.S.vhp.ersatz === "angehoerig" ? "Bestätigung" : "Quittung"} zum Unterschreiben (PDF)</button>` : ""}</li>` : ""}
       <li><strong>Abschicken an:</strong> ${esc([r.name, empfAdresse(b.to).strasse, empfAdresse(b.to).ort].filter(Boolean).join(", "))}.<br><span class="small muted">${esc(r.hint)}</span>${r.mail ? `<br><span class="small">E-Mail: <code>${esc(r.mail)}</code></span>` : ""}</li>
+      <li><strong>Eine Kopie behalten.</strong> Ein Foto mit dem Handy reicht.</li>
+      <li><strong>Nachweis, dass er ankommt:</strong> In der App oder im Online-Postfach der Kasse gibt es eine Bestätigung, beim Fax einen Sendebericht. Persönlich abgeben und den Eingang auf deiner Kopie bestätigen lassen geht auch.</li>
       <li><strong>Hier abhaken, wenn es raus ist.</strong> Wir erinnern dich in 4 Wochen, falls noch keine Antwort da ist.</li>
     </ol>
+    <div class="sicher"><strong>${ic("shield")}Gut zu wissen</strong><ul>${SICHER_ABSCHICKEN.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>
     ${st === "offen" ? `<button class="btn big" type="button" data-act="sent" data-k="${b.k}">${ic("check")}Ich habe den Antrag abgeschickt</button>` : `<p class="notice good">${ic("check")}<span>Abgeschickt${Z.S.sent && Z.S.sent[b.k] ? " am " + deD(parseIso(Z.S.sent[b.k])) : ""}. Status: ${esc(st)}.</span></p>`}
     ${sicherungHinweis()}
     <details><summary class="small">Text selbst ändern (für Geübte)</summary>

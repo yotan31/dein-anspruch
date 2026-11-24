@@ -4085,3 +4085,142 @@ textarea.wq-langtext {
 .beratung-pdf .folge-ico {
   background: var(--accent-soft);
 }
+
+/* Ausführliche Erklärungen (logic/erklaerungen.js): oben drei kurze Antworten, aufklappbar der Rest.
+   Fragen links, Antworten rechts; auf dem Handy untereinander */
+.kurz-erklaert {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.kurz-erklaert > div {
+  display: grid;
+  grid-template-columns: 9.5em 1fr;
+  gap: 2px 14px;
+}
+.kurz-erklaert dt {
+  font-weight: 700;
+}
+.kurz-erklaert dd {
+  margin: 0;
+}
+@media (max-width: 560px) {
+  .kurz-erklaert > div {
+    grid-template-columns: 1fr;
+  }
+}
+.passt {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+.passt svg.i {
+  flex: none;
+  margin-top: 2px;
+}
+.passt.ja {
+  color: var(--money);
+  font-weight: 600;
+}
+.erklaerung {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.erklaerung section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.erklaerung h4 {
+  margin: 0;
+  font-size: 1rem;
+}
+.erklaerung ul {
+  margin: 0;
+  padding-left: 1.2em;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.erklaerung .beispiel {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: var(--r-mittel);
+  background: var(--paper);
+  border-left: 3px solid var(--accent);
+}
+/* Wer springt ein? Eine Karte je Möglichkeit */
+.vergleich {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
+  gap: 10px;
+}
+.v-karte {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-mittel);
+  background: var(--paper);
+}
+.v-karte > small {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+.v-karte dl {
+  margin: 8px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.v-karte dt {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+.v-karte dd {
+  margin: 0;
+}
+/* Im Antrag: „Was ist der Unterschied?“ unter der Auswahl */
+.unterschied {
+  margin-top: 4px;
+}
+.unterschied summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  color: var(--accent);
+  font-weight: 700;
+  cursor: pointer;
+}
+.unterschied[open] summary {
+  margin-bottom: 8px;
+}
+/* Letzte Seite vor dem Abschicken: was bei jedem Antrag gilt */
+.sicher {
+  padding: 14px;
+  border-radius: var(--r-mittel);
+  background: var(--accent-soft);
+}
+.sicher strong {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sicher strong svg.i {
+  color: var(--accent);
+}
+.sicher ul {
+  margin: 8px 0 0;
+  padding-left: 1.2em;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}

@@ -665,3 +665,24 @@ test("Speichern mit Konto überschreibt keine Änderungen einer anderen Person",
   assert.equal(run("S.status.technisch"), "bewilligt", "auch auf dem Bildschirm übernommen");
   assert.equal(run("FAELLE[0].updated_at"), db.updated_at);
 });
+
+// ---------- Erklärungen ----------
+test("Erklärung Verhinderungspflege: Beträge wie in der Berechnung, Reihenfolge wie im Antrag", () => {
+  const run = neu(undefined, PFLEGE3);
+  const e = run('erklaerung("jahresbetrag")');
+  assert.equal(e.passt.ja, true);
+  const text = JSON.stringify(e);
+  assert.match(text, /3\.539 €/, "Jahresbetrag");
+  // nahe Angehörige: zwei Monate Pflegegeld, genau wie vhpCalc() rechnet
+  const doppelt = run("PG.pflegegeld[3] * 2");
+  assert.equal(doppelt, 1198);
+  run('S.vhp.ersatz = "angehoerig"; S.vhp.stunden = "200"; S.vhp.satz = "15"');
+  assert.equal(run("vhpCalc().cap"), doppelt);
+  assert.match(text, /1\.198 €/);
+  // Karten in derselben Reihenfolge und mit denselben Namen wie die Auswahl im Antrag
+  assert.deepEqual(run("vhpVergleich().map((z) => z.wer)"), run("Object.values(VHP_ERSATZ).map((o) => o.t)"));
+  // ohne Pflegegrad 2 passt es nicht, und das steht auch so da
+  const ohne = neu(undefined, { ...PFLEGE3, pg: "1" })('erklaerung("jahresbetrag")');
+  assert.equal(ohne.passt.ja, false);
+  assert.equal(run('erklaerung("rundfunk")'), null);
+});

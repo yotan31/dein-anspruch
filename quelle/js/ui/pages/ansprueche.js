@@ -1,6 +1,7 @@
 // Reiter „Ansprüche“: Liste der Leistungen mit Filter, Stand und aufklappbaren Details.
 import { langNotice } from "../../i18n/sprachen.js";
 import { docsFor } from "../../logic/antragstext.js";
+import { erklaerung } from "../../logic/erklaerungen.js";
 import { kannNachfragen, mitWiderspruch } from "../../logic/folgebriefe.js";
 import { kindHinweis, kindUnterschiede } from "../../logic/kinder.js";
 import { istKind } from "../../logic/lage.js";
@@ -11,6 +12,7 @@ import { finderHTML } from "../components/anbieter.js";
 import { bescheidCard } from "../components/bescheid-karte.js";
 import { datenBox } from "../components/datenbox.js";
 import { entlCard } from "../components/entlastung-karte.js";
+import { ausfuehrlich, kurzErklaert } from "../components/erklaerung.js";
 import { folgeBox } from "../components/folge-box.js";
 import { installKarte } from "../components/install-karte.js";
 import { schritteKarte } from "../components/schritte-karte.js";
@@ -165,8 +167,9 @@ function detailHTML(b) {
   const nQ = (b.q || []).filter((q) => !q.show || q.show()).length;
   const erledigt = checks.filter((c, i) => Z.S.checks[b.k + ":" + i]).length;
   const naehe = finderHTML(b.k, false);
+  const e = erklaerung(b.k);
   return `<div class="detail">
-    <p class="kurz">${esc(txt(b.short))}</p>
+    ${e ? kurzErklaert(e) : `<p class="kurz">${esc(txt(b.short))}</p>`}
     ${
       b.ask
         ? `<div class="startbox">
@@ -179,6 +182,7 @@ function detailHTML(b) {
     ${kindHinweis(b.k) ? `<p class="notice info">${ic("people")}<span><strong>Bei Kindern:</strong> ${esc(kindHinweis(b.k))}</span></p>` : ""}
     <div><h3 class="unter">So läuft es ab</h3><ol class="steps">${b.steps.map((s) => `<li>${esc(s)}</li>`).join("")}</ol></div>
     <div class="akk">
+      ${e ? akk(b.k + ":erkl", "info", "Ausführlich erklärt", "", ausfuehrlich(e)) : ""}
       ${naehe ? akk(b.k + ":naehe", "pin", "In der Nähe finden", "", naehe) : ""}
       ${checks.length ? akk(b.k + ":docs", "list", "Unterlagen", `${erledigt} von ${checks.length} erledigt`, `<ul class="checks">${checks.map((c, i) => `<li><label><input type="checkbox" data-check="${b.k}:${i}" ${Z.S.checks[b.k + ":" + i] ? "checked" : ""}><span>${esc(c)}</span></label></li>`).join("")}</ul>${vollmachtKnopf(checks)}`) : ""}
       <div class="akk-row status">${ic("check")}<label for="st-${b.k}">Stand</label><select id="st-${b.k}" data-status="${b.k}">${[

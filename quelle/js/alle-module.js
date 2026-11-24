@@ -12,6 +12,7 @@ import * as m_logic_belege from "./logic/belege.js";
 import * as m_logic_belegerkennung from "./logic/belegerkennung.js";
 import * as m_logic_bescheid from "./logic/bescheid.js";
 import * as m_logic_entlastung from "./logic/entlastung.js";
+import * as m_logic_erklaerungen from "./logic/erklaerungen.js";
 import * as m_logic_fragebogen from "./logic/fragebogen.js";
 import * as m_logic_folgebriefe from "./logic/folgebriefe.js";
 import * as m_logic_fristen from "./logic/fristen.js";
@@ -59,6 +60,7 @@ import * as m_ui_components_bescheid_karte from "./ui/components/bescheid-karte.
 import * as m_ui_components_datenbox from "./ui/components/datenbox.js";
 import * as m_ui_components_entlastung_karte from "./ui/components/entlastung-karte.js";
 import * as m_ui_components_erinnerung_karte from "./ui/components/erinnerung-karte.js";
+import * as m_ui_components_erklaerung from "./ui/components/erklaerung.js";
 import * as m_ui_components_feedback_fenster from "./ui/components/feedback-fenster.js";
 import * as m_ui_components_fenster from "./ui/components/fenster.js";
 import * as m_ui_components_folge_box from "./ui/components/folge-box.js";
@@ -105,6 +107,7 @@ Object.defineProperty(globalThis, "__da", {
       m_logic_belegerkennung,
       m_logic_bescheid,
       m_logic_entlastung,
+      m_logic_erklaerungen,
       m_logic_fragebogen,
       m_logic_folgebriefe,
       m_logic_fristen,
@@ -152,6 +155,7 @@ Object.defineProperty(globalThis, "__da", {
       m_ui_components_datenbox,
       m_ui_components_entlastung_karte,
       m_ui_components_erinnerung_karte,
+      m_ui_components_erklaerung,
       m_ui_components_feedback_fenster,
       m_ui_components_fenster,
       m_ui_components_folge_box,

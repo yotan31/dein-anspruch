@@ -627,6 +627,42 @@ console.log("Nächste Schritte und Übersicht");
   check("keine Programmfehler", errors.length === 0, errors.join(" | "));
 }
 
+// ---------- 2g. Ausführlich erklärt ----------
+console.log("Ausführlich erklärt");
+{
+  const { page, errors } = await newPage({ gast: { ...GAST, genutzt: {} } });
+  await gehe(page, BASE, 600);
+  await page.tap('[data-open="jahresbetrag"]');
+  await page.waitForTimeout(300);
+  check(
+    "Kurz erklärt: Wofür, was ihr bekommt, wann beantragen",
+    (await page.locator("#it-jahresbetrag .kurz-erklaert > div").count()) === 3,
+  );
+  await page.tap('[data-akk="jahresbetrag:erkl"] summary');
+  await page.waitForTimeout(200);
+  check(
+    "Aufklappbar: wer einspringt, mit vier Möglichkeiten",
+    (await page.locator("#it-jahresbetrag .vergleich .v-karte").count()) === 4,
+  );
+  await page.evaluate(() => {
+    startWiz("jahresbetrag");
+    S.wiz.i = wizSteps().list.findIndex((q) => q.k === "ersatz");
+    render();
+  });
+  await page.waitForTimeout(300);
+  check(
+    "Im Antrag bei „Wer hat gepflegt?“: Was ist der Unterschied?",
+    (await page.locator(".unterschied .v-karte").count()) === 4,
+  );
+  await page.evaluate(() => {
+    S.wiz.i = wizSteps().list.length - 1;
+    render();
+  });
+  await page.waitForTimeout(300);
+  check("Vor dem Abschicken: Gut zu wissen", (await page.locator(".sicher li").count()) === 3);
+  check("keine Programmfehler", errors.length === 0, errors.join(" | "));
+}
+
 // ---------- 2e. Texterkennung vom eigenen Server ----------
 console.log("Texterkennung ohne fremde Dienste");
 {
