@@ -15,10 +15,13 @@ import * as m_logic_entlastung from "./logic/entlastung.js";
 import * as m_logic_fragebogen from "./logic/fragebogen.js";
 import * as m_logic_folgebriefe from "./logic/folgebriefe.js";
 import * as m_logic_fristen from "./logic/fristen.js";
+import * as m_logic_fristen_fall from "./logic/fristen-fall.js";
 import * as m_logic_gutachter from "./logic/gutachter.js";
 import * as m_logic_kinder from "./logic/kinder.js";
 import * as m_logic_toepfe from "./logic/toepfe.js";
+import * as m_logic_uebersicht from "./logic/uebersicht.js";
 import * as m_logic_lage from "./logic/lage.js";
+import * as m_logic_naechste_schritte from "./logic/naechste-schritte.js";
 import * as m_logic_leistungen from "./logic/leistungen.js";
 import * as m_logic_rechner from "./logic/rechner.js";
 import * as m_logic_verhinderungspflege from "./logic/verhinderungspflege.js";
@@ -61,6 +64,8 @@ import * as m_ui_components_fenster from "./ui/components/fenster.js";
 import * as m_ui_components_folge_box from "./ui/components/folge-box.js";
 import * as m_ui_components_fragen from "./ui/components/fragen.js";
 import * as m_ui_components_install_karte from "./ui/components/install-karte.js";
+import * as m_ui_components_schritte_karte from "./ui/components/schritte-karte.js";
+import * as m_ui_components_sicherung_hinweis from "./ui/components/sicherung-hinweis.js";
 import * as m_ui_components_toepfe_karte from "./ui/components/toepfe-karte.js";
 import * as m_ui_components_vollmacht_knopf from "./ui/components/vollmacht-knopf.js";
 import * as m_ui_hinweise from "./ui/hinweise.js";
@@ -81,6 +86,7 @@ import * as m_ui_render from "./ui/render.js";
 import * as m_ui_symbole from "./ui/symbole.js";
 import * as m_utils_datum from "./utils/datum.js";
 import * as m_utils_format from "./utils/format.js";
+import * as m_utils_zusammenfuehren from "./utils/zusammenfuehren.js";
 
 // Alle exportierten Namen unter einem Objekt; die Namen sind projektweit eindeutig.
 Object.defineProperty(globalThis, "__da", {
@@ -102,10 +108,13 @@ Object.defineProperty(globalThis, "__da", {
       m_logic_fragebogen,
       m_logic_folgebriefe,
       m_logic_fristen,
+      m_logic_fristen_fall,
       m_logic_gutachter,
       m_logic_kinder,
       m_logic_toepfe,
+      m_logic_uebersicht,
       m_logic_lage,
+      m_logic_naechste_schritte,
       m_logic_leistungen,
       m_logic_rechner,
       m_logic_verhinderungspflege,
@@ -148,6 +157,8 @@ Object.defineProperty(globalThis, "__da", {
       m_ui_components_folge_box,
       m_ui_components_fragen,
       m_ui_components_install_karte,
+      m_ui_components_schritte_karte,
+      m_ui_components_sicherung_hinweis,
       m_ui_components_toepfe_karte,
       m_ui_components_vollmacht_knopf,
       m_ui_hinweise,
@@ -168,6 +179,7 @@ Object.defineProperty(globalThis, "__da", {
       m_ui_symbole,
       m_utils_datum,
       m_utils_format,
+      m_utils_zusammenfuehren,
     ),
   ),
 });

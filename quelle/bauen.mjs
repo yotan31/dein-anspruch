@@ -11,6 +11,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { FRISTEN_ZIEL, fristenBundleOptionen } from "./fristen-bundle.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const Q = path.join(ROOT, "quelle"),
@@ -135,4 +136,6 @@ if (sbPfad) {
     "Hinweis: @supabase/supabase-js ist nicht installiert (npm install). vendor/supabase.js fehlt – Anmeldung funktioniert dann nicht.",
   );
 }
+// Fristen-Regeln für die E-Mail-Erinnerungen: dieselben wie in der App, als eine Datei für die Edge Function
+await esbuild.build({ ...fristenBundleOptionen(ROOT), outfile: path.join(ROOT, FRISTEN_ZIEL) });
 console.log(`gebaut: Version ${version}, app.js ${Math.round(js.length / 1024)} KB`);

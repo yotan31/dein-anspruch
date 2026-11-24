@@ -4,7 +4,7 @@ import js from "@eslint/js";
 import globals from "globals";
 
 export default [
-  { ignores: ["node_modules/", "site/", "werkzeuge/messung.json"] },
+  { ignores: ["node_modules/", "site/", "werkzeuge/messung.json", "supabase/functions/erinnerungen/fristen.js"] },
   js.configs.recommended,
   {
     // Programm der App: läuft im Browser
@@ -21,7 +21,14 @@ export default [
   },
   {
     // Bauen, Tests und Werkzeuge: laufen mit Node
-    files: ["quelle/bauen.mjs", "quelle/sw.js", "tests/**/*.mjs", "werkzeuge/**/*.mjs", "eslint.config.js"],
+    files: [
+      "quelle/bauen.mjs",
+      "quelle/fristen-bundle.mjs",
+      "quelle/sw.js",
+      "tests/**/*.mjs",
+      "werkzeuge/**/*.mjs",
+      "eslint.config.js",
+    ],
     languageOptions: { ecmaVersion: 2022, sourceType: "module", globals: { ...globals.node, ...globals.browser } },
     // vars: "local" – in den Tests werden Programmteile der App im Browser nur gesetzt (z. B. ASSETS = …), nicht gelesen
     rules: {

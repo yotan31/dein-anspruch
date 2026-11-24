@@ -3,6 +3,7 @@ import { curLetter, docsFor } from "../logic/antragstext.js";
 import { vollmachtInhalt } from "../logic/folgebriefe.js";
 import { gutachterBlatt } from "../logic/gutachter.js";
 import { KATS, selYears } from "../logic/belege.js";
+import { uebersicht } from "../logic/uebersicht.js";
 import { B, RECIP, empfAdresse, kasseName } from "../logic/leistungen.js";
 import { KM_SATZ, VHP_GRUND, vhpCalc, vhpZeitraum } from "../logic/verhinderungspflege.js";
 import { newDoc, saveFile } from "./pdf.js";
@@ -328,6 +329,120 @@ export async function makeVollmacht() {
   doc.setTextColor(90);
   doc.text(doc.splitTextToSize(v.hinweis, W), L0, y);
   await saveFile("Vollmacht.pdf", doc.output("blob"), "PDF gespeichert");
+}
+
+/** „Übersicht für die Beratung“: Lage, Leistungen nach Stand, Fristen und Platz für Notizen (Inhalt: logic/uebersicht.js). */
+export async function makeUebersicht() {
+  const doc = await newDoc();
+  if (!doc) return;
+  const u = uebersicht(),
+    L0 = 20,
+    R = 190,
+    W = R - L0;
+  let y = 24;
+  const platz = (h) => {
+    if (y + h > 278) {
+      doc.addPage();
+      y = 22;
+    }
+  };
+  // Überschrift nie allein am Seitenende: Platz für sie und die erste Zeile darunter
+  const ueberschrift = (t) => {
+    platz(28);
+    y += 4;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.text(t, L0, y);
+    y += 2.5;
+    doc.setLineWidth(0.3);
+    doc.line(L0, y, R, y);
+    y += 6;
+  };
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.text("Übersicht für die Beratung", L0, y);
+  y += 6;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(90);
+  doc.text(`Erstellt mit „Dein Anspruch“ am ${u.stand}. Beträge nach dem Stand 2026.`, L0, y);
+  doc.setTextColor(0);
+  y += 6;
+
+  ueberschrift("Angaben");
+  doc.setFontSize(10);
+  for (const [k, v] of u.angaben) {
+    const z = zeilen(doc, v, W - 55);
+    platz(z.length * 4.8 + 1.5);
+    doc.setFont("helvetica", "bold");
+    doc.text(k, L0, y);
+    doc.setFont("helvetica", "normal");
+    doc.text(z, L0 + 55, y);
+    y += z.length * 4.8 + 1.5;
+  }
+
+  for (const g of u.gruppen) {
+    ueberschrift(`${g.titel} (${g.zeilen.length})`);
+    for (const r of g.zeilen) {
+      doc.setFontSize(10.5);
+      const z = zeilen(doc, r.t, W - 48);
+      platz(z.length * 4.8 + (r.stand ? 4.6 : 0) + 2.5);
+      doc.setFont("helvetica", "bold");
+      doc.text(z, L0, y);
+      doc.setFont("helvetica", "normal");
+      if (r.wert) doc.text(r.wert.replace(/ €/g, "\u00a0€"), R, y, { align: "right" });
+      y += z.length * 4.8;
+      if (r.stand) {
+        doc.setFontSize(9);
+        doc.setTextColor(90);
+        doc.text(zeilen(doc, r.stand, W - 48), L0, y);
+        doc.setTextColor(0);
+        y += 4.6;
+      }
+      y += 2.5;
+    }
+  }
+
+  if (u.fristen.length) {
+    ueberschrift("Fristen in den nächsten 12 Monaten");
+    doc.setFontSize(10.5);
+    for (const f of u.fristen) {
+      const z = zeilen(doc, f.t, W - 28);
+      platz(z.length * 4.8 + 2);
+      doc.setFont("helvetica", "bold");
+      doc.text(f.datum, L0, y);
+      doc.setFont("helvetica", "normal");
+      doc.text(z, L0 + 28, y);
+      y += z.length * 4.8 + 2;
+    }
+  }
+
+  ueberschrift("Fragen und Notizen für das Gespräch");
+  doc.setLineWidth(0.2);
+  doc.setDrawColor(170);
+  for (let i = 0; i < 8; i++) {
+    platz(10);
+    y += 8;
+    doc.line(L0, y, R, y);
+  }
+  doc.setDrawColor(0);
+  y += 10;
+  platz(12);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8.5);
+  doc.setTextColor(90);
+  doc.text(
+    zeilen(
+      doc,
+      "Diese Übersicht ersetzt keine Beratung. Ob eine Leistung im Einzelfall zusteht, entscheidet die zuständige Stelle.",
+      W,
+    ),
+    L0,
+    y,
+  );
+  doc.setTextColor(0);
+  seitenzahlen(doc);
+  await saveFile("Uebersicht-Beratung.pdf", doc.output("blob"), "PDF gespeichert");
 }
 
 /**

@@ -763,6 +763,18 @@ export function txt(v) {
   return typeof v === "function" ? v() : v;
 }
 
+/**
+ * Betrag einer Leistung als kurzer Text, z. B. „1.572 €/Jahr“ oder „bis 1.497 €/Mon.“; "" ohne festen Betrag.
+ * @param b Leistung
+ */
+export function wertText(b) {
+  if (b.val && b.val()) return `${eur(b.val())}/Jahr`;
+  if (b.mon && b.mon()) return `bis ${eur(b.mon(), b.mon() % 1 ? 2 : 0)}/Mon.`;
+  if (b.once) return `bis ${eur(b.once)}`;
+  if (b.frei) return `${eur(b.frei())} Freibetrag`;
+  return "";
+}
+
 /** Leistungen, die nach den Angaben der Familie in Frage kommen. */
 export function applicable() {
   return B.filter((b) => {

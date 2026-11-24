@@ -547,3 +547,121 @@ test("Kennungen kommen nie aus Math.random, auch nicht in alten Browsern", async
     Object.defineProperty(globalThis, "crypto", { value: echt, configurable: true });
   }
 });
+
+// ---------- E-Mail-Erinnerungen ----------
+test("E-Mail-Erinnerungen nutzen dieselben Fristen wie die App (auch die Widerspruchsfrist)", async () => {
+  const { fristenFuerFall } = await import("../supabase/functions/erinnerungen/fristen.js");
+  const daten = {
+    ...PFLEGE3,
+    status: { technisch: "abgelehnt" },
+    ablehnung: { technisch: { datum: "2026-11-10" } },
+    termine: { eigene: [{ id: "x", t: "Arzttermin", d: "2026-12-01" }] },
+  };
+  const L = fristenFuerFall(daten, []);
+  const keys = L.map((f) => f.key);
+  assert.ok(keys.includes("abl-technisch-2026-12-10"), keys.join());
+  assert.ok(keys.includes("own-x-2026-12-01"), keys.join());
+  assert.ok(
+    keys.some((k) => k.startsWith("beratung-")),
+    "Beratungsbesuch fehlt",
+  );
+  // gleiche Fristen wie im Reiter „Termine“ (ohne bereits erledigte)
+  // beide rechnen mit dem heutigen Tag (die erzeugte Datei kennt keinen Test-Kalender)
+  const heute = new Date();
+  const run = neu(
+    `${heute.getFullYear()}-${String(heute.getMonth() + 1).padStart(2, "0")}-${String(heute.getDate()).padStart(2, "0")}`,
+    daten,
+  );
+  const app = run("deadlines().filter((x) => !x.ok).map((x) => x.t)");
+  assert.deepEqual(
+    L.map((f) => f.titel),
+    app,
+  );
+  // Widerspruch abgeschickt: keine Erinnerung mehr
+  const ohne = fristenFuerFall({ ...daten, ablehnung: { technisch: { datum: "2026-11-10", widerspruch: true } } }, []);
+  assert.ok(!ohne.some((f) => f.key.startsWith("abl-")));
+});
+
+test("Fristen-Datei der E-Mail-Erinnerungen ist aktuell und die Funktion hat keine eigenen Regeln", async () => {
+  const { readFileSync } = await import("node:fs");
+  const path = await import("node:path");
+  const esbuild = await import("esbuild");
+  const { FRISTEN_ZIEL, fristenBundleOptionen } = await import("../quelle/fristen-bundle.mjs");
+  const root = path.join(path.dirname(new URL(import.meta.url).pathname), "..");
+  const neuGebaut = await esbuild.build({ ...fristenBundleOptionen(root), write: false, outfile: "x.js" });
+  assert.equal(
+    neuGebaut.outputFiles[0].text,
+    readFileSync(path.join(root, FRISTEN_ZIEL), "utf8"),
+    "fristen.js ist veraltet: node quelle/bauen.mjs ausführen und die Edge Function neu bereitstellen",
+  );
+  const index = readFileSync(path.join(root, "supabase/functions/erinnerungen/index.ts"), "utf8");
+  assert.match(index, /from "\.\/fristen\.js"/);
+  assert.doesNotMatch(index, /function fristen\(/);
+});
+
+// ---------- Gemeinsam bearbeiten ----------
+test("Zusammenführen: eigene Änderungen gelten, Änderungen der anderen Person bleiben erhalten", () => {
+  const run = neu();
+  const basis = { pg: "2", status: { a: "offen", b: "offen" }, termine: { eigene: [] }, person: { name: "E" } };
+  const meins = { pg: "3", status: { a: "beantragt", b: "offen" }, termine: { eigene: [] }, person: { name: "E" } };
+  const ihres = {
+    person: { name: "Erika" },
+    termine: { eigene: [{ id: "1" }] },
+    status: { b: "bewilligt", a: "offen" },
+    pg: "2",
+  };
+  const z = run(`zusammenfuehren(${JSON.stringify(basis)}, ${JSON.stringify(meins)}, ${JSON.stringify(ihres)})`);
+  assert.deepEqual(z, {
+    pg: "3",
+    status: { a: "beantragt", b: "bewilligt" },
+    termine: { eigene: [{ id: "1" }] },
+    person: { name: "Erika" },
+  });
+  // beide ändern dasselbe Feld: meins gilt
+  assert.deepEqual(run(`zusammenfuehren({ x: 1 }, { x: 2 }, { x: 3 })`), { x: 2 });
+  // gelöscht ist gelöscht
+  assert.deepEqual(run(`zusammenfuehren({ a: 1, b: 2 }, { a: 1 }, { a: 1, b: 2, c: 3 })`), { a: 1, c: 3 });
+  // Reihenfolge der Felder zählt nicht (die Datenbank sortiert sie um)
+  assert.equal(run(`gleich({ a: 1, b: { c: 2, d: 3 } }, { b: { d: 3, c: 2 }, a: 1 })`), true);
+});
+
+test("Speichern mit Konto überschreibt keine Änderungen einer anderen Person", async () => {
+  const run = neu(undefined, { ...PFLEGE3 });
+  // Datenbank zum Nachspielen: Ein anderes Familienmitglied hat inzwischen gespeichert (updated_at „t2“)
+  run(`
+    globalThis.__db = { data: { pg: "3", status: { technisch: "bewilligt" }, person: { name: "Erika" } }, updated_at: "t2", writes: 0 };
+    const bau = (tab) => {
+      const st = { filter: {}, upd: null };
+      const q = {
+        update(v) { st.upd = v; return q; },
+        select() { return q; },
+        eq(k, v) { st.filter[k] = v; return q; },
+        maybeSingle() { return Promise.resolve({ data: { data: __db.data, updated_at: __db.updated_at }, error: null }); },
+        then(ok, err) {
+          let r = { data: [], error: null };
+          if (st.upd && (st.filter.updated_at === undefined || st.filter.updated_at === __db.updated_at)) {
+            __db.writes++; __db.data = st.upd.data; __db.updated_at = "t" + (3 + __db.writes);
+            r = { data: [{ updated_at: __db.updated_at }], error: null };
+          }
+          return Promise.resolve(r).then(ok, err);
+        },
+      };
+      return q;
+    };
+    __da.Z.sb = { from: bau };
+    __da.Z.FALL_ID = "f1";
+    __da.Z.FAELLE = [{ id: "f1", updated_at: "t1", basis: { pg: "3", status: {}, person: { name: "" } } }];
+    S.status = { entlastung: "beantragt" };
+    globalThis.__fertig = false;
+    speichereFall(JSON.parse(JSON.stringify(S))).then(() => { __fertig = true; }, (e) => { __fertig = "Fehler: " + e.message; });
+  `);
+  for (let i = 0; i < 50 && run("__fertig") === false; i++) await new Promise((r) => setTimeout(r, 5));
+  assert.equal(run("__fertig"), true);
+  const db = run("__db");
+  assert.equal(db.writes, 1, "erst nach dem Zusammenführen geschrieben");
+  assert.equal(db.data.status.entlastung, "beantragt", "eigene Änderung");
+  assert.equal(db.data.status.technisch, "bewilligt", "Änderung der anderen Person");
+  assert.equal(db.data.person.name, "Erika", "Änderung der anderen Person");
+  assert.equal(run("S.status.technisch"), "bewilligt", "auch auf dem Bildschirm übernommen");
+  assert.equal(run("FAELLE[0].updated_at"), db.updated_at);
+});

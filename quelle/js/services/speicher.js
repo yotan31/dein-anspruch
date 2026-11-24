@@ -6,6 +6,7 @@ import { blank, merge } from "../state/angaben.js";
 import { Z } from "../state/zustand.js";
 import { toast } from "../ui/hinweise.js";
 import { $, render, scrollTop } from "../ui/render.js";
+import { zusammenfuehren } from "../utils/zusammenfuehren.js";
 import { zufallsId } from "../utils/format.js";
 
 /**
@@ -171,14 +172,62 @@ const ASSETS_SB = {
 };
 
 const REF_SB = {
-  async set(data) {
-    const { error } = await Z.sb
-      .from("fall")
-      .update({ data, updated_at: new Date().toISOString() })
-      .eq("id", Z.FALL_ID);
-    if (error) throw error;
-  },
+  set: (data) => speichereFall(data),
 };
+
+/** Ohne Oberflächen-Einstellungen: diese Felder bleiben auf dem Gerät (siehe UI_KEYS) */
+function ohneUi(S) {
+  const d = JSON.parse(JSON.stringify(S));
+  UI_KEYS.forEach((k) => delete d[k]);
+  return d;
+}
+
+/**
+ * Speichert die Angaben der geöffneten Person, aber nur, wenn seit dem letzten bekannten Stand niemand anderes
+ * gespeichert hat (Abgleich über updated_at). Sonst: den neuen Stand holen, mit den eigenen Änderungen
+ * zusammenführen (utils/zusammenfuehren.js) und erneut versuchen. So überschreibt niemand still die Änderungen
+ * einer anderen Person aus der Familie.
+ * @param data zu speichernde Angaben
+ */
+export async function speichereFall(data) {
+  const id = Z.FALL_ID;
+  const f = Z.FAELLE.find((x) => x.id === id);
+  for (let versuch = 0; versuch < 3; versuch++) {
+    let q = Z.sb.from("fall").update({ data, updated_at: new Date().toISOString() }).eq("id", id);
+    if (f && f.updated_at) q = q.eq("updated_at", f.updated_at);
+    const { data: rows, error } = await q.select("updated_at");
+    if (error) throw error;
+    if (rows && rows.length) {
+      if (f) {
+        f.updated_at = rows[0].updated_at;
+        f.basis = data;
+      }
+      return;
+    }
+    // Jemand anderes war schneller: dessen Stand holen und zusammenführen
+    const { data: srv, error: e2 } = await Z.sb.from("fall").select("data,updated_at").eq("id", id).maybeSingle();
+    if (e2) throw e2;
+    if (!srv) throw new Error("Person nicht mehr vorhanden");
+    const basis = (f && f.basis) || {};
+    // Ist die Person noch offen, mit dem aktuellen Stand auf dem Bildschirm zusammenführen (enthält auch,
+    // was seit dem Start dieses Speicherns eingegeben wurde), sonst mit dem, was gespeichert werden sollte
+    const offen = Z.FALL_ID === id;
+    data = zusammenfuehren(basis, offen ? { ...ohneUi(Z.S), updated: data.updated } : data, srv.data || {});
+    if (f) {
+      f.updated_at = srv.updated_at;
+      f.basis = srv.data || {};
+      f.data = data;
+    }
+    if (offen) {
+      const ui = {};
+      UI_KEYS.forEach((k) => (ui[k] = Z.S[k]));
+      Z.S = merge({ ...data, ...ui, font: Z.S.font });
+      render();
+      toast("Änderungen einer anderen Person aus deiner Familie wurden übernommen.");
+    }
+  }
+  throw new Error("Speichern nach drei Versuchen nicht möglich");
+}
 
 const REF_LOCAL = {
   async set(data) {
@@ -207,7 +256,8 @@ export async function loadFaelle() {
   if (error) throw error;
   const { data: m } = await Z.sb.from("mitglied").select("fall_id,rolle").eq("user_id", Z.USER.id);
   const rollen = Object.fromEntries((m || []).map((x) => [x.fall_id, x.rolle]));
-  Z.FAELLE = data.map((f) => ({ ...f, rolle: rollen[f.id] || "mitglied" }));
+  // basis: zuletzt aus der Datenbank gelesener Stand, Grundlage fürs Zusammenführen (speichereFall)
+  Z.FAELLE = data.map((f) => ({ ...f, basis: f.data, rolle: rollen[f.id] || "mitglied" }));
 }
 
 /**
@@ -221,7 +271,7 @@ export async function createFall(data) {
     .select("id,data,created_by,updated_at")
     .single();
   if (error) throw error;
-  Z.FAELLE.push({ ...row, rolle: "besitzer" });
+  Z.FAELLE.push({ ...row, basis: row.data, rolle: "besitzer" });
   return row.id;
 }
 
@@ -332,11 +382,14 @@ async function refreshFromServer() {
   const { data } = await Z.sb.from("fall").select("data,updated_at").eq("id", Z.FALL_ID).maybeSingle();
   const f = Z.FAELLE.find((x) => x.id === Z.FALL_ID);
   if (data && f && data.updated_at !== f.updated_at) {
-    f.data = data.data;
+    // eigene, noch nicht gespeicherte Änderungen bleiben erhalten
+    const zus = zusammenfuehren(f.basis || {}, ohneUi(Z.S), data.data || {});
+    f.data = zus;
+    f.basis = data.data;
     f.updated_at = data.updated_at;
     const ui = {};
     UI_KEYS.forEach((k) => (ui[k] = Z.S[k]));
-    Z.S = merge({ ...data.data, ...ui, font: Z.S.font });
+    Z.S = merge({ ...zus, ...ui, font: Z.S.font });
     render();
   }
   reloadBelege();

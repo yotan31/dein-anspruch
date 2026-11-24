@@ -1,77 +1,98 @@
 // Tägliche E-Mail-Erinnerungen an Fristen. Wird per pg_cron mit geheimem Header aufgerufen.
 // Bereitgestellt als Supabase Edge Function "erinnerungen" (verify_jwt: false, prüft x-cron-secret).
 // Benötigte Secrets: BREVO_API_KEY, ABSENDER
+//
+// Welche Fristen es gibt, steht NICHT hier, sondern in quelle/js/logic/fristen.js (dieselben Regeln wie in der App).
+// quelle/bauen.mjs erzeugt daraus ./fristen.js. Beim Bereitstellen index.ts UND fristen.js hochladen.
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { fristenFuerFall } from "./fristen.js";
 
-const STUFEN = [14, 7, 1];
+/** Erinnerungen 14, 7 und 1 Tag vorher sowie am Tag selbst */
+const STUFEN = [14, 7, 1, 0];
 const APP = "https://yotan31.github.io/dein-anspruch/";
 const de = (d: Date) => d.toLocaleDateString("de-DE", { timeZone: "Europe/Berlin" });
-const iso = (d: Date) => d.toISOString().slice(0, 10);
-const parse = (s?: string) => (s && /^\d{4}-\d{2}-\d{2}$/.test(s) ? new Date(s + "T00:00:00Z") : null);
-const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
+const esc = (s: string) =>
+  s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
+const json = (b: unknown, status = 200) =>
+  new Response(JSON.stringify(b), { status, headers: { "Content-Type": "application/json" } });
 
-type Frist = { key: string; titel: string; datum: Date; text: string };
-
-function fristen(data: any, beratungsDaten: string[], heute: Date): Frist[] {
-  const L: Frist[] = [];
-  const y = heute.getUTCFullYear();
-  const pg = Number(data.pg) || 0;
-  const home = ["angehoerige", "gemischt", "pflegedienst", "wg"].includes(data.wohnen);
-  if (pg >= 2 && ["angehoerige", "gemischt", "wg"].includes(data.wohnen)) {
-    const h1 = heute.getUTCMonth() < 6;
-    const start = new Date(Date.UTC(y, h1 ? 0 : 6, 1)), ende = new Date(Date.UTC(y, h1 ? 5 : 11, h1 ? 30 : 31));
-    const besuche = [...(data.termine?.besuche || []).map((b: any) => b.d), ...beratungsDaten].map(parse).filter(Boolean) as Date[];
-    if (!besuche.some((d) => d >= start && d <= ende))
-      L.push({ key: "beratung-" + iso(ende), titel: "Beratungsbesuch nach § 37 Abs. 3", datum: ende, text: "Ohne Nachweis kürzt die Pflegekasse das Pflegegeld. Bitte Termin mit dem Pflegedienst vereinbaren." });
-  }
-  const b = data.bescheid;
-  if (b && b.eingang) {
-    const e = parse(b.eingang);
-    if (e) { const f = new Date(e); f.setUTCMonth(f.getUTCMonth() + 1); L.push({ key: "wid-" + iso(f), titel: "Widerspruchsfrist Pflegegrad-Bescheid", datum: f, text: "Bis zu diesem Tag kann Widerspruch eingelegt werden. Die App hilft beim Schreiben." }); }
-  }
-  if (pg >= 1 && home) { const d = new Date(Date.UTC(y, 5, 30)); L.push({ key: "entl-" + y, titel: "Entlastungsbetrag aus " + (y - 1) + " verfällt", datum: d, text: "Nicht genutzte Beträge aus dem Vorjahr verfallen. Jetzt Rechnungen einreichen." }); }
-  if (pg >= 2 && home) { const d = new Date(Date.UTC(y, 11, 31)); L.push({ key: "vhp-" + y, titel: "Verhinderungspflege aus " + (y - 1) + " einreichen", datum: d, text: "Danach verfällt der Anspruch auf Erstattung (Ausschlussfrist)." }); }
-  const wm = parse(data.termine?.wertmarke);
-  if (wm) L.push({ key: "wm-" + iso(wm), titel: "Wertmarke läuft ab", datum: wm, text: "Neue Wertmarke beim Versorgungsamt beantragen." });
-  for (const e of data.termine?.eigene || []) { const d = parse(e.d); if (d) L.push({ key: "own-" + e.id, titel: String(e.t || "Erinnerung"), datum: d, text: String(e.n || "") }); }
-  return L;
+/**
+ * Welche Stufe ist heute dran? Die kleinste Stufe, die schon erreicht ist. Fiel ein Lauf aus (oder kam die Frist
+ * erst spät dazu), kommt die Erinnerung so am nächsten Tag nach statt gar nicht. Doppelt wird nichts geschickt,
+ * weil jede Stufe je Frist nur einmal im Protokoll stehen darf.
+ */
+function stufe(tage: number): number | null {
+  if (tage < 0 || tage > STUFEN[0]) return null;
+  return Math.min(...STUFEN.filter((s) => s >= tage));
 }
 
 Deno.serve(async (req) => {
   const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   const { data: ok } = await sb.rpc("cron_secret_pruefen", { s: req.headers.get("x-cron-secret") || "" });
   if (!ok) return new Response("forbidden", { status: 403 });
-  const key = Deno.env.get("BREVO_API_KEY"), absender = Deno.env.get("ABSENDER");
-  if (!key || !absender) return new Response(JSON.stringify({ hinweis: "E-Mail-Versand noch nicht eingerichtet (BREVO_API_KEY, ABSENDER)" }), { status: 200 });
+  const key = Deno.env.get("BREVO_API_KEY"),
+    absender = Deno.env.get("ABSENDER");
+  if (!key || !absender) {
+    // steht so in den Logs der Funktion, damit man es dort findet
+    console.warn("Erinnerungen: E-Mail-Versand nicht eingerichtet (Secret BREVO_API_KEY oder ABSENDER fehlt)");
+    return json({ eingerichtet: false, gesendet: 0 });
+  }
 
-  const heute = new Date(); heute.setUTCHours(0, 0, 0, 0);
+  const heute = new Date();
+  heute.setUTCHours(0, 0, 0, 0);
   const { data: abos } = await sb.from("erinnerung").select("user_id,email").eq("aktiv", true);
-  let gesendet = 0;
+  let gesendet = 0,
+    fehler = 0;
   for (const abo of abos || []) {
     const { data: mit } = await sb.from("mitglied").select("fall_id").eq("user_id", abo.user_id);
     const punkte: string[] = [];
+    /** Einträge im Protokoll, die zurückgenommen werden, falls die E-Mail nicht rausgeht */
+    const reserviert: { f: string; key: string }[] = [];
     for (const m of mit || []) {
       const { data: fall } = await sb.from("fall").select("id,data").eq("id", m.fall_id).maybeSingle();
       if (!fall) continue;
-      const { data: bel } = await sb.from("belege").select("datum").eq("fall_id", fall.id).eq("kat", "beratung");
+      const { data: bel } = await sb.from("belege").select("kat,datum,jahr,betrag").eq("fall_id", fall.id);
       const name = (fall.data?.person?.name || "").trim() || "deine Person";
-      for (const f of fristen(fall.data || {}, (bel || []).map((b: any) => b.datum), heute)) {
+      for (const f of fristenFuerFall(fall.data || {}, bel || [])) {
         const tage = Math.round((f.datum.getTime() - heute.getTime()) / 864e5);
-        const stufe = STUFEN.find((s) => tage === s) ?? (tage >= 0 && tage < 1 ? 0 : null);
-        if (stufe == null) continue;
-        const neu = await sb.rpc("erinnerung_log_neu", { u: abo.user_id, f: fall.id, key: f.key + "-" + stufe });
+        const s = stufe(tage);
+        // „Noch keine Antwort?“ und Ähnliches: erst am Tag selbst, eine Vorwarnung ergibt dort keinen Sinn
+        if (s == null || (f.nurAmTag && s !== 0)) continue;
+        const logKey = f.key + "-" + s;
+        const neu = await sb.rpc("erinnerung_log_neu", { u: abo.user_id, f: fall.id, key: logKey });
         if (!neu.data) continue;
-        punkte.push(`<li><strong>${esc(f.titel)}</strong> (${esc(name)}) – bis ${de(f.datum)}, ${tage === 0 ? "heute" : tage === 1 ? "morgen" : "in " + tage + " Tagen"}<br>${esc(f.text)}</li>`);
+        reserviert.push({ f: fall.id, key: logKey });
+        punkte.push(
+          `<li><strong>${esc(f.titel)}</strong> (${esc(name)}) – bis ${de(f.datum)}, ${tage === 0 ? "heute" : tage === 1 ? "morgen" : "in " + tage + " Tagen"}<br>${esc(f.text)}</li>`,
+        );
       }
     }
     if (!punkte.length) continue;
     const html = `<div style="font-family:Arial,sans-serif;font-size:16px;line-height:1.5;color:#13233a"><p>Hallo,</p><p>diese Fristen stehen bald an:</p><ul>${punkte.join("")}</ul><p><a href="${APP}" style="background:#0d6876;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none">Zur App</a></p><p style="color:#566578;font-size:13px">Du bekommst diese E-Mail, weil du in „Dein Anspruch“ Erinnerungen eingeschaltet hast. Abschalten: in der App unter Termine.</p></div>`;
-    const r = await fetch("https://api.brevo.com/v3/smtp/email", {
-      method: "POST",
-      headers: { "api-key": key, "Content-Type": "application/json", accept: "application/json" },
-      body: JSON.stringify({ sender: { name: "Dein Anspruch", email: absender }, to: [{ email: abo.email }], subject: "Erinnerung: Fristen bei Dein Anspruch", htmlContent: html }),
-    });
-    if (r.ok) gesendet++;
+    let r: Response | null = null;
+    try {
+      r = await fetch("https://api.brevo.com/v3/smtp/email", {
+        method: "POST",
+        headers: { "api-key": key, "Content-Type": "application/json", accept: "application/json" },
+        body: JSON.stringify({
+          sender: { name: "Dein Anspruch", email: absender },
+          to: [{ email: abo.email }],
+          subject: "Erinnerung: Fristen bei Dein Anspruch",
+          htmlContent: html,
+        }),
+      });
+    } catch (_) {
+      r = null;
+    }
+    if (r && r.ok) {
+      gesendet++;
+    } else {
+      // nicht verschickt: Protokoll zurücknehmen, damit der nächste Lauf es noch einmal versucht
+      fehler++;
+      console.error("Erinnerungen: Versand fehlgeschlagen", r ? r.status : "kein Netz");
+      for (const x of reserviert)
+        await sb.rpc("erinnerung_log_zurueck", { u: abo.user_id, f: x.f, key: x.key });
+    }
   }
-  return new Response(JSON.stringify({ gesendet }), { headers: { "Content-Type": "application/json" } });
+  return json({ eingerichtet: true, gesendet, fehler });
 });

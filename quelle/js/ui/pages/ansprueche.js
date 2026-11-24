@@ -5,7 +5,7 @@ import { kannNachfragen, mitWiderspruch } from "../../logic/folgebriefe.js";
 import { kindHinweis, kindUnterschiede } from "../../logic/kinder.js";
 import { istKind } from "../../logic/lage.js";
 import { widerspruchFrist } from "../../logic/fristen.js";
-import { sums, txt } from "../../logic/leistungen.js";
+import { sums, txt, wertText } from "../../logic/leistungen.js";
 import { Z } from "../../state/zustand.js";
 import { finderHTML } from "../components/anbieter.js";
 import { bescheidCard } from "../components/bescheid-karte.js";
@@ -13,11 +13,12 @@ import { datenBox } from "../components/datenbox.js";
 import { entlCard } from "../components/entlastung-karte.js";
 import { folgeBox } from "../components/folge-box.js";
 import { installKarte } from "../components/install-karte.js";
+import { schritteKarte } from "../components/schritte-karte.js";
 import { rueckblickCard, toepfeCard } from "../components/toepfe-karte.js";
 import { vollmachtKnopf } from "../components/vollmacht-knopf.js";
 import { AREA_ICON, CLAIM_ICON, bild, ic } from "../symbole.js";
 import { MON, daysUntil, deD, parseIso } from "../../utils/datum.js";
-import { esc, eur } from "../../utils/format.js";
+import { esc } from "../../utils/format.js";
 
 /* ---------- Reiter: Ansprüche ---------- */
 export function viewAnsprueche() {
@@ -48,12 +49,17 @@ export function viewAnsprueche() {
    }
    ${langNotice() && `<p class="notice info small">${ic("info")}<span>${langNotice()}</span></p>`}
    ${rueckblickCard()}
+   ${schritteKarte()}
    ${kindKarte()}
    <div class="section-title"><h2>Deine offenen Ansprüche</h2>${fortschritt(all)}</div>
    ${areas.length > 2 ? `<div class="filters">${areas.map((a) => `<button type="button" class="chip" data-area="${esc(a)}" aria-pressed="${Z.areaFilter === a}">${a === "Alle" ? "" : `<i class="punkt a-${esc(a)}"></i>`}${esc(a)}</button>`).join("")}</div>` : ""}
    ${sorted.length ? `<div class="list">${sorted.map(itemHTML).join("")}</div>` : `<section class="panel leer">${bild("fertig")}<h3>Alles im Blick</h3><p class="muted">Ihr nutzt bereits alles, was wir für eure Lage prüfen konnten.</p></section>`}
    ${genutzt.length ? `<details class="used"><summary>${ic("chev")}Bereits genutzt (${genutzt.length})</summary><div class="list mt-10">${genutzt.map(itemHTML).join("")}</div></details>` : ""}
    ${bescheidCard() || entlCard() || toepfeCard() ? `<div class="section-title"><h3>Weitere Hilfen</h3></div><div class="minis">${bescheidCard()}${entlCard()}${toepfeCard()}</div>` : ""}
+   <section class="panel beratung-pdf">
+     <div class="folge-kopf"><span class="folge-ico">${ic("people")}</span><div><strong>Termin bei einer Beratung?</strong><p>Ein Blatt mit deiner Lage, allen Leistungen mit Stand und den Fristen. Damit wird das Gespräch beim Pflegestützpunkt oder bei der Pflegeberatung viel konkreter.</p></div></div>
+     <button class="btn small soft self-start" type="button" data-act="uebersicht-pdf">${ic("down")}Übersicht als PDF</button>
+   </section>
    <div class="nav endnav"><button class="btn ghost" type="button" data-act="edit">Angaben ändern</button><button class="linkbtn danger" type="button" data-act="reset">Antworten zurücksetzen</button></div>
    <div id="resetconfirm" hidden class="notice bad">${ic("alert")}<span>Alle Antworten aus dem Fragebogen zurücksetzen und neu anfangen? Belege und Fristen bleiben erhalten. <span class="btnrow mt-8"><button class="btn small danger" type="button" data-act="reset-yes">Ja, löschen</button><button class="btn small ghost" type="button" data-act="reset-no">Abbrechen</button></span></span></div>
    ${datenBox()}`;
@@ -67,11 +73,10 @@ function fortschritt(all) {
 }
 
 function valueLabel(b) {
-  if (b.val && b.val()) return `<span class="val">${eur(b.val())}/Jahr</span>`;
-  if (b.mon && b.mon()) return `<span class="val">bis ${eur(b.mon(), b.mon() % 1 ? 2 : 0)}/Mon.</span>`;
-  if (b.once) return `<span class="val">bis ${eur(b.once)}</span>`;
-  if (b.frei) return `<span class="val">${eur(b.frei())} Freibetrag</span>`;
-  return `<span class="val neutral">${b.opt ? "Prüfen lohnt sich" : "Kostenlos"}</span>`;
+  const w = wertText(b);
+  return w
+    ? `<span class="val">${w}</span>`
+    : `<span class="val neutral">${b.opt ? "Prüfen lohnt sich" : "Kostenlos"}</span>`;
 }
 
 /** Für Eltern: was bei Kindern anders ist (aufklappbar, damit die Liste nicht nach unten rutscht) */

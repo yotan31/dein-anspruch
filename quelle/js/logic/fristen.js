@@ -2,11 +2,14 @@
 import { KATS } from "./belege.js";
 import { bescheidInfo } from "./bescheid.js";
 import { gdb, isHome, pg } from "./lage.js";
-import { B } from "./leistungen.js";
+import { B, FA } from "./leistungen.js";
 import { Z } from "../state/zustand.js";
 import { TODAY, addDays, daysUntil, deD, halfOf, isoD, parseIso, shiftHalf } from "../utils/datum.js";
 
 /* ---------- Termine ---------- */
+/** Nach so vielen Tagen ohne Antwort erinnert die App ans Nachfragen (das verspricht der fertige Antrag: „in 4 Wochen“) */
+export const NACHFRAGE_TAGE = 28;
+
 /**
  * Letzter Tag für den Widerspruch: ein Monat nach dem Datum auf dem Bescheid. Gerechnet wird ab dem Datum des
  * Bescheids und nicht ab dem Tag, an dem er ankam: Das ist etwas früher und damit auf der sicheren Seite.
@@ -97,6 +100,21 @@ export function deadlines() {
       d: frist,
       remind: addDays(frist, -7),
       s: "Bis zu diesem Tag muss der Widerspruch bei der Stelle sein, die abgelehnt hat. Ein kurzes Schreiben reicht, die App hat es vorbereitet.",
+    });
+  }
+  // Abgeschickt und noch keine Antwort: nach 4 Wochen nachfragen (Brief dafür in der App)
+  for (const [k, gesendet] of Object.entries(Z.S.sent || {})) {
+    const b = B.find((x) => x.k === k);
+    const d0 = parseIso(gesendet);
+    if (!b || !d0 || !b.ask || b.to === FA || Z.S.status[k] !== "beantragt") continue;
+    const d = addDays(d0, NACHFRAGE_TAGE);
+    L.push({
+      k: "nach-" + k,
+      t: `Noch keine Antwort? ${b.t}`,
+      d,
+      remind: d,
+      s: `Abgeschickt am ${deD(d0)}. Ist noch keine Antwort da, mit dem fertigen Brief in der App nach dem Stand fragen.`,
+      nurAmTag: true,
     });
   }
   if (pg() >= 1 && isHome()) {

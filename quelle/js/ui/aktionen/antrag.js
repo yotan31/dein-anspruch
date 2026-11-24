@@ -2,7 +2,7 @@
 // Jeder Eintrag gehört zu einem Knopf mit data-act="…"; aufgerufen von ui/bedienung.js mit dem angetippten Element t.
 import { B } from "../../logic/leistungen.js";
 import { nachfrageBrief, widerspruchBrief } from "../../logic/folgebriefe.js";
-import { makeBrief, makeQuittung, makeVollmacht } from "../../services/dokumente.js";
+import { makeBrief, makeQuittung, makeUebersicht, makeVollmacht } from "../../services/dokumente.js";
 import { save } from "../../services/speicher.js";
 import { zaehle } from "../../services/zaehlung.js";
 import { Z } from "../../state/zustand.js";
@@ -45,6 +45,9 @@ export const AKTIONEN_ANTRAG = {
     Z.S.rueckblick = TODAY().getFullYear() - 1;
     save();
     render();
+  },
+  "uebersicht-pdf": () => {
+    makeUebersicht();
   },
   vollmacht: () => {
     makeVollmacht();

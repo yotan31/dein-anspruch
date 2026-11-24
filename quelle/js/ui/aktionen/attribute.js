@@ -212,6 +212,16 @@ export const ATTRIBUT_AKTIONEN = [
       if (Z.openKey) reveal($("it-" + Z.openKey));
     },
   ],
+  // aus „Deine nächsten Schritte“: Leistung immer öffnen (nicht umschalten) und dafür den Filter aufheben
+  [
+    "zeige",
+    (wert) => {
+      Z.areaFilter = "Alle";
+      Z.openKey = wert;
+      render();
+      reveal($("it-" + wert));
+    },
+  ],
   [
     "copy",
     (wert) => {

@@ -26,6 +26,9 @@ jobs:
         run: npm run pruefen
       - name: App bauen (esbuild)
         run: npm run bauen
+      - name: Fristen-Datei der E-Mail-Erinnerungen ist eingecheckt und aktuell
+        # quelle/bauen.mjs erzeugt sie neu; weicht sie ab, wurde nach einer Änderung an den Fristen nicht gebaut
+        run: git diff --exit-code -- supabase/functions/erinnerungen/fristen.js
       - name: Berechnungen prüfen
         run: npm run test:rechnungen
       # Nur den Browser laden: Das Ubuntu von GitHub bringt die nötigen Bibliotheken schon mit. Die Systempakete

@@ -235,6 +235,111 @@ const RX = [
       "Estimated $1 of 100 points. This is an estimate. The Medical Service decides during a home visit.",
     ],
   ],
+  [
+    /^Frist läuft in (\d+) Tagen ab$/,
+    [
+      "Süre $1 gün içinde doluyor",
+      "Срок истекает через $1 дн.",
+      "تنتهي المهلة بعد $1 يومًا",
+      "",
+      "Deadline ends in $1 days",
+    ],
+  ],
+  [
+    /^Seit (\d+) Wochen keine Antwort$/,
+    ["$1 haftadır cevap yok", "Нет ответа уже $1 нед.", "لا رد منذ $1 أسابيع", "", "No reply for $1 weeks"],
+  ],
+  [
+    /^Antrag mit (\d+) Fragen$/,
+    ["$1 sorulu başvuru", "Заявление, вопросов: $1", "طلب فيه $1 أسئلة", "", "Application with $1 questions"],
+  ],
+  [
+    /^Widerspruchsfrist: (.+)$/,
+    ["İtiraz süresi: $1", "Срок возражения: $1", "مهلة الاعتراض: $1", "", "Objection deadline: $1"],
+  ],
+  [
+    /^Noch keine Antwort\? (.+)$/,
+    ["Hâlâ cevap yok mu? $1", "Ответа всё ещё нет? $1", "لم يصل رد بعد؟ $1", "", "No reply yet? $1"],
+  ],
+  [
+    /^Abgeschickt am (\S+)\. Ist noch keine Antwort da, mit dem fertigen Brief in der App nach dem Stand fragen\.$/,
+    [
+      "$1 tarihinde gönderildi. Hâlâ cevap yoksa uygulamadaki hazır mektupla durumu sor.",
+      "Отправлено $1. Если ответа ещё нет, спроси о статусе готовым письмом в приложении.",
+      "أُرسل في $1. إذا لم يصل رد بعد، استفسر عن الحالة بالرسالة الجاهزة في التطبيق.",
+      "",
+      "Sent on $1. If there's no reply yet, ask about the status with the ready-made letter in the app.",
+    ],
+  ],
+  [
+    /^Abgeschickt am (\S+)\. Status: (\S+)\.$/,
+    ["$1 tarihinde gönderildi.", "Отправлено $1.", "أُرسل في $1.", "", "Sent on $1."],
+  ],
+  [
+    /^Beratungsbesuch für das (\d)\. Halbjahr (\d{4})$/,
+    [
+      "$2 yılının $1. yarısı için danışma ziyareti",
+      "Консультационный визит за $1-е полугодие $2",
+      "زيارة الاستشارة للنصف $1 من عام $2",
+      "",
+      "Counselling visit for half-year $1/$2",
+    ],
+  ],
+  [/^(\d)\. Halbjahr (\d{4})$/, ["$2 / $1. yarıyıl", "$1-е полугодие $2", "النصف $1 من $2", "", "Half-year $1/$2"]],
+  [/^offen bis (\S+)$/, ["$1 tarihine kadar açık", "открыто до $1", "مفتوح حتى $1", "", "open until $1"]],
+  [/^in (\d+) Tagen$/, ["$1 gün içinde", "через $1 дн.", "بعد $1 يومًا", "", "in $1 days"]],
+  [/^(\d+) Tage überfällig$/, ["$1 gün gecikti", "просрочено на $1 дн.", "متأخر $1 يومًا", "", "$1 days overdue"]],
+  [
+    /^Verhinderungspflege aus (\d{4}) einreichen$/,
+    [
+      "$1 vekâleten bakım masraflarını gönder",
+      "Подать расходы на замещающий уход за $1",
+      "قدّم تكاليف الرعاية البديلة لعام $1",
+      "",
+      "Submit respite care costs from $1",
+    ],
+  ],
+  [
+    /^Ausschlussfrist: Kosten der Ersatzpflege aus (\d{4}) müssen bis heute mit Nachweisen bei der Pflegekasse sein\.$/,
+    [
+      "Kesin süre: $1 vekâleten bakım masrafları belgeleriyle bugüne kadar bakım sigortasında olmalı.",
+      "Крайний срок: расходы на замещающий уход за $1 с подтверждениями должны быть в кассе по уходу до этого дня.",
+      "مهلة نهائية: يجب أن تصل تكاليف الرعاية البديلة لعام $1 مع الإثباتات إلى صندوق الرعاية حتى هذا اليوم.",
+      "",
+      "Final deadline: respite care costs from $1 must reach the care insurer with proof by this day.",
+    ],
+  ],
+  [
+    /^Zuzahlungsbefreiung für (\d{4}) beantragen$/,
+    [
+      "$1 için katkı payı muafiyetine başvur",
+      "Подать на освобождение от доплат на $1",
+      "اطلب الإعفاء من المساهمات لعام $1",
+      "",
+      "Apply for co-payment exemption for $1",
+    ],
+  ],
+  [
+    /^Nicht genutzte Beträge aus (\d{4}) verfallen an diesem Tag\. Jetzt Haushaltshilfe oder Betreuung organisieren und Rechnungen einreichen\.$/,
+    [
+      "$1 yılından kullanılmayan tutarlar bu gün sona erer. Şimdi ev yardımı veya bakım ayarla ve faturaları gönder.",
+      "Неиспользованные суммы за $1 сгорают в этот день. Организуй помощь по хозяйству или присмотр и подай счета.",
+      "تسقط المبالغ غير المستخدمة من عام $1 في هذا اليوم. نظّم الآن مساعدة منزلية أو رعاية وقدّم الفواتير.",
+      "",
+      "Unused amounts from $1 expire on this day. Arrange household help or care now and submit the invoices.",
+    ],
+  ],
+  [/^Antrag: (.+)$/, ["Başvuru: $1", "Заявление: $1", "الطلب: $1", "", "Application: $1"]],
+  [
+    /^E-Mail: (\S+) \(Adresse bitte prüfen\)\. Sicherer: Upload über (.+)\.$/,
+    [
+      "E-posta: $1 (lütfen adresi kontrol et). Daha güvenli: $2 ile yükleme.",
+      "E-mail: $1 (проверь адрес). Надёжнее: загрузка через $2.",
+      "البريد الإلكتروني: $1 (يُرجى التحقق من العنوان). أكثر أمانًا: الرفع عبر $2.",
+      "",
+      "Email: $1 (please check the address). Safer: upload via $2.",
+    ],
+  ],
   [/^Pflegegrad (\d)$/, ["Bakım derecesi $1", "Степень ухода $1", "درجة الرعاية $1", "ደረጃ ክንክን $1", "Care level $1"]],
 ];
 

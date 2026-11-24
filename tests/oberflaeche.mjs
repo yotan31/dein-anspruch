@@ -577,6 +577,56 @@ console.log("Kinder mit Pflegegrad");
   check("keine Programmfehler", errors.length === 0, errors.join(" | "));
 }
 
+// ---------- 2f. Nächste Schritte, Übersicht für die Beratung, Hinweis „nur auf diesem Gerät“ ----------
+console.log("Nächste Schritte und Übersicht");
+{
+  const heute = new Date();
+  const vor = (tage) => new Date(heute.getTime() - tage * 864e5).toISOString().slice(0, 10);
+  const { page, errors } = await newPage({
+    gast: {
+      ...GAST,
+      genutzt: {},
+      status: { technisch: "abgelehnt", entlastung: "beantragt" },
+      ablehnung: { technisch: { datum: vor(10) } },
+      sent: { entlastung: vor(40) },
+    },
+  });
+  await gehe(page, BASE, 600);
+  const schritte = await page.locator(".schritte li").allInnerTexts();
+  check("„Deine nächsten Schritte“ zeigt höchstens drei Punkte", schritte.length >= 1 && schritte.length <= 3);
+  check("Widerspruchsfrist steht ganz oben", /Widerspruchsfrist/.test(schritte[0] || ""), schritte[0]);
+  check(
+    "Antrag ohne Antwort erscheint zum Nachfragen",
+    schritte.some((x) => /keine Antwort/.test(x)),
+  );
+  await page.tap('.schritte [data-zeige="technisch"]');
+  await page.waitForTimeout(300);
+  check(
+    "Tippen öffnet die Leistung mit dem Widerspruch",
+    (await page.locator("#it-technisch .folge.warn").count()) === 1,
+  );
+  const [ueb] = await Promise.all([page.waitForEvent("download"), page.tap('[data-act="uebersicht-pdf"]')]);
+  check("Übersicht für die Beratung als PDF", /\.pdf$/.test(ueb.suggestedFilename()), ueb.suggestedFilename());
+  await page.evaluate(() => {
+    startWiz("entlastung");
+    S.wiz.i = wizSteps().list.length - 1;
+    render();
+  });
+  await page.waitForTimeout(300);
+  check(
+    "ohne Konto: Hinweis „nur auf diesem Gerät“ beim fertigen Antrag",
+    (await page.locator('[data-act="sicherung-weg"]').count()) === 1,
+  );
+  await page.tap('[data-act="sicherung-weg"]');
+  await page.waitForTimeout(200);
+  check(
+    "Hinweis lässt sich ausblenden und bleibt weg",
+    (await page.locator('[data-act="sicherung-weg"]').count()) === 0 &&
+      !!(await page.evaluate(() => S.sicherungHinweis)),
+  );
+  check("keine Programmfehler", errors.length === 0, errors.join(" | "));
+}
+
 // ---------- 2e. Texterkennung vom eigenen Server ----------
 console.log("Texterkennung ohne fremde Dienste");
 {

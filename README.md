@@ -76,4 +76,8 @@ Solange die App nur getestet wird, sagen alle Seiten Suchmaschinen „nicht aufn
 
 Tabellen `fall`, `mitglied`, `einladung`, `belege`, `erinnerung`, `fehler`, `rueckmeldung`, alle mit Row Level Security. Privater Speicher `belege` (Ordner = Fall). Edge Function `erinnerungen` (täglich per pg_cron).
 
+**E-Mail-Erinnerungen:** Die Edge Function `supabase/functions/erinnerungen/index.ts` hat keine eigenen Fristen-Regeln. Sie nutzt `fristen.js` daneben, das `quelle/bauen.mjs` aus `quelle/js/logic/fristen-fall.js` erzeugt (dieselben Regeln wie der Reiter „Termine“). Ändern sich Fristen in `quelle/js/logic/fristen.js`, nach dem Bauen die Funktion neu bereitstellen (beide Dateien `index.ts` und `fristen.js`, `verify_jwt` aus). Ein Test schlägt fehl, wenn `fristen.js` nicht zum Quelltext passt. Versand über Brevo, nur wenn die Secrets `BREVO_API_KEY` und `ABSENDER` gesetzt sind; sonst steht in den Logs der Funktion „E-Mail-Versand nicht eingerichtet“.
+
+**Gemeinsam bearbeiten:** Gespeichert wird nur, wenn sich `updated_at` seit dem Laden nicht geändert hat (`speichereFall` in `quelle/js/services/speicher.js`). Sonst werden die eigenen Änderungen mit dem neuen Stand zusammengeführt (`quelle/js/utils/zusammenfuehren.js`), statt ihn zu überschreiben.
+
 Einmalig in Supabase: Authentication → URL Configuration → Site URL und Redirect URL `https://yotan31.github.io/dein-anspruch/**`.

@@ -6,6 +6,7 @@ import { KM_SATZ, vhpCalc } from "../../logic/verhinderungspflege.js";
 import { save } from "../../services/speicher.js";
 import { zaehle } from "../../services/zaehlung.js";
 import { Z } from "../../state/zustand.js";
+import { sicherungHinweis } from "../components/sicherung-hinweis.js";
 import { vollmachtKnopf } from "../components/vollmacht-knopf.js";
 import { render, scrollTop } from "../render.js";
 import { ic } from "../symbole.js";
@@ -155,6 +156,7 @@ function viewDone(b) {
       <li><strong>Hier abhaken, wenn es raus ist.</strong> Wir erinnern dich in 4 Wochen, falls noch keine Antwort da ist.</li>
     </ol>
     ${st === "offen" ? `<button class="btn big" type="button" data-act="sent" data-k="${b.k}">${ic("check")}Ich habe den Antrag abgeschickt</button>` : `<p class="notice good">${ic("check")}<span>Abgeschickt${Z.S.sent && Z.S.sent[b.k] ? " am " + deD(parseIso(Z.S.sent[b.k])) : ""}. Status: ${esc(st)}.</span></p>`}
+    ${sicherungHinweis()}
     <details><summary class="small">Text selbst ändern (für Geübte)</summary>
       <div class="field mt-10"><input type="text" data-sub="${b.k}" value="${esc(L.subject)}" aria-label="Betreff"><textarea data-tx="${b.k}" aria-label="Antragstext">${esc(L.body)}</textarea>
       ${Z.S.texte[b.k] != null ? `<button class="btn small ghost" type="button" data-resettx="${b.k}">Änderungen verwerfen</button>` : ""}</div>

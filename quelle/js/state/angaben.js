@@ -57,6 +57,8 @@ export function blank() {
     rechner: [],
     /** Jahr, dessen Rückblick weggeklickt wurde */
     rueckblick: 0,
+    /** Ohne Konto: Hinweis „nur auf diesem Gerät“ erledigt am (Sicherung geladen oder weggeklickt), sonst "" */
+    sicherungHinweis: "",
     /** Geht es um ein Kind? "" (nicht gefragt), "erw" (erwachsen), "baby" (bis 18 Monate), "kind" (bis 10 Jahre), "jugend" (11–17) */
     kindAlter: "",
     checks: {},

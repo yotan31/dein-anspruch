@@ -39,6 +39,7 @@ const ANTIPPBAR = [
 
 /** Schritte und Downloads, die bei einem versehentlichen Doppeltippen nur einmal laufen sollen */
 const NUR_EINMAL = new Set([
+  "uebersicht-pdf",
   "next",
   "back",
   "sent",
