@@ -13,6 +13,7 @@ import * as m_logic_belegerkennung from "./logic/belegerkennung.js";
 import * as m_logic_bescheid from "./logic/bescheid.js";
 import * as m_logic_entlastung from "./logic/entlastung.js";
 import * as m_logic_erklaerungen from "./logic/erklaerungen.js";
+import * as m_logic_erklaerungen_texte from "./logic/erklaerungen-texte.js";
 import * as m_logic_fragebogen from "./logic/fragebogen.js";
 import * as m_logic_folgebriefe from "./logic/folgebriefe.js";
 import * as m_logic_fristen from "./logic/fristen.js";
@@ -108,6 +109,7 @@ Object.defineProperty(globalThis, "__da", {
       m_logic_bescheid,
       m_logic_entlastung,
       m_logic_erklaerungen,
+      m_logic_erklaerungen_texte,
       m_logic_fragebogen,
       m_logic_folgebriefe,
       m_logic_fristen,

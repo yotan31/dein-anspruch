@@ -34,6 +34,17 @@ export const BETRAEGE = Object.freeze({
   kinderkrankTage: 15,
   kinderkrankTageAllein: 30,
 
+  // Hilfsmittel und Pflegeunterstützungsgeld
+  hilfsmittelZuzahlungMax: 25, // § 40 Abs. 3 SGB XI: 10 %, höchstens 25 € je Hilfsmittel
+  pugTage: 10, // § 44a SGB XI: Arbeitstage je Kalenderjahr
+  pugProzent: 90, // Anteil des ausgefallenen Nettoentgelts
+
+  // Schwerbehinderung
+  wertmarkeJahr: 104, // § 228 SGB IX, Eigenbeteiligung Wertmarke
+  wertmarkeHalbjahr: 53,
+  fahrtkostenPauschale: 900, // § 33 Abs. 2a EStG
+  fahrtkostenPauschaleErhoeht: 4500, // aG, Bl, TBl, H oder Pflegegrad 4/5
+
   // Sonstiges
   rundfunkVoll: 18.36,
   rundfunkErmaessigt: 6.12, // Rundfunkbeitrag pro Monat

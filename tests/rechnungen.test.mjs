@@ -688,5 +688,42 @@ test("Erklärung Verhinderungspflege: Beträge wie in der Berechnung, Reihenfolg
   // ohne Pflegegrad 2 passt es nicht, und das steht auch so da
   const ohne = neu(undefined, { ...PFLEGE3, pg: "1" })('erklaerung("jahresbetrag")');
   assert.equal(ohne.passt.ja, false);
-  assert.equal(run('erklaerung("rundfunk")'), null);
+  assert.equal(run('erklaerung("gibt-es-nicht")'), null);
+});
+
+test("Jede Leistung in der Liste hat eine ausführliche Erklärung mit Voraussetzungen und Quelle", () => {
+  // möglichst viele Leistungen auf einmal sichtbar: Pflegegrad 3 zu Hause, Schwerbehinderung mit Merkzeichen, Kind
+  for (const lage of [
+    {
+      ...PFLEGE3,
+      bereiche: { pflege: true, sb: true },
+      sb: { status: "ja", gdb: "80", mz: { G: true, aG: true, H: true, RF: true, Bl: true } },
+    },
+    { ...PFLEGE3, wohnen: "heim" },
+    { ...PFLEGE3, wohnen: "wg" },
+    { ...PFLEGE3, wohnen: "eingliederung" },
+    {
+      pg: "0",
+      wohnen: "angehoerige",
+      rolle: "selbst",
+      bereiche: { pflege: true, sb: true },
+      sb: { status: "nein", gdb: "" },
+    },
+    {
+      ...PFLEGE3,
+      kindAlter: "kind",
+      bereiche: { pflege: true, sb: true },
+      sb: { status: "ja", gdb: "50", mz: { H: true } },
+    },
+  ]) {
+    const run = neu(undefined, lage);
+    const fehlt = run(
+      `applicable().filter((b) => { const e = erklaerung(b.k); return !e || e.kurz.length !== 3 || !e.abschnitte.some((a) => a.titel === "Voraussetzungen") || !e.quellen; }).map((b) => b.k)`,
+    );
+    assert.deepEqual(fehlt, [], JSON.stringify(lage));
+    const kaputt = run(
+      `applicable().filter((b) => /undefined|NaN|\\[object/.test(JSON.stringify(erklaerung(b.k)))).map((b) => b.k)`,
+    );
+    assert.deepEqual(kaputt, []);
+  }
 });

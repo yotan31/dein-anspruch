@@ -199,8 +199,7 @@ export const B = [
     p: "§ 40 Abs. 1 SGB XI",
     when: () => pg() >= 1 && isHome(),
     val: () => null,
-    short:
-      "Pflegekasse übernimmt die Kosten, Zuzahlung höchstens 10 %, maximal 25 € je Hilfsmittel. Hausnotruf wird in der Regel monatlich bezuschusst.",
+    short: `Pflegekasse übernimmt die Kosten, Zuzahlung höchstens 10 %, maximal ${BETRAEGE.hilfsmittelZuzahlungMax} € je Hilfsmittel. Hausnotruf wird in der Regel monatlich bezuschusst.`,
     steps: [
       "Bedarf klären: Hausnotruf, Pflegebett, Lagerungshilfen, Rollator (bei Krankheit über die Krankenkasse).",
       "Kostenvoranschlag beim Sanitätshaus oder Hausnotruf-Anbieter holen.",
@@ -320,8 +319,7 @@ export const B = [
     when: () => Z.S.bereiche.pflege && Z.S.pp.arbeit && Z.S.pp.arbeit !== "nein",
     val: () => null,
     opt: true,
-    short:
-      "Berufstätige Angehörige können bis zu 10 Arbeitstage im Jahr freinehmen und erhalten 90 % des Nettolohns von der Pflegekasse.",
+    short: `Berufstätige Angehörige können bis zu ${BETRAEGE.pugTage} Arbeitstage im Jahr freinehmen und erhalten ${BETRAEGE.pugProzent} % des Nettolohns von der Pflegekasse.`,
     steps: [
       "Arbeitgeber sofort über die Freistellung informieren.",
       "Ärztliche Bescheinigung über die akute Pflegesituation holen.",
@@ -513,7 +511,7 @@ export const B = [
       return BEHPAUSCH[g] || 0;
     },
     short: () =>
-      `Steuerfreibetrag von ${eur(B.find((x) => x.k === "behpausch").frei())} pro Jahr. Kann auf Eltern oder Kinder übertragen werden, wenn die Person selbst keine Steuern zahlt.`,
+      `Steuerfreibetrag von ${eur(B.find((x) => x.k === "behpausch").frei())} pro Jahr. Bei Kindern können ihn die Eltern übernehmen, wenn sie für das Kind Kindergeld bekommen.`,
     steps: [
       "In der Steuererklärung eintragen (Anlage Außergewöhnliche Belastungen).",
       `Bescheid bzw. Ausweis bereithalten. Bei Pflegegrad 4/5 genügt der Pflegegrad-Bescheid für ${eur(BETRAEGE.behindertenPauschbetragErhoeht)}.`,
@@ -529,7 +527,10 @@ export const B = [
     p: "§ 33 Abs. 2a EStG",
     when: () => gdb() >= 80 || (gdb() >= 70 && mz("G")) || mz("aG") || mz("Bl") || mz("TBl") || mz("H") || pg() >= 4,
     val: () => null,
-    frei: () => (mz("aG") || mz("Bl") || mz("TBl") || mz("H") || pg() >= 4 ? 4500 : 900),
+    frei: () =>
+      mz("aG") || mz("Bl") || mz("TBl") || mz("H") || pg() >= 4
+        ? BETRAEGE.fahrtkostenPauschaleErhoeht
+        : BETRAEGE.fahrtkostenPauschale,
     short: () =>
       `${eur(B.find((x) => x.k === "fahrtpausch").frei())} pro Jahr zusätzlich steuerlich absetzbar, ohne Einzelnachweis.`,
     steps: ["In der Steuererklärung (Anlage Außergewöhnliche Belastungen) eintragen."],
@@ -546,7 +547,7 @@ export const B = [
     short: () =>
       mz("H") || mz("Bl") || Z.S.sb.grundsicherung
         ? "Kostenlose Wertmarke: Bus, Bahn und Regionalverkehr in ganz Deutschland frei."
-        : "Wertmarke für 104 € im Jahr (53 € halbjährlich): Bus, Bahn und Regionalverkehr in ganz Deutschland. Alternative zur Kfz-Steuerermäßigung.",
+        : `Wertmarke für ${BETRAEGE.wertmarkeJahr} € im Jahr (${BETRAEGE.wertmarkeHalbjahr} € halbjährlich): Bus, Bahn und Regionalverkehr in ganz Deutschland. Alternative zur Kfz-Steuerermäßigung.`,
     steps: [
       "Beiblatt mit Wertmarke beim Versorgungsamt beantragen.",
       "Bei Merkzeichen H, Bl oder Bezug von Grundsicherung/Bürgergeld kostenlos.",

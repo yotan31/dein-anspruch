@@ -7,6 +7,7 @@
 // Jede Aussage ist mit Gesetz oder Kassen-Information belegt (siehe quellen) und wird monatlich mitgeprüft.
 import { BETRAEGE } from "../config/betraege.js";
 import { JAHRESBETRAG, PG, VHP_ERSATZ } from "../config/stammdaten.js";
+import { GEPRUEFT, TEXTE } from "./erklaerungen-texte.js";
 import { isHome, pg } from "./lage.js";
 import { eur } from "../utils/format.js";
 
@@ -58,6 +59,7 @@ export function vhpVergleich() {
 
 /** @type {Record<string, () => Erklaerung>} */
 const ERKLAERUNGEN = {
+  ...TEXTE,
   jahresbetrag: () => {
     const grad = Math.max(2, pg());
     const doppelt = PG.pflegegeld[grad] * 2;
@@ -85,7 +87,7 @@ const ERKLAERUNGEN = {
       },
       abschnitte: [
         {
-          titel: "Passt das zu euch?",
+          titel: "Voraussetzungen",
           punkte: [
             "Pflegegrad 2 oder höher, gepflegt wird zu Hause.",
             "Die Person, die sonst pflegt, ist verhindert. Der Grund ist egal: Urlaub, Krankheit, Termine oder einfach Erholung.",
@@ -143,7 +145,7 @@ const ERKLAERUNGEN = {
         },
       ],
       quellen: "§ 39 und § 42a SGB XI in der Fassung ab 1. Januar 2026",
-      geprueft: "24.11.2026",
+      geprueft: GEPRUEFT,
     };
   },
 };
