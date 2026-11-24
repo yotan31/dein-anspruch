@@ -46,6 +46,21 @@ var BETRAEGE = Object.freeze({
   // 2026 erhöht und befristet bis 31.12.2026. Für 2027 prüfen: ohne Verlängerung wieder 10 bzw. 20 Tage.
   kinderkrankTage: 15,
   kinderkrankTageAllein: 30,
+  // Hilfsmittel und Pflegeunterstützungsgeld
+  hilfsmittelZuzahlungMax: 25,
+  // § 40 Abs. 3 SGB XI: 10 %, höchstens 25 € je Hilfsmittel
+  pugTage: 10,
+  // § 44a SGB XI: Arbeitstage je Kalenderjahr
+  pugProzent: 90,
+  // Anteil des ausgefallenen Nettoentgelts
+  // Schwerbehinderung
+  wertmarkeJahr: 104,
+  // § 228 SGB IX, Eigenbeteiligung Wertmarke
+  wertmarkeHalbjahr: 53,
+  fahrtkostenPauschale: 900,
+  // § 33 Abs. 2a EStG
+  fahrtkostenPauschaleErhoeht: 4500,
+  // aG, Bl, TBl, H oder Pflegegrad 4/5
   // Sonstiges
   rundfunkVoll: 18.36,
   rundfunkErmaessigt: 6.12,
@@ -642,7 +657,7 @@ var B = [
     p: "§ 40 Abs. 1 SGB XI",
     when: () => pg() >= 1 && isHome(),
     val: () => null,
-    short: "Pflegekasse übernimmt die Kosten, Zuzahlung höchstens 10 %, maximal 25 € je Hilfsmittel. Hausnotruf wird in der Regel monatlich bezuschusst.",
+    short: `Pflegekasse übernimmt die Kosten, Zuzahlung höchstens 10 %, maximal ${BETRAEGE.hilfsmittelZuzahlungMax} € je Hilfsmittel. Hausnotruf wird in der Regel monatlich bezuschusst.`,
     steps: [
       "Bedarf klären: Hausnotruf, Pflegebett, Lagerungshilfen, Rollator (bei Krankheit über die Krankenkasse).",
       "Kostenvoranschlag beim Sanitätshaus oder Hausnotruf-Anbieter holen.",
@@ -755,7 +770,7 @@ var B = [
     when: () => Z.S.bereiche.pflege && Z.S.pp.arbeit && Z.S.pp.arbeit !== "nein",
     val: () => null,
     opt: true,
-    short: "Berufstätige Angehörige können bis zu 10 Arbeitstage im Jahr freinehmen und erhalten 90 % des Nettolohns von der Pflegekasse.",
+    short: `Berufstätige Angehörige können bis zu ${BETRAEGE.pugTage} Arbeitstage im Jahr freinehmen und erhalten ${BETRAEGE.pugProzent} % des Nettolohns von der Pflegekasse.`,
     steps: [
       "Arbeitgeber sofort über die Freistellung informieren.",
       "Ärztliche Bescheinigung über die akute Pflegesituation holen.",
@@ -935,7 +950,7 @@ var B = [
       const g = Math.min(100, Math.floor(gdb() / 10) * 10);
       return BEHPAUSCH[g] || 0;
     },
-    short: () => `Steuerfreibetrag von ${eur(B.find((x) => x.k === "behpausch").frei())} pro Jahr. Kann auf Eltern oder Kinder übertragen werden, wenn die Person selbst keine Steuern zahlt.`,
+    short: () => `Steuerfreibetrag von ${eur(B.find((x) => x.k === "behpausch").frei())} pro Jahr. Bei Kindern können ihn die Eltern übernehmen, wenn sie für das Kind Kindergeld bekommen.`,
     steps: [
       "In der Steuererklärung eintragen (Anlage Außergewöhnliche Belastungen).",
       `Bescheid bzw. Ausweis bereithalten. Bei Pflegegrad 4/5 genügt der Pflegegrad-Bescheid für ${eur(BETRAEGE.behindertenPauschbetragErhoeht)}.`,
@@ -951,7 +966,7 @@ var B = [
     p: "§ 33 Abs. 2a EStG",
     when: () => gdb() >= 80 || gdb() >= 70 && mz("G") || mz("aG") || mz("Bl") || mz("TBl") || mz("H") || pg() >= 4,
     val: () => null,
-    frei: () => mz("aG") || mz("Bl") || mz("TBl") || mz("H") || pg() >= 4 ? 4500 : 900,
+    frei: () => mz("aG") || mz("Bl") || mz("TBl") || mz("H") || pg() >= 4 ? BETRAEGE.fahrtkostenPauschaleErhoeht : BETRAEGE.fahrtkostenPauschale,
     short: () => `${eur(B.find((x) => x.k === "fahrtpausch").frei())} pro Jahr zusätzlich steuerlich absetzbar, ohne Einzelnachweis.`,
     steps: ["In der Steuererklärung (Anlage Außergewöhnliche Belastungen) eintragen."],
     docs: ["Ausweis/Bescheid"],
@@ -964,7 +979,7 @@ var B = [
     p: "§ 228 SGB IX",
     when: () => Z.S.sb.status === "ja" && (mz("G") || mz("aG") || mz("Gl") || mz("H") || mz("Bl")),
     val: () => null,
-    short: () => mz("H") || mz("Bl") || Z.S.sb.grundsicherung ? "Kostenlose Wertmarke: Bus, Bahn und Regionalverkehr in ganz Deutschland frei." : "Wertmarke für 104 € im Jahr (53 € halbjährlich): Bus, Bahn und Regionalverkehr in ganz Deutschland. Alternative zur Kfz-Steuerermäßigung.",
+    short: () => mz("H") || mz("Bl") || Z.S.sb.grundsicherung ? "Kostenlose Wertmarke: Bus, Bahn und Regionalverkehr in ganz Deutschland frei." : `Wertmarke für ${BETRAEGE.wertmarkeJahr} € im Jahr (${BETRAEGE.wertmarkeHalbjahr} € halbjährlich): Bus, Bahn und Regionalverkehr in ganz Deutschland. Alternative zur Kfz-Steuerermäßigung.`,
     steps: [
       "Beiblatt mit Wertmarke beim Versorgungsamt beantragen.",
       "Bei Merkzeichen H, Bl oder Bezug von Grundsicherung/Bürgergeld kostenlos.",
